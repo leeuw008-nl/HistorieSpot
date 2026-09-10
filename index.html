@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="theme-color" content="#0b5cab">
+  <meta name="description"
+        content="HistorieSpot laat zien wat er nu en vroeger op een locatie te vinden was.">
+
+  <title>HistorieSpot</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- App-icoon -->
+  <link rel="icon" href="icons/icon-192.png">
+
+  <!-- Leaflet kaart -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIINfQ3pKq2Vq9H7J7kJ2Kk9n5Z5K5J5K5M="
+        crossorigin=""/>
+
+  <!-- Eigen stijl -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header class="app-header">
+    <h1>HistorieSpot</h1>
+    <p>Ontdek de geschiedenis van de plek waar je staat</p>
+  </header>
+
+  <main>
+
+    <section class="controls">
+
+      <button id="locateBtn" type="button">
+        📍 Waar ben ik?
+      </button>
+
+      <label for="radius">
+        Zoekradius
+      </label>
+
+      <select id="radius">
+        <option value="25">25 meter</option>
+        <option value="50" selected>50 meter</option>
+        <option value="100">100 meter</option>
+        <option value="250">250 meter</option>
+        <option value="500">500 meter</option>
+      </select>
+
+    </section>
+
+    <section id="status" class="status">
+      Druk op ‘Waar ben ik?’ om de huidige positie te bepalen.
+    </section>
+
+    <section class="map-section">
+      <div id="map"></div>
+    </section>
+
+    <section class="results-section">
+
+      <h2>Objecten in de omgeving</h2>
+
+      <div id="results">
+        <p>
+          Nog geen locatie bepaald.
+        </p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer>
+    <small>
+      HistorieSpot · Actuele gebouwgegevens:
+      PDOK / Kadaster BAG
+    </small>
+  </footer>
+
+  <!-- Leaflet JavaScript -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin="">
+  </script>
+
+  <!-- Eigen JavaScript -->
+  <script src="app.js"></script>
+
+</body>
+</html>
