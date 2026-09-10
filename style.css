@@ -1,0 +1,208 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f6f9;
+  color: #1d2a35;
+}
+
+/* =========================
+   HEADER
+   ========================= */
+
+.app-header {
+  background: #0b5cab;
+  color: white;
+  padding: 20px 16px;
+  text-align: center;
+}
+
+.app-header h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+}
+
+.app-header p {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.92;
+}
+
+/* =========================
+   MAIN
+   ========================= */
+
+main {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 15px;
+}
+
+/* =========================
+   BEDIENING
+   ========================= */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.controls label {
+  font-weight: bold;
+}
+
+button,
+select {
+  font-family: inherit;
+  font-size: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+button {
+  border: none;
+  background: #0b5cab;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #084b8c;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+select {
+  border: 1px solid #b8c5d1;
+  background: white;
+  color: #1d2a35;
+}
+
+/* =========================
+   STATUS
+   ========================= */
+
+.status {
+  background: white;
+  border-left: 4px solid #0b5cab;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* =========================
+   KAART
+   ========================= */
+
+.map-section {
+  width: 100%;
+}
+
+#map {
+  width: 100%;
+  height: 480px;
+  background: #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* =========================
+   RESULTATEN
+   ========================= */
+
+.results-section h2 {
+  margin: 22px 0 12px;
+  font-size: 22px;
+}
+
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.card h3 {
+  margin: 0 0 9px;
+  color: #0b5cab;
+}
+
+.meta {
+  margin: 5px 0;
+  line-height: 1.4;
+}
+
+/* =========================
+   FOOTER
+   ========================= */
+
+footer {
+  text-align: center;
+  padding: 20px 15px;
+  color: #64717c;
+}
+
+/* =========================
+   MOBIEL
+   ========================= */
+
+@media (max-width: 600px) {
+
+  .app-header {
+    padding: 16px 12px;
+  }
+
+  .app-header h1 {
+    font-size: 26px;
+  }
+
+  .app-header p {
+    font-size: 14px;
+  }
+
+  main {
+    padding: 10px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .controls button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .controls label {
+    align-self: center;
+  }
+
+  .controls select {
+    width: 100%;
+  }
+
+  #map {
+    height: 55vh;
+    min-height: 350px;
+  }
+
+  .results-section h2 {
+    font-size: 20px;
+  }
+}
