@@ -1,0 +1,26 @@
+{
+  "name": "HistorieSpot",
+  "short_name": "HistorieSpot",
+  "description": "Ontdek de geschiedenis van de plek waar je staat.",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0b5cab",
+  "background_color": "#f3f6f9",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
