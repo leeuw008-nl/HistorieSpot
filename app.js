@@ -692,26 +692,23 @@ async function testMinuutplanWFS() {
 
         const bounds = map.getBounds();
 
-        // Leaflet-kaart gebruikt EPSG:3857.
-        // Daarom vragen we de WFS ook in EPSG:3857 op.
-
-        const sw = map.options.crs.project(bounds.getSouthWest());
-        const ne = map.options.crs.project(bounds.getNorthEast());
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
 
         const bbox = [
-            sw.x,
-            sw.y,
-            ne.x,
-            ne.y
+            sw.lng,
+            sw.lat,
+            ne.lng,
+            ne.lat
         ].join(",");
 
         const url =
             "https://services.rce.geovoorziening.nl/misc/wfs" +
             "?service=WFS" +
-            "&version=1.1.0" +
+            "&version=2.0.0" +
             "&request=GetFeature" +
-            "&typeName=misc:Minuutplanbegrenzingen" +
-            "&srsName=EPSG:3857" +
+            "&typeNames=misc:Minuutplanbegrenzingen" +
+            "&srsName=EPSG:4326" +
             "&bbox=" + encodeURIComponent(bbox) +
             "&outputFormat=application/json";
 
