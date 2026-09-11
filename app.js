@@ -683,12 +683,76 @@ const minuutplanLayer = L.tileLayer.wms(
 // Voeg de laag toe via de knop hieronder.
 minuutplanLayer.addTo(map);
 // ========================================
-// TEST RCE WFS - EERSTE MINUUTPLAN
+// HISTORIEPUNT - KLIKBARE MINUUTPLANS
+// RCE Kadastrale Minuutplans 1811-1832
 // ========================================
 
-async function testMinuutplanWFS() {
+// WGS84 -> RD New
+function wgs84ToRD(lat, lon) {
+
+    const dF = 0.36 * (lat - 52.15517440);
+    const dL = 0.36 * (lon - 5.38720621);
+
+    const x =
+        155000
+        + 190094.945 * dL
+        - 11832.228 * dF * dL
+        - 114.221 * Math.pow(dF, 2) * dL
+        - 32.391 * Math.pow(dL, 3)
+        - 0.705 * dF
+        - 2.340 * Math.pow(dF, 3) * dL
+        - 0.608 * dF * Math.pow(dL, 3)
+        - 0.008 * Math.pow(dL, 2)
+        + 0.148 * Math.pow(dF, 2) * Math.pow(dL, 3);
+
+    const y =
+        463000
+        + 309056.544 * dF
+        + 3638.893 * Math.pow(dL, 2)
+        + 73.077 * Math.pow(dF, 2)
+        - 157.984 * dF * Math.pow(dL, 2)
+        + 59.788 * Math.pow(dF, 3)
+        + 0.433 * dL
+        - 6.439 * Math.pow(dF, 2) * Math.pow(dL, 2)
+        - 0.032 * dF * dL
+        + 0.092 * Math.pow(dL, 4)
+        - 0.054 * dF * Math.pow(dL, 4);
+
+    return {
+        x: x,
+        y: y
+    };
+}
+
+
+// Klik op de kaart
+map.on("click", async function (e) {
+
+    // Alleen actief wanneer historische laag zichtbaar is
+    if (!map.hasLayer(minuutplanLayer)) {
+        return;
+    }
 
     try {
+
+        // Klikpunt omzetten naar RD New
+        const rd = wgs84ToRD(
+            e.latlng.lat,
+            e.latlng.lng
+        );
+
+        // Zoekgebied rond klikpunt: 20 meter
+        const minX = rd.x - 20;
+        const maxX = rd.x + 20;
+        const minY = rd.y - 20;
+        const maxY = rd.y + 20;
+
+        const bbox = [
+            minX,
+            minY,
+            maxX,
+            maxY
+        ].join(",");
 
         const url =
             "https://services.rce.geovoorziening.nl/misc/wfs" +
@@ -696,60 +760,114 @@ async function testMinuutplanWFS() {
             "&version=2.0.0" +
             "&request=GetFeature" +
             "&typeNames=misc:Minuutplanbegrenzingen" +
+            "&srsName=EPSG:28992" +
+            "&bbox=" + encodeURIComponent(bbox) +
             "&outputFormat=application/json" +
-            "&count=1";
+            "&count=5";
 
-        console.log("RCE WFS test:");
-        console.log(url);
+        console.log("RCE minuutplan klik:", e.latlng);
+        console.log("RD-coördinaten:", rd);
+        console.log("WFS:", url);
 
         const response = await fetch(url);
 
-        console.log("HTTP-status:", response.status);
-        console.log(
-            "Content-Type:",
-            response.headers.get("content-type")
-        );
-
-        const text = await response.text();
-
-        console.log("Ruwe respons:");
-        console.log(text);
-
-        const data = JSON.parse(text);
-
-        console.log("WFS-resultaat:");
-        console.log(data);
-
-        console.log(
-            "Aantal features:",
-            data.features ? data.features.length : 0
-        );
-
-        if (data.features && data.features.length > 0) {
-
-            console.log("EERSTE FEATURE:");
-            console.log(data.features[0]);
-
-            console.log("ATTRIBUTEN:");
-            console.log(data.features[0].properties);
-
-            console.log("GEOMETRIE:");
-            console.log(data.features[0].geometry);
-
-        } else {
-
-            console.log("WFS geeft geen features terug.");
-
+        if (!response.ok) {
+            throw new Error(
+                "RCE WFS HTTP " + response.status
+            );
         }
 
-    } catch (error) {
+        const data = await response.json();
+
+        console.log("RCE resultaat:", data);
+
+        if (
+            !data.features ||
+            data.features.length === 0
+        ) {
+
+            console.log(
+                "Geen minuutplan op deze locatie."
+            );
+
+            return;
+        }
+
+        const p = data.features[0].properties;
+
+        let popupContent = `
+            <div style="min-width:240px">
+
+                <strong style="font-size:16px">
+                    🕰 Kadastraal minuutplan
+                </strong>
+
+                <br>
+
+                <small>
+                    Rijksdienst voor het Cultureel Erfgoed
+                </small>
+
+                <hr>
+
+                <strong>Periode:</strong><br>
+                1811–1832
+
+                <br><br>
+
+                <strong>Gemeente:</strong><br>
+                ${p.GEMEENTE || "onbekend"}
+
+                <br><br>
+
+                <strong>Sectie:</strong>
+                ${p.SECTIE || ""}
+
+                <br>
+
+                <strong>Blad:</strong>
+                ${p.BLAD || ""}
+
+                <br><br>
+
+                <strong>Code:</strong><br>
+                ${p.CODE || ""}
+
+                <br><br>
+
+                <a
+                    href="${p.URL}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="
+                        display:inline-block;
+                        padding:8px 12px;
+                        background:#1d5d8f;
+                        color:white;
+                        text-decoration:none;
+                        border-radius:5px;
+                    "
+                >
+                    Bekijk originele minuutplan
+                </a>
+
+            </div>
+        `;
+
+        L.popup()
+            .setLatLng(e.latlng)
+            .setContent(popupContent)
+            .openOn(map);
+
+    }
+
+    catch (error) {
 
         console.error(
-            "Fout bij RCE WFS-test:",
+            "Fout bij ophalen minuutplan:",
             error
         );
 
     }
-}
 
-testMinuutplanWFS();
+});
