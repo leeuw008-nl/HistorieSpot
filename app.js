@@ -690,10 +690,11 @@ async function testMinuutplanWFS() {
 
     try {
 
-        // Huidige kaartuitsnede
         const bounds = map.getBounds();
 
-        // Omzetten van Leaflet/WGS84 naar RD New (EPSG:28992)
+        // Leaflet-kaart gebruikt EPSG:3857.
+        // Daarom vragen we de WFS ook in EPSG:3857 op.
+
         const sw = map.options.crs.project(bounds.getSouthWest());
         const ne = map.options.crs.project(bounds.getNorthEast());
 
@@ -710,7 +711,7 @@ async function testMinuutplanWFS() {
             "&version=1.1.0" +
             "&request=GetFeature" +
             "&typeName=misc:Minuutplanbegrenzingen" +
-            "&srsName=EPSG:28992" +
+            "&srsName=EPSG:3857" +
             "&bbox=" + encodeURIComponent(bbox) +
             "&outputFormat=application/json";
 
@@ -727,49 +728,33 @@ async function testMinuutplanWFS() {
         console.log("Ruwe RCE WFS-respons:");
         console.log(text);
 
-        // Probeer JSON
-        try {
+        const data = JSON.parse(text);
 
-            const data = JSON.parse(text);
+        console.log("RCE WFS JSON:");
+        console.log(data);
 
-            console.log("RCE WFS JSON:");
-            console.log(data);
+        console.log(
+            "Aantal gevonden minuutplan-secties:",
+            data.features ? data.features.length : 0
+        );
 
-            if (data.features && data.features.length > 0) {
-
-                console.log(
-                    "Aantal gevonden minuutplan-secties:",
-                    data.features.length
-                );
-
-                console.log(
-                    "Eerste gevonden sectie:",
-                    data.features[0]
-                );
-
-                console.log(
-                    "Gegevens eerste sectie:",
-                    data.features[0].properties
-                );
-
-            } else {
-
-                console.log(
-                    "Geen minuutplan-secties gevonden in de huidige kaartuitsnede."
-                );
-
-            }
-
-            return;
-        }
-
-        catch (jsonError) {
+        if (data.features && data.features.length > 0) {
 
             console.log(
-                "Respons is geen JSON; waarschijnlijk XML/GML."
+                "Eerste gevonden sectie:",
+                data.features[0]
             );
 
-            console.log(text);
+            console.log(
+                "Gegevens eerste sectie:",
+                data.features[0].properties
+            );
+
+        } else {
+
+            console.log(
+                "Geen minuutplan-secties gevonden in de huidige kaartuitsnede."
+            );
 
         }
 
@@ -783,5 +768,4 @@ async function testMinuutplanWFS() {
     }
 }
 
-// Test automatisch bij het laden
 testMinuutplanWFS();
