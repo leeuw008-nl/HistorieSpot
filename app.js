@@ -682,3 +682,106 @@ const minuutplanLayer = L.tileLayer.wms(
 // Historische laag standaard uitgeschakeld.
 // Voeg de laag toe via de knop hieronder.
 minuutplanLayer.addTo(map);
+// ========================================
+// TEST RCE WFS - MINUUTPLANBEGRENZINGEN
+// ========================================
+
+async function testMinuutplanWFS() {
+
+    try {
+
+        // Huidige kaartuitsnede
+        const bounds = map.getBounds();
+
+        // Omzetten van Leaflet/WGS84 naar RD New (EPSG:28992)
+        const sw = map.options.crs.project(bounds.getSouthWest());
+        const ne = map.options.crs.project(bounds.getNorthEast());
+
+        const bbox = [
+            sw.x,
+            sw.y,
+            ne.x,
+            ne.y
+        ].join(",");
+
+        const url =
+            "https://services.rce.geovoorziening.nl/misc/wfs" +
+            "?service=WFS" +
+            "&version=1.1.0" +
+            "&request=GetFeature" +
+            "&typeName=misc:Minuutplanbegrenzingen" +
+            "&srsName=EPSG:28992" +
+            "&bbox=" + encodeURIComponent(bbox) +
+            "&outputFormat=application/json";
+
+        console.log("RCE WFS aanvraag:");
+        console.log(url);
+
+        const response = await fetch(url);
+
+        console.log("HTTP-status:", response.status);
+        console.log("Content-Type:", response.headers.get("content-type"));
+
+        const text = await response.text();
+
+        console.log("Ruwe RCE WFS-respons:");
+        console.log(text);
+
+        // Probeer JSON
+        try {
+
+            const data = JSON.parse(text);
+
+            console.log("RCE WFS JSON:");
+            console.log(data);
+
+            if (data.features && data.features.length > 0) {
+
+                console.log(
+                    "Aantal gevonden minuutplan-secties:",
+                    data.features.length
+                );
+
+                console.log(
+                    "Eerste gevonden sectie:",
+                    data.features[0]
+                );
+
+                console.log(
+                    "Gegevens eerste sectie:",
+                    data.features[0].properties
+                );
+
+            } else {
+
+                console.log(
+                    "Geen minuutplan-secties gevonden in de huidige kaartuitsnede."
+                );
+
+            }
+
+            return;
+        }
+
+        catch (jsonError) {
+
+            console.log(
+                "Respons is geen JSON; waarschijnlijk XML/GML."
+            );
+
+            console.log(text);
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Fout bij testen RCE WFS:",
+            error
+        );
+
+    }
+}
+
+// Test automatisch bij het laden
+testMinuutplanWFS();
