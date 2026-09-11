@@ -805,12 +805,19 @@ console.log("Minuutplancode:", minuutplanCode);
 
 if (minuutplanCode) {
 
-    // Eventuele vorige historische kaart verwijderen
+    // ----------------------------------------
+    // Vorige historische laag verwijderen
+    // ----------------------------------------
+
     if (window.historischeMinuutplanLayer) {
         map.removeLayer(window.historischeMinuutplanLayer);
+        window.historischeMinuutplanLayer = null;
     }
 
+    // ----------------------------------------
     // Nieuwe historische kaartlaag
+    // ----------------------------------------
+
     window.historischeMinuutplanLayer = L.tileLayer(
         "https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut" +
         minuutplanCode +
@@ -829,8 +836,173 @@ if (minuutplanCode) {
         "Historische minuutplanlaag toegevoegd:",
         minuutplanCode
     );
+
+    // ----------------------------------------
+    // Historische kaartbediening
+    // ----------------------------------------
+
+    if (!window.historischeOpacityControl) {
+
+        window.historischeOpacityControl = L.control({
+            position: "topright"
+        });
+
+        window.historischeOpacityControl.onAdd =
+            function () {
+
+                const div =
+                    L.DomUtil.create(
+                        "div",
+                        "leaflet-control"
+                    );
+
+                div.id =
+                    "historischeKaartControl";
+
+                div.style.background =
+                    "white";
+
+                div.style.padding =
+                    "10px";
+
+                div.style.borderRadius =
+                    "6px";
+
+                div.style.boxShadow =
+                    "0 1px 5px rgba(0,0,0,0.4)";
+
+                div.style.width =
+                    "180px";
+
+                div.innerHTML = `
+
+                    <div style="
+                        font-weight:bold;
+                        margin-bottom:6px;
+                    ">
+                        Historische kaart
+                    </div>
+
+                    <div style="
+                        font-size:12px;
+                        margin-bottom:6px;
+                    ">
+                        Minuutplan
+                        <strong>
+                            ${minuutplanCode}
+                        </strong>
+                    </div>
+
+                    <input
+                        id="historischeOpacity"
+                        type="range"
+                        min="0"
+                        max="100"
+                        value="55"
+                        style="width:100%;"
+                    >
+
+                    <div style="
+                        text-align:center;
+                        font-size:12px;
+                        margin-top:3px;
+                    ">
+                        Zichtbaarheid:
+                        <span id="historischeOpacityValue">
+                            55
+                        </span>%
+                    </div>
+
+                `;
+
+                L.DomEvent.disableClickPropagation(
+                    div
+                );
+
+                return div;
+            };
+
+        window.historischeOpacityControl.addTo(
+            map
+        );
+
+        // ----------------------------------------
+        // Slider koppelen
+        // ----------------------------------------
+
+        setTimeout(function () {
+
+            const slider =
+                document.getElementById(
+                    "historischeOpacity"
+                );
+
+            const value =
+                document.getElementById(
+                    "historischeOpacityValue"
+                );
+
+            if (slider) {
+
+                slider.addEventListener(
+                    "input",
+                    function () {
+
+                        const opacity =
+                            Number(this.value) / 100;
+
+                        if (
+                            window.historischeMinuutplanLayer
+                        ) {
+
+                            window.historischeMinuutplanLayer
+                                .setOpacity(opacity);
+
+                        }
+
+                        if (value) {
+                            value.textContent =
+                                this.value;
+                        }
+
+                    }
+                );
+
+            }
+
+        }, 100);
+
+    }
+
+    else {
+
+        // ----------------------------------------
+        // Bestaande bediening bijwerken
+        // ----------------------------------------
+
+        const control =
+            document.getElementById(
+                "historischeKaartControl"
+            );
+
+        if (control) {
+
+            const codeElement =
+                control.querySelector(
+                    "strong"
+                );
+
+            if (codeElement) {
+                codeElement.textContent =
+                    minuutplanCode;
+            }
+
+        }
+
+    }
+
 }
-      // ========================================
+// ========================================
 // TRANSPARANTIE HISTORISCHE KAART
 // ========================================
 
