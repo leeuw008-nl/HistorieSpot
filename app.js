@@ -1,7 +1,9 @@
+```javascript
 // ========================================
 // HistorieSpot
 // GPS + PDOK/Kadaster BAG
 // ========================================
+
 
 // ----------------------------------------
 // Kaart initialiseren
@@ -21,6 +23,10 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 let currentMarker = null;
 let accuracyCircle = null;
+let searchCircle = null;
+
+let currentLatitude = null;
+let currentLongitude = null;
 
 const objectLayer = L.layerGroup().addTo(map);
 
@@ -47,17 +53,56 @@ locateBtn.addEventListener("click", locateUser);
 
 
 // ----------------------------------------
+// Zoekradius gewijzigd
+// ----------------------------------------
+
+radiusSelect.addEventListener("change", function () {
+
+  const radius = Number(radiusSelect.value);
+
+  // Als er nog geen GPS-positie is:
+  if (
+    currentLatitude === null ||
+    currentLongitude === null
+  ) {
+    setStatus(
+      "Druk op ‘Waar ben ik?’ om eerst de huidige positie te bepalen."
+    );
+
+    return;
+  }
+
+  // Zoekcirkel aanpassen
+  updateSearchCircle(
+    currentLatitude,
+    currentLongitude,
+    radius
+  );
+
+  // BAG opnieuw ophalen
+  loadBAG(
+    currentLatitude,
+    currentLongitude,
+    radius
+  );
+});
+
+
+// ----------------------------------------
 // GPS-locatie bepalen
 // ----------------------------------------
 
 function locateUser() {
 
   if (!navigator.geolocation) {
+
     setStatus(
       "Deze browser ondersteunt geen locatiebepaling."
     );
+
     return;
   }
+
 
   setStatus(
     "📍 Locatie wordt bepaald..."
@@ -65,12 +110,17 @@ function locateUser() {
 
   locateBtn.disabled = true;
 
+
   navigator.geolocation.getCurrentPosition(
 
+    // ------------------------------------
     // Succes
+    // ------------------------------------
+
     function(position) {
 
       locateBtn.disabled = false;
+
 
       const latitude =
         position.coords.latitude;
@@ -85,24 +135,52 @@ function locateUser() {
         Number(radiusSelect.value);
 
 
+      // Positie bewaren
+      currentLatitude = latitude;
+      currentLongitude = longitude;
+
+
+      // ----------------------------------
       // Kaart naar huidige positie
+      // ----------------------------------
+
       map.setView(
         [latitude, longitude],
         18
       );
 
 
-      // Oude positie verwijderen
+      // ----------------------------------
+      // Oude GPS-marker verwijderen
+      // ----------------------------------
+
       if (currentMarker) {
         map.removeLayer(currentMarker);
       }
+
+
+      // ----------------------------------
+      // Oude nauwkeurigheid verwijderen
+      // ----------------------------------
 
       if (accuracyCircle) {
         map.removeLayer(accuracyCircle);
       }
 
 
-      // Marker
+      // ----------------------------------
+      // Oude zoekcirkel verwijderen
+      // ----------------------------------
+
+      if (searchCircle) {
+        map.removeLayer(searchCircle);
+      }
+
+
+      // ----------------------------------
+      // GPS-marker
+      // ----------------------------------
+
       currentMarker = L.marker([
         latitude,
         longitude
@@ -114,36 +192,64 @@ function locateUser() {
       .openPopup();
 
 
-      // Nauwkeurigheidscirkel
+      // ----------------------------------
+      // GPS-nauwkeurigheid
+      // ----------------------------------
+
       accuracyCircle = L.circle(
         [latitude, longitude],
         {
           radius: accuracy,
           color: "#0b5cab",
-          fillOpacity: 0.08
+          fillOpacity: 0.08,
+          weight: 2
         }
       ).addTo(map);
 
 
-      setStatus(
-        `Locatie gevonden. Nauwkeurigheid ongeveer ${accuracy} meter. ` +
-        `BAG-objecten binnen ${radius} meter worden opgezocht...`
+      // ----------------------------------
+      // Zoekcirkel
+      // ----------------------------------
+
+      updateSearchCircle(
+        latitude,
+        longitude,
+        radius
       );
 
 
+      // ----------------------------------
+      // Status
+      // ----------------------------------
+
+      setStatus(
+        `📍 Locatie gevonden. ` +
+        `Nauwkeurigheid ongeveer ${accuracy} meter. ` +
+        `Zoekgebied: ${radius} meter.`
+      );
+
+
+      // ----------------------------------
       // BAG ophalen
+      // ----------------------------------
+
       loadBAG(
         latitude,
         longitude,
         radius
       );
+
     },
 
 
+    // ------------------------------------
     // Fout
+    // ------------------------------------
+
     function(error) {
 
       locateBtn.disabled = false;
+
 
       if (error.code === 1) {
 
@@ -152,19 +258,27 @@ function locateUser() {
           "Geef HistorieSpot toestemming om de locatie te gebruiken."
         );
 
-      } else if (error.code === 2) {
+      }
+
+      else if (error.code === 2) {
 
         setStatus(
-          "⚠️ De locatie kon niet worden bepaald."
+          "⚠️ De locatie kon niet worden bepaald. " +
+          "Controleer of GPS/locatievoorzieningen zijn ingeschakeld."
         );
 
-      } else if (error.code === 3) {
+      }
+
+      else if (error.code === 3) {
 
         setStatus(
-          "⚠️ Het bepalen van de locatie duurde te lang."
+          "⚠️ Het bepalen van de locatie duurde te lang. " +
+          "Probeer het opnieuw."
         );
 
-      } else {
+      }
+
+      else {
 
         setStatus(
           "⚠️ Er is een onbekende locatiefout opgetreden."
@@ -173,13 +287,43 @@ function locateUser() {
     },
 
 
+    // ------------------------------------
     // GPS-instellingen
+    // ------------------------------------
+
     {
       enableHighAccuracy: true,
       timeout: 15000,
       maximumAge: 30000
     }
   );
+}
+
+
+// ----------------------------------------
+// Zoekcirkel tekenen / aanpassen
+// ----------------------------------------
+
+function updateSearchCircle(
+  latitude,
+  longitude,
+  radius
+) {
+
+  if (searchCircle) {
+    map.removeLayer(searchCircle);
+  }
+
+
+  searchCircle = L.circle(
+    [latitude, longitude],
+    {
+      radius: radius,
+      color: "#0b5cab",
+      weight: 2,
+      fillOpacity: 0.04
+    }
+  ).addTo(map);
 }
 
 
@@ -233,6 +377,7 @@ async function loadBAG(
 
   objectLayer.clearLayers();
 
+
   resultsBox.innerHTML =
     "<p>⏳ BAG-gegevens worden opgehaald...</p>";
 
@@ -280,9 +425,13 @@ async function loadBAG(
       data.features || [];
 
 
+    // ------------------------------------
     // Afstand tot ieder gebouw bepalen
+    // ------------------------------------
+
     const nearbyObjects =
       features
+
         .map(function(feature) {
 
           const center =
@@ -290,6 +439,7 @@ async function loadBAG(
 
           let distance =
             Infinity;
+
 
           if (center) {
 
@@ -302,11 +452,13 @@ async function loadBAG(
               );
           }
 
+
           return {
             feature: feature,
             center: center,
             distance: distance
           };
+
         })
 
 
@@ -332,6 +484,7 @@ async function loadBAG(
 
   }
 
+
   catch (error) {
 
     console.error(
@@ -342,6 +495,7 @@ async function loadBAG(
 
     resultsBox.innerHTML =
       "<p>⚠️ De BAG-gegevens konden niet worden opgehaald.</p>";
+
 
     setStatus(
       "⚠️ PDOK kon niet worden bereikt. " +
@@ -490,9 +644,11 @@ function displayResults(
     resultsBox.innerHTML =
       "<p>Geen BAG-gebouwen binnen de gekozen zoekradius gevonden.</p>";
 
+
     setStatus(
       "Geen BAG-objecten binnen de gekozen radius."
     );
+
 
     return;
   }
@@ -550,6 +706,7 @@ function displayResults(
           }
         }
       )
+
       .bindPopup(
         `
         <strong>HistorieSpot BAG-object</strong><br>
@@ -561,6 +718,7 @@ function displayResults(
         )}
         `
       )
+
       .addTo(objectLayer);
 
 
@@ -572,6 +730,7 @@ function displayResults(
         document.createElement(
           "article"
         );
+
 
       card.className =
         "card";
@@ -662,3 +821,4 @@ function escapeHTML(
       "&#039;"
     );
 }
+```
