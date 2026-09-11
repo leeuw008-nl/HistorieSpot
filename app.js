@@ -794,7 +794,42 @@ map.on("click", async function (e) {
         }
 
         const p = data.features[0].properties;
+// ========================================
+// HISTORISCHE MINUUTPLAN-LAAG
+// HisGIS - gegeorefereerde minuutplans
+// ========================================
 
+const minuutplanCode = p.CODE;
+
+console.log("Minuutplancode:", minuutplanCode);
+
+if (minuutplanCode) {
+
+    // Eventuele vorige historische kaart verwijderen
+    if (window.historischeMinuutplanLayer) {
+        map.removeLayer(window.historischeMinuutplanLayer);
+    }
+
+    // Nieuwe historische kaartlaag
+    window.historischeMinuutplanLayer = L.tileLayer(
+        "https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut" +
+        minuutplanCode +
+        "*",
+        {
+            opacity: 0.55,
+            maxZoom: 20,
+            attribution:
+                "Historische kaart: HisGIS / RCE"
+        }
+    );
+
+    window.historischeMinuutplanLayer.addTo(map);
+
+    console.log(
+        "Historische minuutplanlaag toegevoegd:",
+        minuutplanCode
+    );
+}
         let popupContent = `
             <div style="min-width:240px">
 
