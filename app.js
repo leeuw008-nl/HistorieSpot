@@ -681,3 +681,4 @@ const minuutplanLayer = L.tileLayer.wms(
 
 // Historische laag standaard uitgeschakeld.
 // Voeg de laag toe via de knop hieronder.
+minuutplanLayer.addTo(map);
