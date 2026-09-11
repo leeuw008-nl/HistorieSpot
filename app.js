@@ -683,24 +683,12 @@ const minuutplanLayer = L.tileLayer.wms(
 // Voeg de laag toe via de knop hieronder.
 minuutplanLayer.addTo(map);
 // ========================================
-// TEST RCE WFS - MINUUTPLANBEGRENZINGEN
+// TEST RCE WFS - EERSTE MINUUTPLAN
 // ========================================
 
 async function testMinuutplanWFS() {
 
     try {
-
-        const bounds = map.getBounds();
-
-        const sw = bounds.getSouthWest();
-        const ne = bounds.getNorthEast();
-
-        const bbox = [
-            sw.lng,
-            sw.lat,
-            ne.lng,
-            ne.lat
-        ].join(",");
 
         const url =
             "https://services.rce.geovoorziening.nl/misc/wfs" +
@@ -708,57 +696,56 @@ async function testMinuutplanWFS() {
             "&version=2.0.0" +
             "&request=GetFeature" +
             "&typeNames=misc:Minuutplanbegrenzingen" +
-            "&srsName=EPSG:4326" +
-            "&bbox=" + encodeURIComponent(bbox) +
-            "&outputFormat=application/json";
+            "&outputFormat=application/json" +
+            "&count=1";
 
-        console.log("RCE WFS aanvraag:");
+        console.log("RCE WFS test:");
         console.log(url);
 
         const response = await fetch(url);
 
         console.log("HTTP-status:", response.status);
-        console.log("Content-Type:", response.headers.get("content-type"));
+        console.log(
+            "Content-Type:",
+            response.headers.get("content-type")
+        );
 
         const text = await response.text();
 
-        console.log("Ruwe RCE WFS-respons:");
+        console.log("Ruwe respons:");
         console.log(text);
 
         const data = JSON.parse(text);
 
-        console.log("RCE WFS JSON:");
+        console.log("WFS-resultaat:");
         console.log(data);
 
         console.log(
-            "Aantal gevonden minuutplan-secties:",
+            "Aantal features:",
             data.features ? data.features.length : 0
         );
 
         if (data.features && data.features.length > 0) {
 
-            console.log(
-                "Eerste gevonden sectie:",
-                data.features[0]
-            );
+            console.log("EERSTE FEATURE:");
+            console.log(data.features[0]);
 
-            console.log(
-                "Gegevens eerste sectie:",
-                data.features[0].properties
-            );
+            console.log("ATTRIBUTEN:");
+            console.log(data.features[0].properties);
+
+            console.log("GEOMETRIE:");
+            console.log(data.features[0].geometry);
 
         } else {
 
-            console.log(
-                "Geen minuutplan-secties gevonden in de huidige kaartuitsnede."
-            );
+            console.log("WFS geeft geen features terug.");
 
         }
 
     } catch (error) {
 
         console.error(
-            "Fout bij testen RCE WFS:",
+            "Fout bij RCE WFS-test:",
             error
         );
 
