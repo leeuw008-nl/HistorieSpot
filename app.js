@@ -662,3 +662,22 @@ function escapeHTML(
       "&#039;"
     );
 }
+// ========================================
+// HISTORISCHE KAART - KADASTRALE MINUUTPLANS
+// RCE - 1811-1832
+// ========================================
+
+const minuutplanLayer = L.tileLayer.wms(
+    "https://services.rce.geovoorziening.nl/misc/wms",
+    {
+        layers: "Minuutplanbegrenzingen",
+        format: "image/png",
+        transparent: true,
+        version: "1.3.0",
+        opacity: 0.75,
+        attribution: "© Rijksdienst voor het Cultureel Erfgoed"
+    }
+);
+
+// Historische laag standaard uitgeschakeld.
+// Voeg de laag toe via de knop hieronder.
