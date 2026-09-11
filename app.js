@@ -830,6 +830,105 @@ if (minuutplanCode) {
         minuutplanCode
     );
 }
+      // ========================================
+// TRANSPARANTIE HISTORISCHE KAART
+// ========================================
+
+if (window.historischeOpacityControl) {
+    map.removeControl(window.historischeOpacityControl);
+}
+
+window.historischeOpacityControl = L.control({
+    position: "topright"
+});
+
+window.historischeOpacityControl.onAdd = function () {
+
+    const div = L.DomUtil.create(
+        "div",
+        "leaflet-control"
+    );
+
+    div.style.background = "white";
+    div.style.padding = "10px";
+    div.style.borderRadius = "6px";
+    div.style.boxShadow = "0 1px 5px rgba(0,0,0,0.4)";
+    div.style.width = "170px";
+
+    div.innerHTML = `
+        <div style="
+            font-weight:bold;
+            margin-bottom:6px;
+        ">
+            Historische kaart
+        </div>
+
+        <input
+            id="historischeOpacity"
+            type="range"
+            min="0"
+            max="100"
+            value="55"
+            style="width:100%;"
+        >
+
+        <div style="
+            text-align:center;
+            font-size:12px;
+            margin-top:3px;
+        ">
+            Transparantie: <span id="historischeOpacityValue">55</span>%
+        </div>
+    `;
+
+    L.DomEvent.disableClickPropagation(div);
+
+    return div;
+};
+
+window.historischeOpacityControl.addTo(map);
+
+
+// Slider koppelen
+setTimeout(function () {
+
+    const slider =
+        document.getElementById(
+            "historischeOpacity"
+        );
+
+    const value =
+        document.getElementById(
+            "historischeOpacityValue"
+        );
+
+    if (slider) {
+
+        slider.addEventListener(
+            "input",
+            function () {
+
+                const opacity =
+                    Number(this.value) / 100;
+
+                if (
+                    window.historischeMinuutplanLayer
+                ) {
+
+                    window.historischeMinuutplanLayer
+                        .setOpacity(opacity);
+                }
+
+                if (value) {
+                    value.textContent =
+                        this.value;
+                }
+
+            }
+        );
+    }
+
+}, 100);
         let popupContent = `
             <div style="min-width:240px">
 
