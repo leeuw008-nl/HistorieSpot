@@ -1,213 +1,102 @@
-// Fix menu + info pagina + radius + badges + zoom 18
-const map = L.map("map", { zoomControl: false }).setView([52.516, 6.42], 16);
-L.control.zoom({ position: 'bottomleft' }).addTo(map);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "OSM" }).addTo(map);
+const map=L.map("map",{zoomControl:false}).setView([52.516,6.42],16);
+L.control.zoom({position:'bottomleft'}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+let curMarker=null,accCircle=null,lastLat=52.516,lastLng=6.42,monumentenData=[];
+const bagLayer=L.layerGroup().addTo(map),bagLabel=L.layerGroup().addTo(map),monLayer=L.layerGroup().addTo(map),monLabel=L.layerGroup().addTo(map);
+const minuutLayer=L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms",{layers:"Minuutplanbegrenzingen",format:"image/png",transparent:true,version:"1.3.0",opacity:0.5}).addTo(map);
+// menu/info
+const menuBtn=document.getElementById("menuBtn"),closeMenuBtn=document.getElementById("closeMenuBtn"),sideMenu=document.getElementById("sideMenu"),menuOverlay=document.getElementById("menuOverlay");
+const infoBtn=document.getElementById("infoBtn"),closeInfoBtn=document.getElementById("closeInfoBtn"),infoModal=document.getElementById("infoModal"),infoOverlay=document.getElementById("infoOverlay");
+const toggleMin=document.getElementById("toggleMinuutplan"),opSlider=document.getElementById("historischeOpacity"),opVal=document.getElementById("historischeOpacityValue");
+const toggleMIP=document.getElementById("toggleMIP"),toggleMIPBtn=document.getElementById("toggleMIPBtn"),toggleBAGBtn=document.getElementById("toggleBAGBtn");
+function openMenu(){sideMenu&&sideMenu.classList.add("open");menuOverlay&&menuOverlay.classList.remove("hidden");}
+function closeMenu(){sideMenu&&sideMenu.classList.remove("open");menuOverlay&&menuOverlay.classList.add("hidden");}
+function openInfo(){infoModal&&infoModal.classList.remove("hidden");infoOverlay&&infoOverlay.classList.remove("hidden");}
+function closeInfo(){infoModal&&infoModal.classList.add("hidden");infoOverlay&&infoOverlay.classList.add("hidden");}
+menuBtn&&menuBtn.addEventListener("click",openMenu);
+closeMenuBtn&&closeMenuBtn.addEventListener("click",closeMenu);
+menuOverlay&&menuOverlay.addEventListener("click",closeMenu);
+infoBtn&&infoBtn.addEventListener("click",openInfo);
+closeInfoBtn&&closeInfoBtn.addEventListener("click",closeInfo);
+infoOverlay&&infoOverlay.addEventListener("click",closeInfo);
+toggleMin&&toggleMin.addEventListener("change",e=>{e.target.checked?minuutLayer.addTo(map):map.removeLayer(minuutLayer);});
+opSlider&&opSlider.addEventListener("input",function(){const o=Number(this.value)/100;if(window.histLayer)window.histLayer.setOpacity(o);if(minuutLayer)minuutLayer.setOpacity(o);if(opVal)opVal.textContent=this.value+"%";});
+toggleBAGBtn&&toggleBAGBtn.addEventListener("click",()=>{const h=map.hasLayer(bagLayer);if(h){map.removeLayer(bagLayer);map.removeLayer(bagLabel);toggleBAGBtn.classList.remove("active");}else{bagLayer.addTo(map);bagLabel.addTo(map);toggleBAGBtn.classList.add("active");}});
+toggleMIPBtn&&toggleMIPBtn.addEventListener("click",()=>{const h=map.hasLayer(monLayer);if(h){map.removeLayer(monLayer);map.removeLayer(monLabel);toggleMIPBtn.classList.remove("active");if(toggleMIP)toggleMIP.checked=false;}else{monLayer.addTo(map);monLabel.addTo(map);toggleMIPBtn.classList.add("active");if(toggleMIP)toggleMIP.checked=true;}});
+toggleMIP&&toggleMIP.addEventListener("change",e=>{if(e.target.checked){monLayer.addTo(map);monLabel.addTo(map);toggleMIPBtn&&toggleMIPBtn.classList.add("active");}else{map.removeLayer(monLayer);map.removeLayer(monLabel);toggleMIPBtn&&toggleMIPBtn.classList.remove("active");}});
 
-let curMarker = null, accCircle = null, lastLat = 52.516, lastLng = 6.42;
-const bagLayer = L.layerGroup().addTo(map);
-const bagLabel = L.layerGroup().addTo(map);
-const monLayer = L.layerGroup().addTo(map);
-const monLabel = L.layerGroup().addTo(map);
-const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format: "image/png", transparent: true, version: "1.3.0", opacity: 0.5 });
-minuutplanLayer.addTo(map);
-
-// MENU + INFO fix
-const menuBtn = document.getElementById("menuBtn");
-const closeMenuBtn = document.getElementById("closeMenuBtn");
-const sideMenu = document.getElementById("sideMenu");
-const menuOverlay = document.getElementById("menuOverlay");
-const infoBtn = document.getElementById("infoBtn");
-const closeInfoBtn = document.getElementById("closeInfoBtn");
-const infoModal = document.getElementById("infoModal");
-const infoOverlay = document.getElementById("infoOverlay");
-const toggleMinuutplan = document.getElementById("toggleMinuutplan");
-const opacitySlider = document.getElementById("historischeOpacity");
-const opacityValue = document.getElementById("historischeOpacityValue");
-const toggleMIP = document.getElementById("toggleMIP");
-const toggleMIPBtn = document.getElementById("toggleMIPBtn");
-const toggleBAGBtn = document.getElementById("toggleBAGBtn");
-
-function openMenu() { if (sideMenu) sideMenu.classList.add("open"); if (menuOverlay) menuOverlay.classList.remove("hidden"); }
-function closeMenu() { if (sideMenu) sideMenu.classList.remove("open"); if (menuOverlay) menuOverlay.classList.add("hidden"); }
-function openInfo() { if (infoModal) infoModal.classList.remove("hidden"); if (infoOverlay) infoOverlay.classList.remove("hidden"); }
-function closeInfo() { if (infoModal) infoModal.classList.add("hidden"); if (infoOverlay) infoOverlay.classList.add("hidden"); }
-
-if (menuBtn) menuBtn.addEventListener("click", openMenu);
-if (closeMenuBtn) closeMenuBtn.addEventListener("click", closeMenu);
-if (menuOverlay) menuOverlay.addEventListener("click", closeMenu);
-if (infoBtn) infoBtn.addEventListener("click", openInfo);
-if (closeInfoBtn) closeInfoBtn.addEventListener("click", closeInfo);
-if (infoOverlay) infoOverlay.addEventListener("click", closeInfo);
-if (toggleMinuutplan) toggleMinuutplan.addEventListener("change", e => { if (e.target.checked) minuutplanLayer.addTo(map); else map.removeLayer(minuutplanLayer); });
-if (opacitySlider) opacitySlider.addEventListener("input", function () {
-  const o = Number(this.value) / 100;
-  if (window.histLayer) window.histLayer.setOpacity(o);
-  if (minuutplanLayer) minuutplanLayer.setOpacity(o);
-  if (opacityValue) opacityValue.textContent = this.value + "%";
-});
-if (toggleBAGBtn) toggleBAGBtn.addEventListener("click", () => {
-  const has = map.hasLayer(bagLayer);
-  if (has) { map.removeLayer(bagLayer); map.removeLayer(bagLabel); toggleBAGBtn.classList.remove("active"); }
-  else { bagLayer.addTo(map); bagLabel.addTo(map); toggleBAGBtn.classList.add("active"); }
-});
-if (toggleMIPBtn) toggleMIPBtn.addEventListener("click", () => {
-  const has = map.hasLayer(monLayer);
-  if (has) { map.removeLayer(monLayer); map.removeLayer(monLabel); toggleMIPBtn.classList.remove("active"); if (toggleMIP) toggleMIP.checked = false; }
-  else { monLayer.addTo(map); monLabel.addTo(map); toggleMIPBtn.classList.add("active"); if (toggleMIP) toggleMIP.checked = true; }
-});
-if (toggleMIP) toggleMIP.addEventListener("change", e => {
-  if (e.target.checked) { monLayer.addTo(map); monLabel.addTo(map); if (toggleMIPBtn) toggleMIPBtn.classList.add("active"); }
-  else { map.removeLayer(monLayer); map.removeLayer(monLabel); if (toggleMIPBtn) toggleMIPBtn.classList.remove("active"); }
-});
-
-const locateBtn = document.getElementById("locateBtn");
-const radiusSel = document.getElementById("radius");
-const statusBox = document.getElementById("status");
-function setStatus(t) { if (statusBox) statusBox.textContent = t; }
-function esc(s) { return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
-function yearClass(y) { const n = parseInt(y, 10); if (isNaN(n)) return "unknown"; if (n < 1850) return "very-old"; if (n < 1920) return "old"; return ""; }
-function dist(lat1, lon1, lat2, lon2) {
-  const R = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+const locateBtn=document.getElementById("locateBtn"),radiusSel=document.getElementById("radius"),statusBox=document.getElementById("status");
+function setStatus(t){if(statusBox)statusBox.textContent=t;}
+function esc(s){return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");}
+function yearClass(y){const n=parseInt(y,10);if(isNaN(n))return"unknown";if(n<1850)return"very-old";if(n<1920)return"old";return"";}
+function dist(a,b,c,d){const R=6371000,la=(c-a)*Math.PI/180,lo=(d-b)*Math.PI/180;const x=Math.sin(la/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(lo/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function box(lat,lng,r){const dLa=r/111320,dLo=r/(111320*Math.cos(lat*Math.PI/180));return{minLa:lat-dLa,maxLa:lat+dLa,minLo:lng-dLo,maxLo:lng+dLo};}
+function centerOf(f){if(!f.geometry)return null;const pts=[];function rec(c){if(typeof c[0]==="number"){pts.push(c);return;}c.forEach(rec);}rec(f.geometry.coordinates);if(!pts.length)return null;let sl=0,sa=0;pts.forEach(p=>{sl+=p[0];sa+=p[1];});return{lat:sa/pts.length,lng:sl/pts.length};}
+function wgs84ToRD(lat,lon){const dF=0.36*(lat-52.1551744),dL=0.36*(lon-5.38720621);const x=155000+190094.945*dL, y=463000+309056.544*dF;return{x,y};}
+async function loadMinAuto(lat,lng){
+  try{const rd=wgs84ToRD(lat,lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;const r=await fetch(url),d=await r.json();if(!d.features||!d.features.length)return;const code=d.features[0].properties.CODE;if(window.histLayer)map.removeLayer(window.histLayer);window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:0.6,maxZoom:20}).addTo(map);}catch(e){}
 }
-function box(lat, lng, r) {
-  const dLat = r / 111320, dLng = r / (111320 * Math.cos(lat * Math.PI / 180));
-  return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
-}
-function centerOf(f) {
-  if (!f.geometry) return null; const pts = []; function rec(c) { if (typeof c[0] === "number") { pts.push(c); return; } c.forEach(rec); } rec(f.geometry.coordinates);
-  if (!pts.length) return null; let slng = 0, slat = 0; pts.forEach(p => { slng += p[0]; slat += p[1]; }); return { lat: slat / pts.length, lng: slng / pts.length };
-}
-
-const MONUMENTEN = [
-  {n:"Woonhuis", b:"1910", a:"Bouwstraat 6/7, Ommen", t:"Gemeentelijk", lat:52.5194, lng:6.4242},
-  {n:"Winkel De Bakoven", b:"1905", a:"Brugstraat 17, Ommen", t:"Gemeentelijk", lat:52.5183, lng:6.4225},
-  {n:"Woonhuis", b:"1938", a:"De Kamp 38, Ommen", t:"Gemeentelijk", lat:52.508, lng:6.4245},
-  {n:"Soltana", b:"1930", a:"De Kamp 44, Ommen", t:"Gemeentelijk", lat:52.5072, lng:6.4242},
-  {n:"Den Hof", b:"1903", a:"De Voormars 4, Ommen", t:"Gemeentelijk", lat:52.52, lng:6.4194},
-  {n:"Woonhuis", b:"1900", a:"Den Oordt 6, Ommen", t:"Gemeentelijk", lat:52.5178, lng:6.425},
-  {n:"Edith-Hof", b:"1928", a:"Edith-Hof 1-10, Ommen", t:"Gemeentelijk", lat:52.5142, lng:6.426},
-  {n:"Hei en Dennen", b:"1903", a:"Hammerweg 14, Ommen", t:"Gemeentelijk", lat:52.5089, lng:6.4197},
-  {n:"Baarhuisje", b:"1924", a:"Hardenbergerweg, Ommen", t:"Gemeentelijk", lat:52.5231, lng:6.4369},
-  {n:"Laarhoeve", b:"1849", a:"Koesteeg 5, Ommen", t:"Gemeentelijk", lat:52.515, lng:6.4194},
-  {n:"Winkelpand", b:"1903", a:"Kruisstraat 1, Ommen", t:"Gemeentelijk", lat:52.5192, lng:6.4233},
-  {n:"Winkelpui", b:"1910", a:"Kruisstraat 2, Ommen", t:"Gemeentelijk", lat:52.5192, lng:6.4233},
-  {n:"VVV-kantoor", b:"1881", a:"Kruisstraat 6-6a, Ommen", t:"Gemeentelijk", lat:52.5192, lng:6.4236},
-  {n:"Postkantoor", b:"1905", a:"Markt 17, Ommen", t:"Gemeentelijk", lat:52.5178, lng:6.4231},
-  {n:"Kantoor", b:"1900", a:"Markt 32, Ommen", t:"Gemeentelijk", lat:52.5192, lng:6.42},
-  {n:"Pastorie RK", b:"1938", a:"Nering Bodelstraat 1, Ommen", t:"Gemeentelijk", lat:52.5203, lng:6.4197},
-  {n:"St. Brigitta", b:"1938", a:"Nering Bodelstraat 1a, Ommen", t:"Gemeentelijk", lat:52.5203, lng:6.4197},
-  {n:"Restaurant", b:"1903", a:"Stationsweg 31, Ommen", t:"Gemeentelijk", lat:52.5103, lng:6.4183},
-  {n:"NS Station", b:"1902", a:"Stationsweg 35, Ommen", t:"Gemeentelijk", lat:52.51, lng:6.4172},
-  {n:"Baarhuisje", b:"1828", a:"Van Raaltestraat, Ommen", t:"Gemeentelijk", lat:52.5206, lng:6.426},
-  {n:"Joodse begraafplaats", b:"1700", a:"Van Raaltestraat, Ommen", t:"Gemeentelijk", lat:52.5206, lng:6.426},
-  {n:"v. Raalteschool", b:"1950", a:"Van Raaltestraat 23, Ommen", t:"Gemeentelijk", lat:52.5208, lng:6.426},
-  {n:"De Ark", b:"1940", a:"Wolfskuil 41, Ommen", t:"Gemeentelijk", lat:52.5061, lng:6.4042},
-  {n:"Piet Hein", b:"1905", a:"Zeesserweg 5, Ommen", t:"Gemeentelijk", lat:52.5158, lng:6.4244},
-  {n:"Ada's Hoeve", b:"1853", a:"Zwolseweg 17, Ommen", t:"Gemeentelijk", lat:52.5142, lng:6.4019},
-  {n:"Besthmenermolen", b:"1862", a:"Hammerweg 59a, Ommen", t:"Rijks", lat:52.4969, lng:6.4231},
-  {n:"Stadhuis", b:"1828", a:"Markt 1-5, Ommen", t:"Rijks", lat:52.5189, lng:6.4239},
-  {n:"Brigitta Kerk", b:"15e eeuw", a:"Kerkplein 2, Ommen", t:"Rijks", lat:52.5186, lng:6.4233},
-  {n:"Den Oordt Molen", b:"1824", a:"Den Oordt 7, Ommen", t:"Rijks", lat:52.5178, lng:6.4256},
-  {n:"De Lelie Molen", b:"1846", a:"Molenpad 7, Ommen", t:"Rijks", lat:52.5219, lng:6.4261},
-  {n:"Tuinkoepel", b:"1700", a:"Stationsweg, Ommen", t:"Rijks", lat:52.5158, lng:6.4219},
-  {n:"Olde Vechte", b:"1849", a:"Zeesserweg 12, Ommen", t:"Rijks", lat:52.5158, lng:6.4278},
-  {n:"De Konijnenbelt", b:"1806", a:"Zwolseweg 5, Ommen", t:"Rijks", lat:52.5172, lng:6.4206},
-  {n:"Geref. Kerk", b:"1932", a:"Bouwstraat 23, Ommen", t:"Rijks", lat:52.52, lng:6.424},
-  {n:"Hoeve Bargsigt", b:"1924", a:"Hammerweg 44, Ommen", t:"Rijks", lat:52.5022, lng:6.4198},
-  {n:"Het Laar", b:"18e eeuw", a:"Het Laar 2, Ommen", t:"Rijks", lat:52.5136, lng:6.4136},
-  {n:"Het Laar koetshuis", b:"1843", a:"Het Laar 2B, Ommen", t:"Rijks", lat:52.5108, lng:6.4106}
-];
-
-async function loadBAG(lat, lng, radius) {
-  bagLayer.clearLayers(); bagLabel.clearLayers();
-  lastLat = lat; lastLng = lng;
-  const b = box(lat, lng, radius);
-  const url = `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLng},${b.minLat},${b.maxLng},${b.maxLat}&limit=100&f=json`;
-  try {
-    const res = await fetch(url); const data = await res.json();
-    const list = data.features.map(f => {
-      const c = centerOf(f); if (!c) return null;
-      const d = dist(lat, lng, c.lat, c.lng); if (d > radius) return null;
-      return { f, c, d };
-    }).filter(Boolean).sort((a, b) => a.d - b.d);
-    list.forEach(o => {
-      const y = String(o.f.properties.bouwjaar || "Onbekend");
-      const cls = yearClass(y);
-      L.geoJSON(o.f, { style: { weight: 1.2, color: "#0b5cab", fillOpacity: 0.15 } }).bindPopup(`<b>BAG</b><br>Bouwjaar BAG: <b>${esc(y)}</b><br>Afstand: ${Math.round(o.d)}m`).addTo(bagLayer);
-      const icon = L.divIcon({ className: "", html: `<div class="year-badge ${cls}">${esc(y)}</div>` });
-      L.marker([o.c.lat, o.c.lng], { icon }).addTo(bagLabel);
-    });
-    loadMonInRadius(lat, lng, radius);
+async function loadBAG(lat,lng,radius){
+  bagLayer.clearLayers();bagLabel.clearLayers();lastLat=lat;lastLng=lng;
+  const b=box(lat,lng,radius*1.5);
+  const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
+  try{
+    const res=await fetch(url);const data=await res.json();
+    const list=data.features.map(f=>{const c=centerOf(f);if(!c)return null;const d=dist(lat,lng,c.lat,c.lng);if(d>radius)return null;return{f,c,d};}).filter(Boolean).sort((a,b)=>a.d-b.d);
+    list.forEach(o=>{const y=String(o.f.properties.bouwjaar||"Onb");const cl=yearClass(y);L.geoJSON(o.f,{style:{weight:1.2,color:"#0b5cab",fillOpacity:0.15}}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>Afstand ${Math.round(o.d)}m`).addTo(bagLayer);const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}">${esc(y)}</div>`});L.marker([o.c.lat,o.c.lng],{icon:ic}).addTo(bagLabel);});
+    loadMon(radius,lat,lng);
     setStatus(`${list.length} BAG + ${monLayer.getLayers().length} monumenten binnen ${radius}m`);
-  } catch (e) { console.error(e); }
+  }catch(e){console.error(e);setStatus("BAG fout");}
 }
-
-function loadMonInRadius(lat, lng, radius) {
-  monLayer.clearLayers(); monLabel.clearLayers();
-  MONUMENTEN.forEach(m => {
-    const d = dist(lat, lng, m.lat, m.lng);
-    if (d > radius) return;
-    const cls = yearClass(m.b);
-    const color = m.t === "Rijks" ? "#c0392b" : "#27ae60";
-    const dot = L.circleMarker([m.lat, m.lng], { radius: 7, color: "white", weight: 2, fillColor: color, fillOpacity: 0.95 }).bindPopup(`<b style="color:${color}">${esc(m.n)} (${esc(m.t)})</b><br>${esc(m.a)}<br><b>Echt bouwjaar:</b> <span style="font-size:18px;font-weight:800;color:${color}">${esc(m.b)}</span><br><small>${Math.round(d)}m</small>`);
+function loadMon(radius,lat,lng){
+  monLayer.clearLayers();monLabel.clearLayers();
+  monumentenData.forEach(m=>{
+    const d=dist(lat,lng,m.lat,m.lng);if(d>radius)return;
+    const cl=yearClass(m.b),col=m.t==="R"?"#c0392b":"#27ae60";
+    const dot=L.circleMarker([m.lat,m.lng],{radius:7,color:"white",weight:2,fillColor:col,fillOpacity:0.95}).bindPopup(`<b style="color:${col}">${esc(m.n)} (${m.t==="R"?"Rijks":"Gemeentelijk"})</b><br>${esc(m.a)}<br><b>Echt bouwjaar: ${esc(m.b)}</b><br>${Math.round(d)}m`);
     monLayer.addLayer(dot);
-    const icon = L.divIcon({ className: "", html: `<div class="year-badge ${cls}" style="background:${color};border-color:${color}">${esc(m.b.substring(0, 4))}</div>` });
-    L.marker([m.lat, m.lng], { icon, interactive: false }).addTo(monLabel);
+    const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="background:${col};border-color:${col}">${esc(m.b.substring(0,4))}</div>`});
+    L.marker([m.lat,m.lng],{icon:ic,interactive:false}).addTo(monLabel);
   });
 }
+locateBtn&&locateBtn.addEventListener("click",()=>{
+  if(!navigator.geolocation){setStatus("Geen geolocatie");return;}
+  setStatus("Locatie bepalen...");locateBtn.disabled=true;
+  navigator.geolocation.getCurrentPosition(p=>{
+    locateBtn.disabled=false;
+    const lat=p.coords.latitude,lng=p.coords.longitude,acc=Math.round(p.coords.accuracy),r=Number(radiusSel.value);
+    map.setView([lat,lng],18);
+    if(curMarker)map.removeLayer(curMarker);
+    if(accCircle)map.removeLayer(accCircle);
+    curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie").openPopup();
+    accCircle=L.circle([lat,lng],{radius:acc,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
+    loadBAG(lat,lng,r);closeMenu();
+  },()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},{enableHighAccuracy:true,timeout:15000});
+});
+radiusSel&&radiusSel.addEventListener("change",()=>{const r=Number(radiusSel.value);if(lastLat!==null)loadBAG(lastLat,lastLng,r);else loadBAG(52.516,6.42,r);});
 
-if (locateBtn) locateBtn.addEventListener("click", () => {
-  if (!navigator.geolocation) { setStatus("Geen geolocatie"); return; }
-  setStatus("Locatie bepalen...");
-  locateBtn.disabled = true;
-  navigator.geolocation.getCurrentPosition(p => {
-    locateBtn.disabled = false;
-    const lat = p.coords.latitude, lng = p.coords.longitude, acc = Math.round(p.coords.accuracy), r = Number(radiusSel.value);
-    map.setView([lat, lng], 18);
-    if (curMarker) map.removeLayer(curMarker);
-    if (accCircle) map.removeLayer(accCircle);
-    curMarker = L.marker([lat, lng]).addTo(map).bindPopup("Huidige positie").openPopup();
-    accCircle = L.circle([lat, lng], { radius: acc, color: "#0b5cab", fillOpacity: 0.08 }).addTo(map);
-    loadBAG(lat, lng, r);
-    if (sideMenu) closeMenu();
-  }, () => { locateBtn.disabled = false; setStatus("Locatie geweigerd"); }, { enableHighAccuracy: true, timeout: 15000 });
+map.on("click",async e=>{
+  const hasMon=[...monLayer.getLayers(),...bagLabel.getLayers()].some(l=>{try{return map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(l.getLatLng()))<35;}catch{return false;}});
+  if(hasMon)return;
+  if(!map.hasLayer(minuutLayer))return;
+  try{
+    const rd=wgs84ToRD(e.latlng.lat,e.latlng.lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
+    const res=await fetch(url),data=await res.json();if(!data.features||!data.features.length)return;
+    const p=data.features[0].properties,code=p.CODE;
+    if(window.histLayer)map.removeLayer(window.histLayer);
+    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
+    L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Kadastraal minuutplan 1811-1832</strong><br>Gemeente: ${esc(p.GEMEENTE||"")}<br>Sectie: ${esc(p.SECTIE||"")} Blad: ${esc(p.BLAD||"")}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a></div>`).openOn(map);
+  }catch(err){console.error(err);}
 });
 
-if (radiusSel) radiusSel.addEventListener("change", () => {
-  const r = Number(radiusSel.value);
-  if (lastLat) loadBAG(lastLat, lastLng, r);
-});
+fetch("monumenten.json").then(r=>r.json()).then(d=>{monumentenData=d;const rad=Number(radiusSel?.value||100);loadBAG(52.516,6.42,rad);}).catch(()=>{monumentenData=[];const rad=Number(radiusSel?.value||100);loadBAG(52.516,6.42,rad);});
 
-function wgs84ToRD(lat, lon) {
-  const dF = 0.36 * (lat - 52.15517440), dL = 0.36 * (lon - 5.38720621);
-  const x = 155000 + 190094.945 * dL - 11832.228 * dF * dL;
-  const y = 463000 + 309056.544 * dF;
-  return { x, y };
-}
-async function loadMinuutplanAuto(lat, lng) {
-  try {
-    const rd = wgs84ToRD(lat, lng); const b = [rd.x - 20, rd.y - 20, rd.x + 20, rd.y + 20].join(",");
-    const url = `https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-    const res = await fetch(url); const data = await res.json();
-    if (!data.features || !data.features.length) return;
-    const code = data.features[0].properties.CODE;
-    if (window.histLayer) map.removeLayer(window.histLayer);
-    window.histLayer = L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`, { opacity: 0.6, maxZoom: 20 }).addTo(map);
-  } catch (e) { }
-}
-
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    const r = Number(document.getElementById("radius")?.value || 100);
-    loadBAG(52.516, 6.42, r);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(p => {
-        const lat = p.coords.latitude, lng = p.coords.longitude;
-        map.setView([lat, lng], 18);
-        loadBAG(lat, lng, r);
-      });
-    }
-  }, 600);
+window.addEventListener("load",()=>{
+  setTimeout(()=>{
+    const r=Number(radiusSel?.value||100);
+    lastLat=52.516;lastLng=6.42;
+    // geen huidige positie icoon bij opstarten
+    if(!monumentenData.length){fetch("monumenten.json").then(r=>r.json()).then(d=>{monumentenData=d;loadBAG(52.516,6.42,r);});}
+    else loadBAG(52.516,6.42,r);
+  },500);
 });
