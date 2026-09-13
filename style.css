@@ -62,27 +62,27 @@ body {
 .map-bottom-bar {
   position:absolute;
   bottom:32px;
-  left:calc(50% - 10px);
+  left:50%;
   transform: translateX(-50%);
   z-index:800;
   background: rgba(255,255,255,0.94);
   backdrop-filter: blur(8px);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 6px 16px;
   height: 36px;
   display:flex;
   align-items:center;
-  gap:4px;
+  gap:10px;
   box-shadow:0 4px 14px rgba(0,0,0,0.18);
   border:1px solid rgba(0,0,0,0.06);
-  min-width: 260px;
-  max-width: calc(100% - 120px);
+  min-width: 280px;
+  max-width: calc(100% - 140px);
 }
 .map-bottom-bar.hidden { display:none; }
 .map-bottom-bar input[type=range] {
   -webkit-appearance:none;
   appearance:none;
-  width:200px;
+  width:260px;
   height:4px;
   background:#d6dde5;
   border-radius:999px;
@@ -112,14 +112,12 @@ body {
   width:1px;
   height:20px;
   background:#d6dde5;
-  margin:0 4px;
+  margin:0 2px;
 }
 .bag-toggle-btn {
-  width:28px!important;
-  height:28px!important;
-  min-width:28px;
-  min-height:28px;
-  border-radius:50%!important;
+  width:28px;
+  height:28px;
+  border-radius:50%;
   border:none;
   background:#0b5cab;
   color:white;
@@ -129,9 +127,6 @@ body {
   cursor:pointer;
   box-shadow:0 1px 4px rgba(0,0,0,0.2);
   transition: all 0.2s;
-  padding:0;
-  aspect-ratio:1/1;
-  flex-shrink:0;
 }
 .bag-toggle-btn.active {
   background:#0b5cab;
@@ -148,7 +143,6 @@ body {
   color:#0b5cab;
   min-width:30px;
   text-align:right;
-  margin-left:2px;
 }
 .status-toast {
   position:absolute;
@@ -190,7 +184,7 @@ body {
 .modal-header h2 { margin:0; font-size:18px; }
 .modal-body { padding:16px 20px 20px; font-size:14.5px; line-height:1.5; color:#2f3d4a; }
 .modal-body p { margin:0 0 10px; }
-.year-badge { background:#0b5cab; color:white; border:2px solid white; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap; line-height:1.2; min-width:44px; text-align:center; cursor:pointer; pointer-events:auto!important; }
+.year-badge { background:#0b5cab; color:white; border:2px solid white; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap; line-height:1.2; pointer-events:none; }
 .year-badge.unknown { background:#6b7d8e; }
 .year-badge.very-old { background:#8b4513; }
 .year-badge.old { background:#b7791f; }
