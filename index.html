@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
@@ -11,71 +12,108 @@
   <title>HistorieSpot</title>
 
   <!-- PWA -->
+
   <link rel="manifest" href="manifest.json">
 
   <!-- App-icoon -->
+
   <link rel="icon" href="icons/icon-192.png">
 
   <!-- Leaflet kaart -->
+
   <link rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
       crossorigin=""/>
 
   <!-- Eigen stijl -->
+
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
+  <!-- Vaste bovenbalk -->
+
   <header class="app-header">
-    <h1>HistorieSpot</h1>
-    <p>Ontdek de geschiedenis van de plek waar je staat</p>
+
+```
+<div class="header-title">
+  <h1>HistorieSpot</h1>
+</div>
+
+<div class="header-buttons">
+  <button id="menuBtn" class="header-icon" type="button"
+          aria-label="Menu">
+    ☰
+  </button>
+
+  <button id="infoBtn" class="header-icon" type="button"
+          aria-label="Informatie">
+    ⓘ
+  </button>
+</div>
+```
+
   </header>
+
+  <!-- Hoofdinhoud -->
 
   <main>
 
-    <section class="controls">
+```
+<!-- Bestaande bediening voorlopig behouden,
+     maar verborgen via CSS -->
+<section class="controls">
 
-      <button id="locateBtn" type="button">
-        📍 Waar ben ik?
-      </button>
+  <button id="locateBtn" type="button">
+    📍 Waar ben ik?
+  </button>
 
-      <label for="radius">
-        Zoekradius
-      </label>
+  <label for="radius">
+    Zoekradius
+  </label>
 
-      <select id="radius">
-        <option value="25">25 meter</option>
-        <option value="50" selected>50 meter</option>
-        <option value="100">100 meter</option>
-        <option value="250">250 meter</option>
-        <option value="500">500 meter</option>
-      </select>
+  <select id="radius">
+    <option value="25">25 meter</option>
+    <option value="50" selected>50 meter</option>
+    <option value="100">100 meter</option>
+    <option value="250">250 meter</option>
+    <option value="500">500 meter</option>
+  </select>
 
-    </section>
+</section>
 
-    <section id="status" class="status">
-      Druk op ‘Waar ben ik?’ om de huidige positie te bepalen.
-    </section>
+<!-- Status blijft voor app.js beschikbaar,
+     maar wordt niet onder de kaart getoond -->
+<section id="status" class="status">
+  Druk op ‘Waar ben ik?’ om de huidige positie te bepalen.
+</section>
 
-    <section class="map-section">
-      <div id="map"></div>
-    </section>
+<!-- Volledig kaartgebied -->
+<section class="map-section">
+  <div id="map"></div>
+</section>
 
-    <section class="results-section">
+<!-- Bestaande resultaten blijven technisch aanwezig
+     zodat app.js niet hoeft te worden aangepast.
+     Ze worden visueel verborgen. -->
+<section class="results-section">
 
-      <h2>Objecten in de omgeving</h2>
+  <h2>Objecten in de omgeving</h2>
 
-      <div id="results">
-        <p>
-          Nog geen locatie bepaald.
-        </p>
-      </div>
+  <div id="results">
+    <p>
+      Nog geen locatie bepaald.
+    </p>
+  </div>
 
-    </section>
+</section>
+```
 
   </main>
+
+  <!-- Footer blijft technisch aanwezig maar wordt verborgen -->
 
   <footer>
     <small>
@@ -85,6 +123,7 @@
   </footer>
 
   <!-- Leaflet JavaScript -->
+
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -92,6 +131,7 @@
   </script>
 
   <!-- Eigen JavaScript -->
+
   <script src="app.js"></script>
 
 </body>
