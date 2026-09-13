@@ -6,8 +6,6 @@ body {
   color:#1d2a35;
   overflow:hidden;
 }
-
-/* HEADER - vergrendeld */
 .app-header {
   position: fixed;
   top:0; left:0; right:0;
@@ -35,26 +33,14 @@ body {
 .icon-btn:hover { background: rgba(255,255,255,0.15); }
 .icon-btn.small { width:36px; height:36px; color:#333; background:#f1f4f8; }
 .icon-btn.small:hover { background:#e2e8ef; }
-
-/* FULLSCREEN MAIN + MAP */
-.main-fullscreen {
-  position: fixed;
-  top:60px;
-  left:0; right:0; bottom:0;
-}
-#map {
-  width:100%;
-  height:100%;
-  background:#cbd5e1;
-}
-
-/* LOCATE FAB - rond icoontje op kaart */
+.main-fullscreen { position: fixed; top:60px; left:0; right:0; bottom:0; }
+#map { width:100%; height:100%; background:#cbd5e1; }
 .locate-fab {
   position:absolute;
-  bottom:24px;
-  right:16px;
-  width:56px;
-  height:56px;
+  bottom:12px;
+  right:12px;
+  width:48px;
+  height:48px;
   border-radius:50%;
   background:white;
   border:none;
@@ -65,55 +51,39 @@ body {
   color:#0b5cab;
   cursor:pointer;
   z-index:800;
-  transition: transform 0.15s;
 }
-.locate-fab:active { transform: scale(0.96); }
-.locate-fab:disabled { opacity:0.6; }
-
-/* ZOOM - Leaflet default links onder, iets hoger */
-.leaflet-bottom.leaflet-left {
-  bottom: 20px;
-}
+.leaflet-bottom.leaflet-left { bottom: 8px; }
 .leaflet-control-zoom {
   border-radius: 14px !important;
   overflow:hidden;
   box-shadow:0 4px 12px rgba(0,0,0,0.2) !important;
   border:none !important;
 }
-
-/* BOTTOM OPACITY SLIDER - midden onder */
 .map-bottom-bar {
   position:absolute;
-  bottom:24px;
+  bottom:12px;
   left:50%;
   transform: translateX(-50%);
   z-index:800;
   background: rgba(255,255,255,0.94);
   backdrop-filter: blur(8px);
   border-radius: 999px;
-  padding: 8px 14px;
+  padding: 6px 16px;
+  height: 36px;
   display:flex;
   align-items:center;
   gap:10px;
   box-shadow:0 4px 14px rgba(0,0,0,0.18);
   border:1px solid rgba(0,0,0,0.06);
-  min-width: 190px;
-  max-width: calc(100% - 160px);
+  min-width: 280px;
+  max-width: calc(100% - 140px);
 }
 .map-bottom-bar.hidden { display:none; }
-.map-bottom-bar label {
-  font-size:11px;
-  font-weight:700;
-  color:#3a4a5a;
-  white-space:nowrap;
-  text-transform:uppercase;
-  letter-spacing:0.5px;
-}
 .map-bottom-bar input[type=range] {
   -webkit-appearance:none;
   appearance:none;
-  width:120px;
-  height:6px;
+  width:260px;
+  height:4px;
   background:#d6dde5;
   border-radius:999px;
   outline:none;
@@ -121,21 +91,21 @@ body {
 }
 .map-bottom-bar input[type=range]::-webkit-slider-thumb {
   -webkit-appearance:none;
-  width:20px;
-  height:20px;
+  width:16px;
+  height:16px;
   border-radius:50%;
   background:#0b5cab;
   border:2px solid white;
-  box-shadow:0 2px 6px rgba(0,0,0,0.25);
+  box-shadow:0 1px 4px rgba(0,0,0,0.25);
   cursor:pointer;
 }
 .map-bottom-bar input[type=range]::-moz-range-thumb {
-  width:20px;
-  height:20px;
+  width:16px;
+  height:16px;
   border-radius:50%;
   background:#0b5cab;
   border:2px solid white;
-  box-shadow:0 2px 6px rgba(0,0,0,0.25);
+  box-shadow:0 1px 4px rgba(0,0,0,0.25);
   cursor:pointer;
 }
 .map-bottom-bar .value {
@@ -145,8 +115,6 @@ body {
   min-width:30px;
   text-align:right;
 }
-
-/* STATUS TOAST */
 .status-toast {
   position:absolute;
   top:12px;
@@ -163,8 +131,6 @@ body {
   text-align:center;
   border:1px solid rgba(0,0,0,0.06);
 }
-
-/* SIDE MENU */
 .overlay { position:fixed; inset:0; background: rgba(0,0,0,0.35); z-index:9998; }
 .overlay.hidden { display:none; }
 .side-menu {
@@ -183,24 +149,19 @@ body {
 .menu-hint { font-size:12px; color:#6b7d8e; margin-top:8px; line-height:1.4; }
 .toggle { display:flex; gap:10px; align-items:center; cursor:pointer; font-weight:500 !important; }
 .toggle input { width:18px; height:18px; }
-
-/* MODAL INFO */
 .modal { position:fixed; top:50%; left:50%; transform: translate(-50%,-50%); background:white; width:92%; max-width:420px; border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,0.25); z-index:10001; }
 .modal.hidden { display:none; }
 .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 16px 0 20px; }
 .modal-header h2 { margin:0; font-size:18px; }
 .modal-body { padding:16px 20px 20px; font-size:14.5px; line-height:1.5; color:#2f3d4a; }
 .modal-body p { margin:0 0 10px; }
-
-/* BOUWJAAR BADGE op kaart */
 .year-badge { background:#0b5cab; color:white; border:2px solid white; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap; line-height:1.2; pointer-events:none; }
 .year-badge.unknown { background:#6b7d8e; }
 .year-badge.very-old { background:#8b4513; }
 .year-badge.old { background:#b7791f; }
 .leaflet-control-attribution { font-size:10px; }
 .leaflet-popup-content { font-size:13px; }
-
 @media (max-width:480px){
-  .map-bottom-bar { max-width: calc(100% - 140px); min-width: 160px; padding:6px 10px; bottom:20px; }
-  .map-bottom-bar input[type=range] { width:80px; }
+  .map-bottom-bar { max-width: calc(100% - 110px); min-width: 200px; }
+  .map-bottom-bar input[type=range] { width:140px; }
 }

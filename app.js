@@ -1,4 +1,4 @@
-// HistorieSpot - fullscreen + bottom opacity slider + B02/B03 fix
+// HistorieSpot - FINAL versie vanmorgen: sticky header, fullscreen, fab, bouwjaar, B02/B03 fix, bottom slider, auto kadaster
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
@@ -11,10 +11,31 @@ const yearLabelLayer = L.layerGroup().addTo(map);
 const MINUUTPLAN_CORRECTIES = { "MIN04041B02": "MIN04041B03", "MIN04041B03": "MIN04041B02" };
 function corrigeerMinuutplanCode(code){ return MINUUTPLAN_CORRECTIES[code] || code; }
 
+async function loadMinuutplanAuto(lat, lng){
+  try{
+    const rd = wgs84ToRD(lat, lng);
+    const bbox = [rd.x-20, rd.y-20, rd.x+20, rd.y+20].join(",");
+    const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
+    const response = await fetch(url);
+    if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
+    const data = await response.json();
+    if(!data.features || data.features.length===0) return;
+    const p = data.features[0].properties;
+    const origineleCode = p.CODE;
+    const minuutplanCode = corrigeerMinuutplanCode(origineleCode);
+    if(minuutplanCode){
+      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
+      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
+      window.historischeMinuutplanLayer.addTo(map);
+      console.log(`Auto kadasterkaart geladen: ${origineleCode} -> ${minuutplanCode} op 55%`);
+      updateOpacityBarVisibility();
+    }
+  }catch(e){ console.error("Auto kadaster laden mislukt", e); }
+}
+
 const locateBtn = document.getElementById("locateBtn");
 const radiusSelect = document.getElementById("radius");
 const statusBox = document.getElementById("status");
-
 const menuBtn = document.getElementById("menuBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const sideMenu = document.getElementById("sideMenu");
@@ -24,7 +45,6 @@ const closeInfoBtn = document.getElementById("closeInfoBtn");
 const infoModal = document.getElementById("infoModal");
 const infoOverlay = document.getElementById("infoOverlay");
 const toggleMinuutplan = document.getElementById("toggleMinuutplan");
-
 const opacityBar = document.getElementById("opacityBar");
 const opacitySlider = document.getElementById("historischeOpacity");
 const opacityValue = document.getElementById("historischeOpacityValue");
@@ -74,8 +94,9 @@ function locateUser(){
       if(accuracyCircle) map.removeLayer(accuracyCircle);
       currentMarker = L.marker([latitude, longitude]).addTo(map).bindPopup("📍 Huidige positie").openPopup();
       accuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color:"#0b5cab", fillOpacity:0.08 }).addTo(map);
-      setStatus(`Gevonden (±${accuracy}m) · ${radius}m radius wordt geladen...`);
+      setStatus(`Gevonden (±${accuracy}m)`);
       loadBAG(latitude, longitude, radius);
+      loadMinuutplanAuto(latitude, longitude);
       closeMenu();
     },
     function(error){
@@ -167,17 +188,16 @@ function displayResults(objects){
       L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
     }
   });
-  setStatus(`${objects.length} gebouwen · bouwjaar op kaart`);
+  setStatus(`${objects.length} gebouwen`);
 }
 function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
 // HISTORISCHE KAART
-const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.75, attribution:"© RCE" });
+const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.55, attribution:"© RCE" });
 minuutplanLayer.addTo(map);
 toggleMinuutplan.addEventListener("change", ()=>{
   if(toggleMinuutplan.checked) minuutplanLayer.addTo(map);
   else map.removeLayer(minuutplanLayer);
-  updateOpacityBarVisibility();
 });
 
 function wgs84ToRD(lat, lon){
@@ -186,11 +206,8 @@ function wgs84ToRD(lat, lon){
   const y=463000+309056.544*dF+3638.893*Math.pow(dL,2)+73.077*Math.pow(dF,2)-157.984*dF*Math.pow(dL,2)+59.788*Math.pow(dF,3)+0.433*dL-6.439*Math.pow(dF,2)*Math.pow(dL,2)-0.032*dF*dL+0.092*Math.pow(dL,4)-0.054*dF*Math.pow(dL,4);
   return {x,y};
 }
-
 function updateOpacityBarVisibility(){
-  const hasHistorical = !!window.historischeMinuutplanLayer;
-  if(hasHistorical){ opacityBar.classList.remove("hidden"); }
-  else { /* keep visible to allow control even before first click, but dim if no layer? We keep visible */ }
+  // altijd zichtbaar, default 55%
 }
 
 map.on("click", async function(e){
@@ -211,19 +228,25 @@ map.on("click", async function(e){
       if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
       window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
       window.historischeMinuutplanLayer.addTo(map);
-      updateOpacityBarVisibility();
     }
-    let correctieNote = isGecorrigeerd ? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠️ Correctie: ${origineleCode} → ${minuutplanCode} (Ommen B02↔B03 verwisseld)</div>` : "";
+    let correctieNote = isGecorrigeerd ? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠️ Correctie: ${origineleCode} → ${minuutplanCode} (Ommen B02↔B03)</div>` : "";
     let popupContent=`<div style="min-width:240px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>RCE</small>${correctieNote}<hr><strong>Periode:</strong> 1811–1832<br><br><strong>Gemeente:</strong> ${p.GEMEENTE||"onbekend"}<br><strong>Sectie:</strong> ${p.SECTIE||""} <strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong> ${p.CODE||""}${isGecorrigeerd?` → <b>${minuutplanCode}</b>`:""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
     L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
   }catch(error){ console.error("Fout bij ophalen minuutplan:", error); }
 });
 
-// Opacity slider on map bottom
 opacitySlider.addEventListener("input", function(){
   const opacity=Number(this.value)/100;
   if(window.historischeMinuutplanLayer) window.historischeMinuutplanLayer.setOpacity(opacity);
+  if(minuutplanLayer) minuutplanLayer.setOpacity(opacity);
   opacityValue.textContent=this.value+"%";
 });
 opacityValue.textContent=opacitySlider.value+"%";
-updateOpacityBarVisibility();
+
+// Default: auto inzoomen op huidige locatie + default kadasterkaart 55%
+window.addEventListener("load", ()=>{
+  setTimeout(()=>{
+    if(navigator.geolocation){ locateUser(); }
+  }, 800);
+});
+minuutplanLayer.setOpacity(0.55);
