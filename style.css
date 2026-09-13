@@ -1,208 +1,191 @@
 * {
   box-sizing: border-box;
-}
+  }
 
+html,
 body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f3f6f9;
-  color: #1d2a35;
+margin: 0;
+padding: 0;
+width: 100%;
+height: 100%;
+overflow: hidden;
+font-family: Arial, sans-serif;
+background: #f3f6f9;
+color: #1d2a35;
 }
 
 /* =========================
-   HEADER
-   ========================= */
+VASTE BOVENBALK
+========================= */
 
 .app-header {
-  background: #0b5cab;
-  color: white;
-  padding: 20px 16px;
-  text-align: center;
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+height: 58px;
+z-index: 2000;
+
+display: flex;
+align-items: center;
+justify-content: space-between;
+
+padding: 0 10px 0 16px;
+
+background: #0b5cab;
+color: white;
+
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
 }
 
-.app-header h1 {
-  margin: 0 0 6px;
-  font-size: 30px;
+.header-title h1 {
+margin: 0;
+font-size: 23px;
+line-height: 1;
 }
 
-.app-header p {
-  margin: 0;
-  font-size: 16px;
-  opacity: 0.92;
+.header-buttons {
+display: flex;
+align-items: center;
+gap: 4px;
+}
+
+.header-icon {
+width: 42px;
+height: 42px;
+
+padding: 0;
+
+display: flex;
+align-items: center;
+justify-content: center;
+
+border: none;
+border-radius: 50%;
+
+background: transparent;
+color: white;
+
+font-size: 25px;
+font-weight: normal;
+
+cursor: pointer;
+}
+
+.header-icon:hover {
+background: rgba(255, 255, 255, 0.15);
+}
+
+.header-icon:active {
+background: rgba(255, 255, 255, 0.25);
 }
 
 /* =========================
-   MAIN
-   ========================= */
+HOOFDGEBIED
+========================= */
 
 main {
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 15px;
+width: 100%;
+height: 100vh;
+margin: 0;
+padding: 58px 0 0 0;
 }
 
 /* =========================
-   BEDIENING
-   ========================= */
+BESTAANDE BEDIENING
+Voorlopig verborgen.
+app.js kan de elementen
+nog steeds gebruiken.
+========================= */
 
 .controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.controls label {
-  font-weight: bold;
-}
-
-button,
-select {
-  font-family: inherit;
-  font-size: 16px;
-  padding: 10px 14px;
-  border-radius: 8px;
-}
-
-button {
-  border: none;
-  background: #0b5cab;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #084b8c;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-select {
-  border: 1px solid #b8c5d1;
-  background: white;
-  color: #1d2a35;
+display: none;
 }
 
 /* =========================
-   STATUS
-   ========================= */
+STATUS
+Voorlopig verborgen.
+========================= */
 
 .status {
-  background: white;
-  border-left: 4px solid #0b5cab;
-  border-radius: 8px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+display: none;
 }
 
 /* =========================
-   KAART
-   ========================= */
+KAART
+========================= */
 
 .map-section {
-  width: 100%;
+width: 100%;
+height: calc(100vh - 58px);
+margin: 0;
+padding: 0;
 }
 
 #map {
-  width: 100%;
-  height: 480px;
-  background: #ddd;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+width: 100%;
+height: 100%;
+
+margin: 0;
+padding: 0;
+
+background: #ddd;
 }
 
 /* =========================
-   RESULTATEN
-   ========================= */
+RESULTATEN
+Technisch aanwezig voor
+app.js, maar niet zichtbaar.
+========================= */
 
-.results-section h2 {
-  margin: 22px 0 12px;
-  font-size: 22px;
-}
-
-.card {
-  background: white;
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 10px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-.card h3 {
-  margin: 0 0 9px;
-  color: #0b5cab;
-}
-
-.meta {
-  margin: 5px 0;
-  line-height: 1.4;
+.results-section {
+display: none;
 }
 
 /* =========================
-   FOOTER
-   ========================= */
+FOOTER
+========================= */
 
 footer {
-  text-align: center;
-  padding: 20px 15px;
-  color: #64717c;
+display: none;
 }
 
 /* =========================
-   MOBIEL
-   ========================= */
+LEAFLET
+========================= */
+
+.leaflet-container {
+width: 100%;
+height: 100%;
+}
+
+/* =========================
+MOBIEL
+========================= */
 
 @media (max-width: 600px) {
 
-  .app-header {
-    padding: 16px 12px;
-  }
+.app-header {
+height: 56px;
+padding-left: 14px;
+}
 
-  .app-header h1 {
-    font-size: 26px;
-  }
+.header-title h1 {
+font-size: 21px;
+}
 
-  .app-header p {
-    font-size: 14px;
-  }
+.header-icon {
+width: 40px;
+height: 40px;
+font-size: 24px;
+}
 
-  main {
-    padding: 10px;
-  }
+main {
+padding-top: 56px;
+}
 
-  .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
+.map-section {
+height: calc(100vh - 56px);
+}
 
-  .controls button {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
-  .controls label {
-    align-self: center;
-  }
-
-  .controls select {
-    width: 100%;
-  }
-
-  #map {
-    height: 55vh;
-    min-height: 350px;
-  }
-
-  .results-section h2 {
-    font-size: 20px;
-  }
 }
