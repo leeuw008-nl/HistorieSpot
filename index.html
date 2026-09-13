@@ -22,16 +22,39 @@
   <nav id="sideMenu" class="side-menu">
     <div class="side-menu-header"><strong>Menu</strong><button id="closeMenuBtn" class="icon-btn small" aria-label="Sluiten"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
     <div class="side-menu-content">
-      <div class="menu-section"><h3>Cultuurhistorie</h3><label class="toggle"><input type="checkbox" id="toggleMIP" checked><span>MIP objecten 1850-1940</span></label><p class="menu-hint">Oranje markers = RCE MIP</p></div><div class="menu-section"><h3>Zoeken</h3><label for="radius">Zoekradius</label><select id="radius"><option value="25">25 meter</option><option value="50" selected>50 meter</option><option value="100">100 meter</option><option value="250">250 meter</option><option value="500">500 meter</option></select><p class="menu-hint">Gebouwen binnen deze radius tonen hun bouwjaar direct op de kaart.</p></div>
+      <div class="menu-section"><h3>Cultuurhistorie (MIP)</h3>
+        <label class="toggle"><input type="checkbox" id="toggleMIP" checked><span>MIP objecten 1850-1940</span></label>
+        <p class="menu-hint">152.400 objecten uit RCE dataset. Oranje markers op kaart.</p>
+        <label class="toggle" style="margin-top:12px"><input type="checkbox" id="toggleMIPBeschrijving"><span>Gemeentebeschrijving tonen</span></label>
+        <p class="menu-hint" id="mipGemeenteHint" style="display:none">Klik op oranje marker voor beschrijving + PDF.</p>
+        <button id="openMIPBeschrijvingBtn" class="mip-gemeente-btn" style="display:none">📄 Open gemeentebeschrijving</button>
+      </div>
+      <div class="menu-section"><h3>Zoeken</h3><label for="radius">Zoekradius BAG</label><select id="radius"><option value="25">25 meter</option><option value="50" selected>50 meter</option><option value="100">100 meter</option><option value="250">250 meter</option><option value="500">500 meter</option></select><p class="menu-hint">Gebouwen binnen deze radius tonen hun bouwjaar direct op de kaart.</p></div>
       <div class="menu-section"><h3>Kaartlagen</h3><label class="toggle"><input type="checkbox" id="toggleMinuutplan" checked><span>Kadastrale minuutplan 1811-1832</span></label><p class="menu-hint">Transparantie regel je onderin de kaart.</p></div>
-      <div class="menu-section small"><p>Data: PDOK / Kadaster BAG · RCE minuutplans<br>Ommen B02↔B03 automatisch gecorrigeerd.</p></div>
+      <div class="menu-section small"><p>Data: PDOK / Kadaster BAG · RCE MIP + minuutplans<br>Ommen B02↔B03 automatisch gecorrigeerd.</p></div>
     </div>
   </nav>
 
   <div id="infoOverlay" class="overlay hidden"></div>
   <div id="infoModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-header"><h2>Over HistorieSpot</h2><button id="closeInfoBtn" class="icon-btn small">✕</button></div>
-    <div class="modal-body"><p><strong>HistorieSpot</strong> laat zien wat er nu en vroeger op een locatie te vinden was.</p><p>De app gebruikt je GPS-locatie en haalt BAG-gegevens op via PDOK/Kadaster. Het bouwjaar wordt standaard op de kaart getoond.</p><p>Tip: klik op de kaart om een kadastrale minuutplan (1811-1832) te bekijken. Transparantie regel je met de schuifregelaar onderin.</p><p>Data: PDOK, Kadaster BAG, Rijksdienst voor het Cultureel Erfgoed, HisGIS.</p></div>
+    <div class="modal-body"><p><strong>HistorieSpot</strong> laat zien wat er nu en vroeger op een locatie te vinden was.</p><p>De app gebruikt je GPS-locatie en haalt BAG-gegevens op via PDOK/Kadaster. Het bouwjaar wordt standaard op de kaart getoond.</p><p><strong>Nieuw: MIP</strong> – 152.400 cultuurhistorische objecten 1850-1940 (RCE) + gemeentebeschrijvingen als PDF in de app.</p><p>Tip: klik op de kaart voor minuutplan, klik op oranje marker voor MIP info.</p><p>Data: PDOK, Kadaster BAG, RCE (MIP Objecten + Gemeentebeschrijvingen), HisGIS.</p></div>
+  </div>
+
+  <!-- MIP Gemeentebeschrijving PDF viewer modal -->
+  <div id="mipOverlay" class="overlay hidden"></div>
+  <div id="mipModal" class="modal mip-modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-header"><h2 id="mipModalTitle">MIP Gemeentebeschrijving</h2><button id="closeMipBtn" class="icon-btn small">✕</button></div>
+    <div class="modal-body mip-body">
+      <div id="mipBeschrijvingText" class="mip-text"></div>
+      <div id="mipPdfContainer" class="mip-pdf-container">
+        <iframe id="mipPdfFrame" class="mip-pdf-frame" src="" title="MIP Gemeentebeschrijving PDF"></iframe>
+      </div>
+      <div class="mip-actions">
+        <a id="mipPdfLink" href="#" target="_blank" class="mip-link">📄 Open PDF in nieuw tabblad</a>
+        <a id="mipRceLink" href="#" target="_blank" class="mip-link secondary">🔗 Bekijk op RCE site</a>
+      </div>
+    </div>
   </div>
 
   <main class="main-fullscreen">
@@ -39,7 +62,11 @@
     <button id="locateBtn" class="locate-fab" aria-label="Bepaal mijn positie"><svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></button>
     <div id="opacityBar" class="map-bottom-bar">
       <input id="historischeOpacity" type="range" min="0" max="100" value="55">
-      <span id="historischeOpacityValue" class="value">55%</span><div class="bar-divider"></div><button id="toggleBAGBtn" class="bag-toggle-btn active" title="BAG">BAG</button><button id="toggleMIPBtn" class="mip-toggle-btn active" title="MIP">MIP</button></div>
+      <span id="historischeOpacityValue" class="value">55%</span>
+      <div class="bar-divider"></div>
+      <button id="toggleBAGBtn" class="bag-toggle-btn active" aria-label="BAG aan/uit" title="BAG gebouwen aan/uit"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2L2 7v3c0 5.25 3.84 10.14 10 11.42C18.16 20.14 22 15.25 22 10V7L12 2m0 2.18l6 2.7v2.49c0 4.12-2.88 8.33-6 9.72-3.12-1.39-6-5.6-6-9.72V6.88l6-2.7M9 10v2H7v-2h2m4 0v2h-2v-2h2m4 0v2h-2v-2h2M9 14v2H7v-2h2m4 0v2h-2v-2h2m4 0v2h-2v-2h2z"/></svg></button>
+      <button id="toggleMIPBtn" class="mip-toggle-btn active" aria-label="MIP aan/uit" title="MIP objecten aan/uit"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 2.18l6 2.18v4.64c0 3.9-2.54 7.94-6 9.18-3.46-1.24-6-5.28-6-9.18V6.36l6-2.18zM11 14h2v2h-2v-2m0-7h2v5h-2V7z"/></svg></button>
+    </div>
     <div id="status" class="status-toast">Druk op het kompas-icoontje om je positie te bepalen.</div>
   </main>
 
