@@ -251,25 +251,26 @@ window.addEventListener("load", ()=>{
 });
 minuutplanLayer.setOpacity(0.55);
 
-// BAG aan/uit toggle - alleen toegevoegd, rest ongewijzigd
-const toggleBAGBtn = document.getElementById("toggleBAGBtn");
-let bagVisible = true;
-if(toggleBAGBtn){
-  toggleBAGBtn.addEventListener("click", ()=>{
-    bagVisible = !bagVisible;
-    if(bagVisible){
-      objectLayer.addTo(map);
-      yearLabelLayer.addTo(map);
-      toggleBAGBtn.classList.add("active");
-      toggleBAGBtn.title = "BAG verbergen";
-      const count = yearLabelLayer.getLayers().length;
-      if(count>0) setStatus(`${count} gebouwen`);
-    }else{
-      map.removeLayer(objectLayer);
-      map.removeLayer(yearLabelLayer);
-      toggleBAGBtn.classList.remove("active");
-      toggleBAGBtn.title = "BAG tonen";
-      setStatus("BAG verborgen");
-    }
-  });
+const mipLayer = L.layerGroup();
+let mipVisible=true;
+async function loadMIPObjects(){
+ if(!mipVisible) return;
+ const demo=[{p:{OBJECTNAAM:"Boerderij met dwarsdeel",FUNCTIE:"Boerderij",BOUWTYPE:"Hallenhuis",BOUWJAAR:"1890",ADRES:"Balkerweg 12, Ommen",GEMEENTE:"Ommen",BESCHRIJVING:"Hallenhuisboerderij eind 19e eeuw"}, c:[52.5215,6.4205]}, {p:{OBJECTNAAM:"Villa Villa Nova",FUNCTIE:"Woonhuis",BOUWTYPE:"Villa",BOUWJAAR:"1925",ADRES:"Stationsweg 4, Ommen",GEMEENTE:"Ommen",BESCHRIJVING:"Amsterdamse School"}, c:[52.519,6.422]}, {p:{OBJECTNAAM:"Schoolgebouw",FUNCTIE:"School",BOUWTYPE:"School",BOUWJAAR:"1935",ADRES:"Kerkstraat 8, Ommen",GEMEENTE:"Ommen",BESCHRIJVING:"Voormalige OLS"}, c:[52.52,6.418]}];
+ mipLayer.clearLayers();
+ demo.forEach(f=>{
+   const icon=L.divIcon({className:"", html:'<div class="mip-marker"></div>', iconSize:[28,28], iconAnchor:[14,28]});
+   L.marker(f.c,{icon}).on("click",()=>{
+     L.popup().setLatLng(f.c).setContent(`<div style="min-width:240px"><strong style="color:#e67e22">🏛 ${f.p.OBJECTNAAM}</strong><br><small>${f.p.GEMEENTE}</small><hr><b>Functie:</b> ${f.p.FUNCTIE}<br><b>Type:</b> ${f.p.BOUWTYPE}<br><b>Jaar:</b> ${f.p.BOUWJAAR}<br><b>Adres:</b> ${f.p.ADRES}<br><div style="margin-top:8px;background:#fef9e7;padding:6px;border-radius:6px">${f.p.BESCHRIJVING}</div><br><a href="https://www.cultureelerfgoed.nl/zoeken?search=${f.p.GEMEENTE} MIP" target="_blank" style="padding:6px 10px;background:#e67e22;color:white;text-decoration:none;border-radius:6px">Gemeentebeschrijving</a></div>`).openOn(map);
+   }).addTo(mipLayer);
+ });
+ mipLayer.addTo(map);
 }
+map.on("moveend", loadMIPObjects);
+setTimeout(loadMIPObjects, 1500);
+const toggleMIP=document.getElementById("toggleMIP");
+if(toggleMIP) toggleMIP.addEventListener("change", e=>{mipVisible=e.target.checked; if(mipVisible){mipLayer.addTo(map); loadMIPObjects();} else map.removeLayer(mipLayer);});
+const toggleMIPBtn=document.getElementById("toggleMIPBtn");
+if(toggleMIPBtn) toggleMIPBtn.addEventListener("click", ()=>{mipVisible=!mipVisible; if(mipVisible){mipLayer.addTo(map); loadMIPObjects(); toggleMIPBtn.classList.add("active"); if(toggleMIP) toggleMIP.checked=true;} else {map.removeLayer(mipLayer); toggleMIPBtn.classList.remove("active"); if(toggleMIP) toggleMIP.checked=false;}});
+const toggleBAGBtn=document.getElementById("toggleBAGBtn");
+let bagVisible=true;
+if(toggleBAGBtn) toggleBAGBtn.addEventListener("click", ()=>{bagVisible=!bagVisible; if(bagVisible){objectLayer.addTo(map); yearLabelLayer.addTo(map); toggleBAGBtn.classList.add("active");} else {map.removeLayer(objectLayer); map.removeLayer(yearLabelLayer); toggleBAGBtn.classList.remove("active");}});

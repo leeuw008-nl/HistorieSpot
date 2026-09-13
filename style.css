@@ -194,3 +194,5 @@ body {
   .map-bottom-bar { max-width: calc(100% - 110px); min-width: 200px; }
   .map-bottom-bar input[type=range] { width:140px; }
 }
+
+.mip-toggle-btn{width:28px;height:28px;border-radius:50%;border:none;background:#e67e22;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer} .mip-toggle-btn.active{background:#e67e22} .mip-toggle-btn:not(.active){background:#e5eaf0;color:#7a8a9a} .bar-divider{width:1px;height:20px;background:#d6dde5;margin:0 2px} .bag-toggle-btn{width:28px;height:28px;border-radius:50%;border:none;background:#0b5cab;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer} .bag-toggle-btn.active{background:#0b5cab} .bag-toggle-btn:not(.active){background:#e5eaf0;color:#7a8a9a} .mip-badge{background:#e67e22;color:white;border:2px solid white;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800} .mip-marker{width:28px;height:28px;background:#e67e22;border:2px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
