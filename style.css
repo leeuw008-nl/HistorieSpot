@@ -53,8 +53,8 @@ body {
   position:absolute;
   bottom:24px;
   right:16px;
-  width:48px;
-  height:48px;
+  width:56px;
+  height:56px;
   border-radius:50%;
   background:white;
   border:none;
@@ -72,7 +72,7 @@ body {
 
 /* ZOOM - Leaflet default links onder, iets hoger */
 .leaflet-bottom.leaflet-left {
-  bottom: 24px;
+  bottom: 20px;
 }
 .leaflet-control-zoom {
   border-radius: 14px !important;
@@ -84,22 +84,21 @@ body {
 /* BOTTOM OPACITY SLIDER - midden onder */
 .map-bottom-bar {
   position:absolute;
-  bottom:24px;
+  bottom:12px;
   left:50%;
   transform: translateX(-50%);
   z-index:800;
   background: rgba(255,255,255,0.94);
   backdrop-filter: blur(8px);
   border-radius: 999px;
-  padding: 10px 18px;
-  height: 48px;
+  padding: 8px 14px;
   display:flex;
   align-items:center;
   gap:10px;
   box-shadow:0 4px 14px rgba(0,0,0,0.18);
   border:1px solid rgba(0,0,0,0.06);
-  min-width: 240px;
-  max-width: calc(100% - 170px);
+  min-width: 190px;
+  max-width: calc(100% - 160px);
 }
 .map-bottom-bar.hidden { display:none; }
 .map-bottom-bar label {
@@ -113,7 +112,7 @@ body {
 .map-bottom-bar input[type=range] {
   -webkit-appearance:none;
   appearance:none;
-  width:180px;
+  width:120px;
   height:6px;
   background:#d6dde5;
   border-radius:999px;
@@ -122,17 +121,17 @@ body {
 }
 .map-bottom-bar input[type=range]::-webkit-slider-thumb {
   -webkit-appearance:none;
-  width:20px;
-  height:20px;
+  width:16px;
+  height:16px;
   border-radius:50%;
   background:#0b5cab;
   border:2px solid white;
-  box-shadow:0 2px 6px rgba(0,0,0,0.25);
+  box-shadow:0 1px 4px rgba(0,0,0,0.25);
   cursor:pointer;
 }
 .map-bottom-bar input[type=range]::-moz-range-thumb {
-  width:20px;
-  height:20px;
+  width:16px;
+  height:16px;
   border-radius:50%;
   background:#0b5cab;
   border:2px solid white;
@@ -203,5 +202,5 @@ body {
 
 @media (max-width:480px){
   .map-bottom-bar { max-width: calc(100% - 140px); min-width: 160px; padding:6px 10px; bottom:20px; }
-  .map-bottom-bar input[type=range] { width:120px; }
+  .map-bottom-bar input[type=range] { width:80px; }
 }
