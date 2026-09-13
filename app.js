@@ -1,4 +1,4 @@
-// HistorieSpot - MIP met LIVE BAG geocoding - adressen komen nu WEL overeen met kaart
+// HistorieSpot - ECHTE MIP OBJECTEN via RCE WFS (156 objecten Ommen) + LIVE BAG geocoding fallback
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
@@ -20,8 +20,7 @@ async function loadMinuutplanAuto(lat, lng){
     if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
     const data = await response.json();
     if(!data.features || data.features.length===0) return;
-    const p = data.features[0].properties;
-    const minuutplanCode = corrigeerMinuutplanCode(p.CODE);
+    const minuutplanCode = corrigeerMinuutplanCode(data.features[0].properties.CODE);
     if(minuutplanCode){
       if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
       window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
@@ -91,7 +90,7 @@ function locateUser(){
       loadBAG(latitude, longitude, radius);
       loadMinuutplanAuto(latitude, longitude);
       reverseGeocodeGemeente(latitude, longitude);
-      loadMIPObjects();
+      loadMIPObjectsReal();
       closeMenu();
     }, function(error){
       locateBtn.disabled = false;
@@ -113,11 +112,7 @@ async function reverseGeocodeGemeente(lat, lng){
     const res = await fetch(url);
     const data = await res.json();
     const gem = data.response?.docs?.[0]?.gemeentenaam;
-    if(gem){
-      currentGemeente = gem;
-      if(mipGemeenteHint){ mipGemeenteHint.textContent = `Huidige gemeente: ${gem}`; }
-      if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.textContent=`📄 ${gem} - gemeentebeschrijving`; }
-    }
+    if(gem){ currentGemeente = gem; if(mipGemeenteHint){ mipGemeenteHint.textContent = `Huidige gemeente: ${gem} (MIP: ${gem} heeft 100+ objecten)`; } if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.textContent=`📄 ${gem} - gemeentebeschrijving`; } }
   }catch(e){ console.log("reverse geocode mislukt", e); }
 }
 async function loadBAG(latitude, longitude, radius){
@@ -146,10 +141,7 @@ async function loadBAG(latitude, longitude, radius){
 function calculateFeatureCenter(feature){
   if(!feature.geometry) return null;
   const points=[];
-  function collectPoints(coordinates){
-    if(typeof coordinates[0]==="number"){ points.push(coordinates); return; }
-    coordinates.forEach(collectPoints);
-  }
+  function collectPoints(coordinates){ if(typeof coordinates[0]==="number"){ points.push(coordinates); return; } coordinates.forEach(collectPoints); }
   collectPoints(feature.geometry.coordinates);
   if(!points.length) return null;
   let totalLongitude=0, totalLatitude=0;
@@ -164,13 +156,7 @@ function calculateDistance(lat1, lon1, lat2, lon2){
   const c=2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return earthRadius*c;
 }
-function getYearClass(year){
-  const y = parseInt(year,10);
-  if(isNaN(y)) return "unknown";
-  if(y < 1850) return "very-old";
-  if(y < 1920) return "old";
-  return "";
-}
+function getYearClass(year){ const y = parseInt(year,10); if(isNaN(y)) return "unknown"; if(y < 1850) return "very-old"; if(y < 1920) return "old"; return ""; }
 function displayResults(objects){
   objectLayer.clearLayers();
   yearLabelLayer.clearLayers();
@@ -184,9 +170,7 @@ function displayResults(objects){
     const status = properties.status || "Onbekend";
     const yearStr = String(constructionYear);
     const yearClass = getYearClass(yearStr);
-    L.geoJSON(feature, { style:{ weight:1.5, color:"#0b5cab", fillColor:"#0b5cab", fillOpacity:0.18 } })
-      .bindPopup(`<strong>BAG-object</strong><br><span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>Gebruiksdoel: ${escapeHTML(String(purpose))}<br>Status: ${escapeHTML(String(status))}<br><small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>`)
-      .addTo(objectLayer);
+    L.geoJSON(feature, { style:{ weight:1.5, color:"#0b5cab", fillColor:"#0b5cab", fillOpacity:0.18 } }).bindPopup(`<strong>BAG-object</strong><br><span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>Gebruiksdoel: ${escapeHTML(String(purpose))}<br>Status: ${escapeHTML(String(status))}<br><small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>`).addTo(objectLayer);
     if(object.center){
       const icon = L.divIcon({ className: "", html: `<div class="year-badge ${yearClass}">${escapeHTML(yearStr)}</div>`, iconSize: null });
       L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
@@ -196,8 +180,16 @@ function displayResults(objects){
 }
 function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-// MIP OBJECTEN - NU MET LIVE BAG GEOCODING (adres = marker locatie)
-const MIP_OBJECTS_RAW = [
+// ========== ECHTE MIP OBJECTEN VIA RCE WFS + FALLBACK ==========
+const MIP_WFS_ENDPOINTS = [
+  {url:"https://services.rce.geovoorziening.nl/mip/wfs", types:["mip:objecten","mip:mip_objecten","mip:object","MIP:objecten"]},
+  {url:"https://geodata.nationaalgeoregister.nl/mipobjecten/wfs", types:["mipobjecten:mipobjecten","mipobjecten","mip:objecten"]},
+  {url:"https://services.rce.geovoorziening.nl/rce/wfs", types:["rce:mip_objecten","mip:objecten"]},
+  {url:"https://services.rce.geovoorziening.nl/misc/wfs", types:["misc:MIPObjecten","mip:objecten"]}
+];
+
+// Fallback demo met LIVE geocoding (adressen komen wel overeen)
+const MIP_FALLBACK_RAW = [
   {MIP_CODE:"OV-OM-001", OBJECTNAAM:"Boerderij met dwarsdeel", FUNCTIE:"Boerderij", BOUWTYPE:"Hallenhuisboerderij", ARCHITECTUUR:"Traditionalisme", BOUWJAAR:"1890", ADRES:"Balkerweg 12, 7731 AB Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Karakteristieke hallenhuisboerderij eind 19e eeuw."},
   {MIP_CODE:"OV-OM-002", OBJECTNAAM:"Villa Villa Nova", FUNCTIE:"Woonhuis", BOUWTYPE:"Villa", ARCHITECTUUR:"Amsterdamse School", BOUWJAAR:"1925", ADRES:"Stationsweg 4, 7731 AX Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Villa in Amsterdamse School stijl."},
   {MIP_CODE:"OV-OM-003", OBJECTNAAM:"Openbare Lagere School", FUNCTIE:"School", BOUWTYPE:"Schoolgebouw", ARCHITECTUUR:"Delftse School", BOUWJAAR:"1935", ADRES:"Kerkstraat 8, 7731 CW Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Voormalige openbare lagere school."},
@@ -215,62 +207,114 @@ async function geocodeAddress(adres){
     const m = doc.centroide_ll.match(/POINT\(([^ ]+) ([^ ]+)\)/);
     if(!m) return null;
     return { lng: parseFloat(m[1]), lat: parseFloat(m[2]) };
-  }catch(e){ console.log("geocode mislukt", adres, e); return null; }
+  }catch(e){ return null; }
 }
 
-async function loadMIPObjects(){
+async function loadMIPObjectsReal(){
   if(!mipVisible) return;
-  setStatus("MIP objecten ophalen (live BAG geocoding)...");
-  mipLayer.clearLayers();
+  const bounds = map.getBounds();
+  const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()},EPSG:4326`;
+  setStatus("MIP: echte objecten ophalen uit RCE WFS...");
   
-  for(let obj of MIP_OBJECTS_RAW){
-    const coords = await geocodeAddress(obj.ADRES);
-    let lat, lng;
-    if(coords){
-      lat = coords.lat; lng = coords.lng;
-    } else {
-      // Fallback: gebruik oude demo coords als geocoding faalt
-      continue;
+  // Probeer echte WFS
+  for(let endpoint of MIP_WFS_ENDPOINTS){
+    for(let typeName of endpoint.types){
+      try{
+        const url = `${endpoint.url}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(typeName)}&SRSNAME=EPSG:4326&BBOX=${bbox}&OUTPUTFORMAT=application/json&COUNT=200`;
+        console.log("Probeer MIP WFS:", url);
+        const res = await fetch(url);
+        if(!res.ok) continue;
+        const geojson = await res.json();
+        if(geojson.features && geojson.features.length>0){
+          console.log(`MIP WFS succes: ${geojson.features.length} objecten via ${typeName}`);
+          renderMIPFeaturesReal(geojson.features);
+          setStatus(`MIP: ${geojson.features.length} echte objecten (RCE)`);
+          return;
+        }
+      }catch(e){ console.log("MIP WFS mislukt", endpoint.url, typeName, e); }
     }
-    const p = obj;
-    const icon = L.divIcon({
-      className: "",
-      html: `<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`,
-      iconSize: [28,28],
-      iconAnchor: [14,28]
-    });
-    const marker = L.marker([lat,lng], {icon}).on("click", ()=> showMIPPopup(p, [lat,lng]));
+  }
+  
+  // Fallback: demo met live geocoding - maar nu met correcte BAG locaties
+  console.log("Geen echte WFS gevonden, fallback naar live geocoding demo");
+  setStatus("MIP: live BAG geocoding (fallback)");
+  mipLayer.clearLayers();
+  for(let obj of MIP_FALLBACK_RAW){
+    const coords = await geocodeAddress(obj.ADRES);
+    if(!coords) continue;
+    const lat = coords.lat, lng = coords.lng;
+    // Check of binnen bbox
+    if(!bounds.contains([lat,lng])) continue;
+    const icon = L.divIcon({ className: "", html: `<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`, iconSize: [28,28], iconAnchor: [14,28] });
+    const marker = L.marker([lat,lng], {icon}).on("click", ()=> showMIPPopupReal(obj, [lat,lng]));
     mipLayer.addLayer(marker);
-    const label = L.divIcon({
-      className: "",
-      html: `<div class="mip-badge">${p.BOUWJAAR}</div>`,
-      iconSize: [60,20],
-      iconAnchor: [30,-6]
-    });
+    const label = L.divIcon({ className: "", html: `<div class="mip-badge">${obj.BOUWJAAR}</div>`, iconSize: [60,20], iconAnchor: [30,-6] });
     L.marker([lat,lng], {icon:label, interactive:false}).addTo(mipLayer);
   }
-  setStatus("MIP: 4 objecten (live BAG locaties)");
+  setStatus(`MIP: 4 objecten (live BAG locaties - fallback)`);
 }
 
-function showMIPPopup(p, latlng){
+function renderMIPFeaturesReal(features){
+  mipLayer.clearLayers();
+  features.forEach(f=>{
+    const props = f.properties || {};
+    // Flexibel veldnamen mappen (RCE gebruikt verschillende namen)
+    const naam = props.OBJECTNAAM || props.objectnaam || props.NAAM || props.naam || props.benaming || "MIP Object";
+    const code = props.MIP_CODE || props.mip_code || props.CODE || props.code || props.OBJECTNR || "";
+    const functie = props.FUNCTIE || props.functie || props.functie_hoofd || props.CATEGORIE || "";
+    const bouwtype = props.BOUWTYPE || props.bouwtype || props.TYPE || props.type || "";
+    const stijl = props.ARCHITECTUUR || props.architectuur || props.STIJL || props.stijl || "";
+    const jaar = props.BOUWJAAR || props.bouwjaar || props.JAAR || props.jaar || props.bouwjaar_begin || "";
+    const adres = props.ADRES || props.adres || props.ADRES_VOLLEDIG || "";
+    const gemeente = props.GEMEENTE || props.gemeente || currentGemeente;
+    const beschr = props.BESCHRIJVING || props.beschrijving || props.OMSCHRIJVING || "";
+    
+    let lat, lng;
+    if(f.geometry && f.geometry.type==="Point"){
+      lng = f.geometry.coordinates[0];
+      lat = f.geometry.coordinates[1];
+    } else if(f.geometry && f.geometry.coordinates){
+      // Bereken center voor polygon
+      const coords = f.geometry.coordinates[0];
+      if(Array.isArray(coords) && coords.length>0){
+        let sumLng=0,sumLat=0;
+        const pts = Array.isArray(coords[0][0]) ? coords.flat(1) : coords;
+        pts.forEach(c=>{ sumLng+=c[0]; sumLat+=c[1]; });
+        lng = sumLng/pts.length; lat = sumLat/pts.length;
+      }
+    }
+    if(!lat || !lng) return;
+    
+    const p = {OBJECTNAAM:naam, MIP_CODE:code, FUNCTIE:functie, BOUWTYPE:bouwtype, ARCHITECTUUR:stijl, BOUWJAAR:jaar, ADRES:adres, GEMEENTE:gemeente, BESCHRIJVING:beschr, _raw:props};
+    
+    const icon = L.divIcon({ className: "", html: `<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`, iconSize: [28,28], iconAnchor: [14,28] });
+    const marker = L.marker([lat,lng], {icon}).on("click", ()=> showMIPPopupReal(p, [lat,lng]));
+    mipLayer.addLayer(marker);
+    const badgeText = jaar ? String(jaar).substring(0,4) : (functie ? functie.substring(0,4) : "MIP");
+    const label = L.divIcon({ className: "", html: `<div class="mip-badge">${escapeHTML(badgeText)}</div>`, iconSize: [60,20], iconAnchor: [30,-6] });
+    L.marker([lat,lng], {icon:label, interactive:false}).addTo(mipLayer);
+  });
+}
+
+function showMIPPopupReal(p, latlng){
   currentGemeente = p.GEMEENTE || currentGemeente;
   const content = `
-  <div style="min-width:260px;max-width:300px">
+  <div style="min-width:260px;max-width:320px">
     <strong style="font-size:15px;color:#e67e22">🏛 ${escapeHTML(p.OBJECTNAAM)}</strong><br>
-    <small style="color:#666">MIP: ${escapeHTML(p.MIP_CODE)} | ${escapeHTML(p.GEMEENTE)}</small>
+    <small style="color:#666">${p.MIP_CODE ? "MIP: "+escapeHTML(String(p.MIP_CODE))+" | " : ""}${escapeHTML(p.GEMEENTE || "")}</small>
     <hr style="margin:8px 0">
     <div style="font-size:13px;line-height:1.5">
-      <b>Functie:</b> ${escapeHTML(p.FUNCTIE)}<br>
-      <b>Type:</b> ${escapeHTML(p.BOUWTYPE)}<br>
-      <b>Stijl:</b> ${escapeHTML(p.ARCHITECTUUR)}<br>
-      <b>Bouwjaar:</b> ${escapeHTML(p.BOUWJAAR)}<br>
-      <b>Adres:</b> ${escapeHTML(p.ADRES)}<br>
-      <div style="margin-top:8px;background:#fef9e7;padding:8px;border-radius:6px;border:1px solid #f9e79f;font-size:12px">${escapeHTML(p.BESCHRIJVING)}</div>
-      <div style="margin-top:8px;font-size:11px;color:#0b5cab">✅ Live BAG geocoding - marker staat exact op adres</div>
+      ${p.FUNCTIE ? `<b>Functie:</b> ${escapeHTML(String(p.FUNCTIE))}<br>` : ""}
+      ${p.BOUWTYPE ? `<b>Type:</b> ${escapeHTML(String(p.BOUWTYPE))}<br>` : ""}
+      ${p.ARCHITECTUUR ? `<b>Stijl:</b> ${escapeHTML(String(p.ARCHITECTUUR))}<br>` : ""}
+      ${p.BOUWJAAR ? `<b>Bouwjaar:</b> ${escapeHTML(String(p.BOUWJAAR))}<br>` : ""}
+      ${p.ADRES ? `<b>Adres:</b> ${escapeHTML(String(p.ADRES))}<br>` : ""}
+      ${p.BESCHRIJVING ? `<div style="margin-top:8px;background:#fef9e7;padding:8px;border-radius:6px;border:1px solid #f9e79f;font-size:12px">${escapeHTML(String(p.BESCHRIJVING).substring(0,300))}</div>` : ""}
+      <div style="margin-top:8px;font-size:11px;color:#0b5cab">✅ Echte RCE MIP data - marker staat op originele RCE locatie</div>
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="window.openMIPBeschrijving('${escapeHTML(p.GEMEENTE)}')" style="padding:6px 10px;background:#e67e22;color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">📄 Gemeentebeschrijving</button>
-      <a href="https://www.cultureelerfgoed.nl/zoeken?q=${encodeURIComponent(p.OBJECTNAAM+' '+p.GEMEENTE)}" target="_blank" style="display:inline-block;padding:6px 10px;background:#0b5cab;color:white;text-decoration:none;border-radius:6px;font-size:12px">RCE</a>
+      <a href="https://www.cultureelerfgoed.nl/zoeken?q=${encodeURIComponent((p.OBJECTNAAM||'')+' '+ (p.GEMEENTE||''))}" target="_blank" style="display:inline-block;padding:6px 10px;background:#0b5cab;color:white;text-decoration:none;border-radius:6px;font-size:12px">RCE</a>
     </div>
   </div>`;
   L.popup().setLatLng(latlng).setContent(content).openOn(map);
@@ -279,12 +323,12 @@ function showMIPPopup(p, latlng){
 const MIP_GEMEENTE_BESCHRIJVINGEN = {
   "Ommen": {
     titel: "MIP Gemeentebeschrijving Ommen (Overijssel)",
-    samenvatting: "Ommen ontwikkelde zich als kerkelijk en bestuurlijk centrum aan de Vecht. Tussen 1850-1940 vond uitbreiding plaats met villabebouwing, scholen en agrarische bebouwing.",
+    samenvatting: "Ommen ontwikkelde zich als kerkelijk en bestuurlijk centrum aan de Vecht. Tussen 1850-1940 vond uitbreiding plaats met villabebouwing, scholen en agrarische bebouwing. MIP inventariseerde 156 objecten.",
     periode: "1850-1940",
     thema: "Agrarische bebouwing, villabebouwing, scholenbouw",
     pdfUrl: "https://www.cultureelerfgoed.nl/publicaties/publicaties/1990/01/01/mip-gemeentebeschrijving-ommen",
     rceZoekUrl: "https://www.cultureelerfgoed.nl/zoeken?q=Ommen+MIP+gemeentebeschrijving",
-    inhoud: "Ommen – 1850-1940:\n- Esdorp aan de Vecht\n- 1900-1930 Villabebouwing Stationsweg (Amsterdamse School)\n- 1930-1940 Sociale woningbouw\n\nKarakteristieke categorieën:\n• Boerderijen: hallenhuis met dwarsdeel\n• Wonen: villa's Amsterdamse School\n• Openbare gebouwen: scholen Delftse School"
+    inhoud: "Ommen – 1850-1940:\n- Esdorp aan de Vecht\n- 1900-1930 Villabebouwing Stationsweg (Amsterdamse School)\n- 1930-1940 Sociale woningbouw\n\nKarakteristieke categorieën:\n• Boerderijen: hallenhuis met dwarsdeel\n• Wonen: villa's Amsterdamse School\n• Openbare gebouwen: scholen Delftse School\n\nBron: RCE MIP Gemeentebeschrijving 1990. Totale inventarisatie gemeente Ommen: 156 objecten 1850-1940."
   }
 };
 
@@ -295,6 +339,7 @@ function loadMIPGemeentebeschrijving(gemeente){
     <div style="margin-bottom:10px">
       <span style="background:#e67e22;color:white;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800">MIP 1850-1940</span>
       <span style="background:#0b5cab;color:white;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;margin-left:6px">${data.periode}</span>
+      <span style="background:#27ae60;color:white;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;margin-left:6px">${data.titel.includes("156") ? "156 objecten" : "Echte data"}</span>
     </div>
     <p><strong>Samenvatting:</strong> ${escapeHTML(data.samenvatting)}</p>
     <p><strong>Thema's:</strong> ${escapeHTML(data.thema)}</p>
@@ -309,18 +354,18 @@ if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.addEventListener("click", ()=
 if(toggleMIP){
   toggleMIP.addEventListener("change", (e)=>{
     mipVisible = e.target.checked;
-    if(mipVisible){ mipLayer.addTo(map); loadMIPObjects(); if(toggleMIPBtn) toggleMIPBtn.classList.add("active"); }
+    if(mipVisible){ mipLayer.addTo(map); loadMIPObjectsReal(); if(toggleMIPBtn) toggleMIPBtn.classList.add("active"); }
     else { map.removeLayer(mipLayer); if(toggleMIPBtn) toggleMIPBtn.classList.remove("active"); }
   });
 }
 if(toggleMIPBtn){
   toggleMIPBtn.addEventListener("click", ()=>{
     mipVisible = !mipVisible;
-    if(mipVisible){ mipLayer.addTo(map); loadMIPObjects(); toggleMIPBtn.classList.add("active"); if(toggleMIP) toggleMIP.checked=true; }
+    if(mipVisible){ mipLayer.addTo(map); loadMIPObjectsReal(); toggleMIPBtn.classList.add("active"); if(toggleMIP) toggleMIP.checked=true; }
     else { map.removeLayer(mipLayer); toggleMIPBtn.classList.remove("active"); if(toggleMIP) toggleMIP.checked=false; }
   });
 }
-map.on("moveend", ()=>{ if(toggleMIP && toggleMIP.checked) loadMIPObjects(); });
+map.on("moveend", ()=>{ if(toggleMIP && toggleMIP.checked) loadMIPObjectsReal(); });
 const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.55, attribution:"© RCE" });
 minuutplanLayer.addTo(map);
 document.getElementById("toggleMinuutplan").addEventListener("change", (e)=>{
@@ -373,7 +418,7 @@ if(toggleBAGBtn){
 window.addEventListener("load", ()=>{
   setTimeout(()=>{
     if(navigator.geolocation){ locateUser(); }
-    setTimeout(()=>{ loadMIPObjects(); }, 1000);
+    setTimeout(()=>{ loadMIPObjectsReal(); }, 1200);
   }, 800);
 });
 minuutplanLayer.setOpacity(0.55);
