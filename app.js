@@ -11,29 +11,6 @@ const yearLabelLayer = L.layerGroup().addTo(map);
 const MINUUTPLAN_CORRECTIES = { "MIN04041B02": "MIN04041B03", "MIN04041B03": "MIN04041B02" };
 function corrigeerMinuutplanCode(code){ return MINUUTPLAN_CORRECTIES[code] || code; }
 
-async function loadMinuutplanAuto(lat, lng){
-  try{
-    const rd = wgs84ToRD(lat, lng);
-    const bbox = [rd.x-20, rd.y-20, rd.x+20, rd.y+20].join(",");
-    const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
-    const response = await fetch(url);
-    if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
-    const data = await response.json();
-    if(!data.features || data.features.length===0) return;
-    const p = data.features[0].properties;
-    const origineleCode = p.CODE;
-    const minuutplanCode = corrigeerMinuutplanCode(origineleCode);
-    if(minuutplanCode){
-      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
-      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
-      window.historischeMinuutplanLayer.addTo(map);
-      console.log(`Auto kadasterkaart geladen: ${origineleCode} -> ${minuutplanCode} op 55%`);
-      updateOpacityBarVisibility();
-    }
-  }catch(e){ console.error("Auto kadaster laden mislukt", e); }
-}
-
-
 const locateBtn = document.getElementById("locateBtn");
 const radiusSelect = document.getElementById("radius");
 const statusBox = document.getElementById("status");
@@ -99,7 +76,6 @@ function locateUser(){
       accuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color:"#0b5cab", fillOpacity:0.08 }).addTo(map);
       setStatus(`Gevonden (±${accuracy}m) · ${radius}m radius wordt geladen...`);
       loadBAG(latitude, longitude, radius);
-      loadMinuutplanAuto(latitude, longitude);
       closeMenu();
     },
     function(error){
@@ -191,7 +167,7 @@ function displayResults(objects){
       L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
     }
   });
-  setStatus(`${objects.length} gebouwen · bouwjaar op kaart`);
+  setStatus(`${objects.length} gebouwen`);
 }
 function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
@@ -251,3 +227,15 @@ opacitySlider.addEventListener("input", function(){
 });
 opacityValue.textContent=opacitySlider.value+"%";
 updateOpacityBarVisibility();
+
+// Default: auto inzoomen op huidige locatie bij opstart
+window.addEventListener("load", ()=>{
+  // Kleine delay zodat kaart klaar is
+  setTimeout(()=>{ 
+    if(navigator.geolocation){ locateUser(); }
+  }, 800);
+});
+
+// Default kadasterkaart op 55% - zorg dat beide lagen 55% gebruiken
+minuutplanLayer.setOpacity(0.55);
+if(window.historischeMinuutplanLayer){ window.historischeMinuutplanLayer.setOpacity(0.55); }
