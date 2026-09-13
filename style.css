@@ -193,7 +193,6 @@ body {
   margin-top:10px;
   width:100%;
   padding:10px 12px;
-  border:none;
   border-radius:10px;
   background:#fef9e7;
   border:1px solid #f9e79f;
@@ -213,13 +212,30 @@ body {
 .mip-modal .modal-header { flex-shrink:0; }
 .mip-body { overflow-y:auto; max-height: calc(90vh - 60px); }
 .mip-text { font-size:13.5px; line-height:1.6; margin-bottom:14px; background:#fef9e7; padding:12px; border-radius:10px; border:1px solid #f9e79f; }
-.mip-pdf-container { width:100%; height: 480px; border:1px solid #d6dde5; border-radius:10px; overflow:hidden; background:#f8f9fa; }
-.mip-pdf-frame { width:100%; height:100%; border:none; }
+.mip-pdf-container { width:100%; min-height: 120px; border:1px solid #d6dde5; border-radius:10px; overflow:hidden; background:#f8f9fa; padding:16px; text-align:center; }
+.mip-pdf-frame { display:none; } /* RCE blokkeert iframe - we gebruiken knoppen ipv iframe */
 .mip-actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
 .mip-link { display:inline-block; padding:10px 14px; background:#e67e22; color:white; text-decoration:none; border-radius:8px; font-size:13px; font-weight:600; }
 .mip-link.secondary { background:#0b5cab; }
 .mip-link:hover { opacity:0.9; }
-.year-badge { background:#0b5cab; color:white; border:2px solid white; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap; line-height:1.2; pointer-events:none; }
+
+/* FIX: bouwjaar badges zelfde breedte voor BAG en MIP */
+.year-badge { 
+  background:#0b5cab; 
+  color:white; 
+  border:2px solid white; 
+  border-radius:999px; 
+  padding:3px 10px; 
+  font-size:11px; 
+  font-weight:800; 
+  box-shadow:0 2px 6px rgba(0,0,0,0.3); 
+  white-space:nowrap; 
+  line-height:1.2; 
+  pointer-events:none;
+  min-width: 44px;
+  text-align:center;
+  display:inline-block;
+}
 .year-badge.unknown { background:#6b7d8e; }
 .year-badge.very-old { background:#8b4513; }
 .year-badge.old { background:#b7791f; }
@@ -235,15 +251,9 @@ body {
   white-space:nowrap; 
   line-height:1.2; 
   pointer-events:none;
-  min-width:44px;
+  min-width: 44px;
   text-align:center;
   display:inline-block;
-}
-.year-badge {
-  min-width:44px;
-  text-align:center;
-  display:inline-block;
-  padding:3px 10px;
 }
 .mip-marker { width:28px; height:28px; background:#e67e22; border:2px solid white; border-radius:50% 50% 50% 0; transform: rotate(-45deg); box-shadow:0 2px 6px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; }
 .mip-marker-inner { transform: rotate(45deg); font-size:14px; color:white; }
@@ -253,5 +263,4 @@ body {
   .map-bottom-bar { max-width: calc(100% - 110px); min-width: 300px; }
   .map-bottom-bar input[type=range] { width:120px; }
   .mip-modal { width:98%; max-height:92vh; }
-  .mip-pdf-container { height: 380px; }
 }
