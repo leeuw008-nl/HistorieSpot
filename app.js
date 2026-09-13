@@ -394,8 +394,10 @@ function loadMIPGemeentebeschrijving(gemeente){
   // PDF iframe - probeer echte PDF, fallback naar RCE site
   if(isOmmen){
     // Voor demo: gebruik RCE site in iframe, echte PDF URL werkt vaak met X-Frame-Options block, dus we linken
-    // mipPdfFrame.src = beschrijving.rceZoekUrl; // geblokkeerd door RCE, dus niet gebruiken
-  mipPdfFrame.style.display = "none";
+    mipPdfFrame.src = beschrijving.rceZoekUrl;
+  } else {
+    mipPdfFrame.src = beschrijving.rceZoekUrl;
+  }
   
   mipPdfLink.href = beschrijving.pdfUrl;
   mipRceLink.href = beschrijving.rceZoekUrl;
