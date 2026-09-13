@@ -5,8 +5,9 @@ let curMarker=null,accCircle=null,lastLat=52.516,lastLng=6.42;
 const bagLayer=L.layerGroup().addTo(map),bagLabel=L.layerGroup().addTo(map),monLayer=L.layerGroup().addTo(map),monLabel=L.layerGroup().addTo(map);
 const minuutLayer=L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms",{layers:"Minuutplanbegrenzingen",format:"image/png",transparent:true,version:"1.3.0",opacity:0.5}).addTo(map);
 minuutLayer.addTo(map);
-const MIN_CORR={"MIN04041B02":"MIN04041B03","MIN04041B03":"MIN04041B02"};
-function corr(c){return MIN_CORR[c]||c;}
+const CORR={"MIN04041B02":"MIN04041B03","MIN04041B03":"MIN04041B02"};
+function corr(c){return CORR[c]||c;}
+// menu/info
 const menuBtn=document.getElementById("menuBtn"),closeMenuBtn=document.getElementById("closeMenuBtn"),sideMenu=document.getElementById("sideMenu"),menuOverlay=document.getElementById("menuOverlay");
 const infoBtn=document.getElementById("infoBtn"),closeInfoBtn=document.getElementById("closeInfoBtn"),infoModal=document.getElementById("infoModal"),infoOverlay=document.getElementById("infoOverlay");
 const toggleMin=document.getElementById("toggleMinuutplan"),opSlider=document.getElementById("historischeOpacity"),opVal=document.getElementById("historischeOpacityValue");
@@ -26,6 +27,7 @@ opSlider&&opSlider.addEventListener("input",function(){const o=Number(this.value
 toggleBAGBtn&&toggleBAGBtn.addEventListener("click",()=>{const h=map.hasLayer(bagLayer);if(h){map.removeLayer(bagLayer);map.removeLayer(bagLabel);toggleBAGBtn.classList.remove("active");}else{bagLayer.addTo(map);bagLabel.addTo(map);toggleBAGBtn.classList.add("active");}});
 toggleMIPBtn&&toggleMIPBtn.addEventListener("click",()=>{const h=map.hasLayer(monLayer);if(h){map.removeLayer(monLayer);map.removeLayer(monLabel);toggleMIPBtn.classList.remove("active");if(toggleMIP)toggleMIP.checked=false;}else{monLayer.addTo(map);monLabel.addTo(map);toggleMIPBtn.classList.add("active");if(toggleMIP)toggleMIP.checked=true;}});
 toggleMIP&&toggleMIP.addEventListener("change",e=>{if(e.target.checked){monLayer.addTo(map);monLabel.addTo(map);toggleMIPBtn&&toggleMIPBtn.classList.add("active");}else{map.removeLayer(monLayer);map.removeLayer(monLabel);toggleMIPBtn&&toggleMIPBtn.classList.remove("active");}});
+
 const locateBtn=document.getElementById("locateBtn"),radiusSel=document.getElementById("radius"),statusBox=document.getElementById("status");
 function setStatus(t){if(statusBox)statusBox.textContent=t;}
 function esc(s){return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");}
@@ -33,8 +35,30 @@ function yearClass(y){const n=parseInt(y,10);if(isNaN(n))return"unknown";if(n<18
 function dist(a,b,c,d){const R=6371000,la=(c-a)*Math.PI/180,lo=(d-b)*Math.PI/180;const x=Math.sin(la/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(lo/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 function box(lat,lng,r){const dLa=r/111320,dLo=r/(111320*Math.cos(lat*Math.PI/180));return{minLa:lat-dLa,maxLa:lat+dLa,minLo:lng-dLo,maxLo:lng+dLo};}
 function centerOf(f){if(!f.geometry)return null;const pts=[];function rec(c){if(typeof c[0]==="number"){pts.push(c);return;}c.forEach(rec);}rec(f.geometry.coordinates);if(!pts.length)return null;let sl=0,sa=0;pts.forEach(p=>{sl+=p[0];sa+=p[1];});return{lat:sa/pts.length,lng:sl/pts.length};}
-function wgs84ToRD(lat,lon){const dF=0.36*(lat-52.1551744),dL=0.36*(lon-5.38720621);const x=155000+190094.945*dL, y=463000+309056.544*dF;return{x,y};}
-const MON=[{n:"Woonhuis",b:"1910",a:"Bouwstraat 6/7",t:"G",lat:52.5194,lng:6.4242},{n:"De Bakoven",b:"1905",a:"Brugstraat 17",t:"G",lat:52.5183,lng:6.4225},{n:"Woonhuis",b:"1938",a:"De Kamp 38",t:"G",lat:52.508,lng:6.4245},{n:"Soltana",b:"1930",a:"De Kamp 44",t:"G",lat:52.5072,lng:6.4242},{n:"Den Hof",b:"1903",a:"De Voormars 4",t:"G",lat:52.52,lng:6.4194},{n:"Woonhuis",b:"1900",a:"Den Oordt 6",t:"G",lat:52.5178,lng:6.425},{n:"Edith-Hof",b:"1928",a:"Edith-Hof",t:"G",lat:52.5142,lng:6.426},{n:"Hei en Dennen",b:"1903",a:"Hammerweg 14",t:"G",lat:52.5089,lng:6.4197},{n:"Laarhoeve",b:"1849",a:"Koesteeg 5",t:"G",lat:52.515,lng:6.4194},{n:"Winkelpand",b:"1903",a:"Kruisstraat 1",t:"G",lat:52.5192,lng:6.4233},{n:"VVV-kantoor",b:"1881",a:"Kruisstraat 6",t:"G",lat:52.5192,lng:6.4236},{n:"Postkantoor",b:"1905",a:"Markt 17",t:"G",lat:52.5178,lng:6.4231},{n:"Stadhuis",b:"1828",a:"Markt 1-5",t:"R",lat:52.5189,lng:6.4239},{n:"Brigitta Kerk",b:"15e eeuw",a:"Kerkplein 2",t:"R",lat:52.5186,lng:6.4233},{n:"Den Oordt Molen",b:"1824",a:"Den Oordt 7",t:"R",lat:52.5178,lng:6.4256},{n:"De Lelie",b:"1846",a:"Molenpad 7",t:"R",lat:52.5219,lng:6.4261},{n:"Olde Vechte",b:"1849",a:"Zeesserweg 12",t:"R",lat:52.5158,lng:6.4278},{n:"Besthmenermolen",b:"1862",a:"Hammerweg 59a",t:"R",lat:52.4969,lng:6.4231},{n:"Het Laar",b:"18e eeuw",a:"Het Laar 2",t:"R",lat:52.5136,lng:6.4136}];
+function wgs84ToRD(lat,lon){
+  const dF=0.36*(lat-52.15517440),dL=0.36*(lon-5.38720621);
+  const x=155000+190094.945*dL-11832.228*dF*dL-114.221*Math.pow(dF,2)*dL-32.391*Math.pow(dL,3)-0.705*dF-2.34*Math.pow(dF,3)*dL-0.608*dF*Math.pow(dL,3)-0.008*Math.pow(dL,2)+0.148*Math.pow(dF,2)*Math.pow(dL,3);
+  const y=463000+309056.544*dF+3638.893*Math.pow(dL,2)+73.077*Math.pow(dF,2)-157.984*dF*Math.pow(dL,2)+59.788*Math.pow(dF,3)+0.433*dL-6.439*Math.pow(dF,2)*Math.pow(dL,2)-0.032*dF*dL+0.092*Math.pow(dL,4)-0.054*dF*Math.pow(dL,4);
+  return{x,y};
+}
+const MON=[
+{n:"Woonhuis",b:"1910",a:"Bouwstraat 6/7",t:"G",lat:52.5194,lng:6.4242},
+{n:"De Bakoven",b:"1905",a:"Brugstraat 17",t:"G",lat:52.5183,lng:6.4225},
+{n:"Woonhuis",b:"1938",a:"De Kamp 38",t:"G",lat:52.508,lng:6.4245},
+{n:"Den Hof",b:"1903",a:"De Voormars 4",t:"G",lat:52.52,lng:6.4194},
+{n:"Edith-Hof",b:"1928",a:"Edith-Hof",t:"G",lat:52.5142,lng:6.426},
+{n:"Laarhoeve",b:"1849",a:"Koesteeg 5",t:"G",lat:52.515,lng:6.4194},
+{n:"VVV-kantoor",b:"1881",a:"Kruisstraat 6",t:"G",lat:52.5192,lng:6.4236},
+{n:"Postkantoor",b:"1905",a:"Markt 17",t:"G",lat:52.5178,lng:6.4231},
+{n:"NS Station",b:"1902",a:"Stationsweg 35",t:"G",lat:52.51,lng:6.4172},
+{n:"Joodse begr.",b:"1700",a:"Van Raaltestraat",t:"G",lat:52.5206,lng:6.426},
+{n:"Stadhuis",b:"1828",a:"Markt 1-5",t:"R",lat:52.5189,lng:6.4239},
+{n:"Brigitta Kerk",b:"15e eeuw",a:"Kerkplein 2",t:"R",lat:52.5186,lng:6.4233},
+{n:"Den Oordt",b:"1824",a:"Den Oordt 7",t:"R",lat:52.5178,lng:6.4256},
+{n:"De Lelie",b:"1846",a:"Molenpad 7",t:"R",lat:52.5219,lng:6.4261},
+{n:"Olde Vechte",b:"1849",a:"Zeesserweg 12",t:"R",lat:52.5158,lng:6.4278},
+{n:"Het Laar",b:"18e eeuw",a:"Het Laar 2",t:"R",lat:52.5136,lng:6.4136}
+];
 async function loadBAG(lat,lng,radius){
   bagLayer.clearLayers();bagLabel.clearLayers();lastLat=lat;lastLng=lng;
   const b=box(lat,lng,radius*1.5);
@@ -52,10 +76,12 @@ function loadMon(lat,lng,radius){
   MON.forEach(m=>{
     const d=dist(lat,lng,m.lat,m.lng);if(d>radius)return;
     const cl=yearClass(m.b),col=m.t==="R"?"#c0392b":"#27ae60";
-    const dot=L.circleMarker([m.lat,m.lng],{radius:7,color:"white",weight:2,fillColor:col,fillOpacity:0.95}).bindPopup(`<b style="color:${col}">${esc(m.n)} (${m.t==="R"?"Rijks":"Gemeentelijk"})</b><br>${esc(m.a)}<br><b>Echt: ${esc(m.b)}</b><br>${Math.round(d)}m`);
+    const popup=`<b style="color:${col}">${esc(m.n)} (${m.t==="R"?"Rijks":"Gemeentelijk"})</b><br>${esc(m.a)}<br><b>Echt: ${esc(m.b)}</b><br>${Math.round(d)}m`;
+    const dot=L.circleMarker([m.lat,m.lng],{radius:8,color:"white",weight:2,fillColor:col,fillOpacity:0.95}).bindPopup(popup);
     monLayer.addLayer(dot);
-    const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="background:${col};border-color:${col}">${esc(m.b.substring(0,4))}</div>`});
-    L.marker([m.lat,m.lng],{icon:ic,interactive:false}).addTo(monLabel);
+    const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="background:${col};border-color:${col};cursor:pointer">${esc(m.b.substring(0,4))}</div>`});
+    const lab=L.marker([m.lat,m.lng],{icon:ic}).bindPopup(popup);
+    monLabel.addLayer(lab);
   });
 }
 locateBtn&&locateBtn.addEventListener("click",()=>{
@@ -74,17 +100,17 @@ locateBtn&&locateBtn.addEventListener("click",()=>{
 });
 radiusSel&&radiusSel.addEventListener("change",()=>{const r=Number(radiusSel.value);if(lastLat!==null)loadBAG(lastLat,lastLng,r);else loadBAG(52.516,6.42,r);});
 map.on("click",async e=>{
-  const has=[...monLayer.getLayers(),...bagLabel.getLayers()].some(l=>{try{return map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(l.getLatLng()))<35;}catch{return false;}});
-  if(has)return;
+  const near=[...monLayer.getLayers()].some(l=>{try{return map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(l.getLatLng()))<50;}catch{return false;}});
+  if(near)return;
   if(!map.hasLayer(minuutLayer))return;
   try{
     const rd=wgs84ToRD(e.latlng.lat,e.latlng.lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
     const res=await fetch(url),data=await res.json();if(!data.features||!data.features.length)return;
-    let code=data.features[0].properties.CODE;code=corr(code);
+    let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
     if(window.histLayer)map.removeLayer(window.histLayer);
     window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(document.getElementById("historischeOpacity").value)/100||0.6,maxZoom:20}).addTo(map);
     const p=data.features[0].properties;
-    L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>Code ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a></div>`).openOn(map);
+    L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE code ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a></div>`).openOn(map);
   }catch(err){console.error(err);}
 });
 window.addEventListener("load",()=>{setTimeout(()=>{const r=Number(radiusSel?.value||100);lastLat=52.516;lastLng=6.42;loadBAG(52.516,6.42,r);},500);});
