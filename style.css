@@ -37,10 +37,10 @@ body {
 #map { width:100%; height:100%; background:#cbd5e1; }
 .locate-fab {
   position:absolute;
-  bottom:64px;
+  bottom:12px;
   right:12px;
   width:48px;
-  height:48px; /* zelfde hoogte als slider bar */
+  height:48px;
   border-radius:50%;
   background:white;
   border:none;
@@ -52,7 +52,7 @@ body {
   cursor:pointer;
   z-index:800;
 }
-.leaflet-bottom.leaflet-left { bottom: 8px; } /* zoom blijft laag */
+.leaflet-bottom.leaflet-left { bottom: 8px; }
 .leaflet-control-zoom {
   border-radius: 14px !important;
   overflow:hidden;
@@ -61,7 +61,7 @@ body {
 }
 .map-bottom-bar {
   position:absolute;
-  bottom:64px; /* hoger los van zoom */
+  bottom:12px;
   left:50%;
   transform: translateX(-50%);
   z-index:800;
