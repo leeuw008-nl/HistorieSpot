@@ -250,3 +250,26 @@ window.addEventListener("load", ()=>{
   }, 800);
 });
 minuutplanLayer.setOpacity(0.55);
+
+// BAG aan/uit toggle - alleen toegevoegd, rest ongewijzigd
+const toggleBAGBtn = document.getElementById("toggleBAGBtn");
+let bagVisible = true;
+if(toggleBAGBtn){
+  toggleBAGBtn.addEventListener("click", ()=>{
+    bagVisible = !bagVisible;
+    if(bagVisible){
+      objectLayer.addTo(map);
+      yearLabelLayer.addTo(map);
+      toggleBAGBtn.classList.add("active");
+      toggleBAGBtn.title = "BAG verbergen";
+      const count = yearLabelLayer.getLayers().length;
+      if(count>0) setStatus(`${count} gebouwen`);
+    }else{
+      map.removeLayer(objectLayer);
+      map.removeLayer(yearLabelLayer);
+      toggleBAGBtn.classList.remove("active");
+      toggleBAGBtn.title = "BAG tonen";
+      setStatus("BAG verborgen");
+    }
+  });
+}
