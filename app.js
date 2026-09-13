@@ -1,4 +1,4 @@
-// HistorieSpot - nieuwe UI: fullscreen kaart, sticky header, fab, bouwjaar op kaart
+// HistorieSpot - fullscreen kaart, sticky header, fab, bouwjaar op kaart + B02/B03 fix
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
@@ -11,6 +11,15 @@ let currentMarker = null;
 let accuracyCircle = null;
 const objectLayer = L.layerGroup().addTo(map);
 const yearLabelLayer = L.layerGroup().addTo(map);
+
+// Fix voor verwisselde minuutplanbladen Ommen - Stad Ommen Sectie B
+const MINUUTPLAN_CORRECTIES = {
+  "MIN04041B02": "MIN04041B03",
+  "MIN04041B03": "MIN04041B02"
+};
+function corrigeerMinuutplanCode(code){
+  return MINUUTPLAN_CORRECTIES[code] || code;
+}
 
 const locateBtn = document.getElementById("locateBtn");
 const radiusSelect = document.getElementById("radius");
@@ -43,7 +52,6 @@ function setStatus(msg){
   statusBox.textContent = msg;
   statusBox.style.opacity = "1";
   clearTimeout(statusBox._hideTimer);
-  // auto fade after 6 sec unless it is an error
   if(!msg.startsWith("⚠️")){
     statusBox._hideTimer = setTimeout(()=>{ statusBox.style.opacity="0.85"; }, 6000);
   }
@@ -167,10 +175,8 @@ function displayResults(objects){
     const constructionYear = properties.bouwjaar ?? "Onbekend";
     const purpose = Array.isArray(properties.gebruiksdoel) ? properties.gebruiksdoel.join(", ") : (properties.gebruiksdoel || "Onbekend");
     const status = properties.status || "Onbekend";
-
     const yearStr = String(constructionYear);
     const yearClass = getYearClass(yearStr);
-
     L.geoJSON(feature, { style:{ weight:1.5, color:"#0b5cab", fillColor:"#0b5cab", fillOpacity:0.18 } })
       .bindPopup(`
         <strong>HistorieSpot BAG-object</strong><br>
@@ -180,7 +186,6 @@ function displayResults(objects){
         <small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>
       `)
       .addTo(objectLayer);
-
     if(object.center){
       const icon = L.divIcon({
         className: "",
@@ -197,9 +202,7 @@ function escapeHTML(value){
   return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
 }
 
-// ========================================
 // HISTORISCHE KAART - KADASTRALE MINUUTPLANS
-// ========================================
 const minuutplanLayer = L.tileLayer.wms(
     "https://services.rce.geovoorziening.nl/misc/wms",
     { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.75, attribution:"© Rijksdienst voor het Cultureel Erfgoed" }
@@ -211,7 +214,6 @@ toggleMinuutplan.addEventListener("change", ()=>{
   else map.removeLayer(minuutplanLayer);
 });
 
-// WGS84 -> RD New
 function wgs84ToRD(lat, lon){
   const dF=0.36*(lat-52.15517440); const dL=0.36*(lon-5.38720621);
   const x=155000+190094.945*dL-11832.228*dF*dL-114.221*Math.pow(dF,2)*dL-32.391*Math.pow(dL,3)-0.705*dF-2.340*Math.pow(dF,3)*dL-0.608*dF*Math.pow(dL,3)-0.008*Math.pow(dL,2)+0.148*Math.pow(dF,2)*Math.pow(dL,3);
@@ -231,15 +233,23 @@ map.on("click", async function(e){
     const data=await response.json();
     if(!data.features || data.features.length===0) return;
     const p=data.features[0].properties;
-    const minuutplanCode=p.CODE;
+    
+    const origineleCode = p.CODE;
+    const minuutplanCode = corrigeerMinuutplanCode(origineleCode);
+    const isGecorrigeerd = origineleCode !== minuutplanCode;
+    if(isGecorrigeerd){
+      console.log(`Minuutplan correctie Ommen: ${origineleCode} -> ${minuutplanCode}`);
+    }
+
     if(minuutplanCode){
       if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); window.historischeMinuutplanLayer=null; }
       window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:0.55,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
       window.historischeMinuutplanLayer.addTo(map);
-      // opacity control in menu
       ensureOpacityControl();
     }
-    let popupContent=`<div style="min-width:240px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>Rijksdienst voor het Cultureel Erfgoed</small><hr><strong>Periode:</strong><br>1811–1832<br><br><strong>Gemeente:</strong><br>${p.GEMEENTE||"onbekend"}<br><br><strong>Sectie:</strong> ${p.SECTIE||""}<br><strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong><br>${p.CODE||""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
+
+    let correctieNote = isGecorrigeerd ? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠️ Correctie toegepast: broncode <b>${origineleCode}</b> verwisseld met <b>${minuutplanCode}</b> (Ommen B02 ↔ B03)</div>` : "";
+    let popupContent=`<div style="min-width:240px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>Rijksdienst voor het Cultureel Erfgoed</small>${correctieNote}<hr><strong>Periode:</strong><br>1811–1832<br><br><strong>Gemeente:</strong><br>${p.GEMEENTE||"onbekend"}<br><br><strong>Sectie:</strong> ${p.SECTIE||""}<br><strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong><br>${p.CODE||""}${isGecorrigeerd ? ` → <b>${minuutplanCode}</b>` : ""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
     L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
   }catch(error){ console.error("Fout bij ophalen minuutplan:", error); }
 });
