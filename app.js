@@ -1,4 +1,4 @@
-// HistorieSpot - Ommen - BAG + 40 gemeentelijk + 20 rijks - zelfde badges + zoekradius + 2 stappen verder ingezoomd
+// Fix menu + info pagina + radius + badges + zoom 18
 const map = L.map("map", { zoomControl: false }).setView([52.516, 6.42], 16);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "OSM" }).addTo(map);
@@ -8,12 +8,62 @@ const bagLayer = L.layerGroup().addTo(map);
 const bagLabel = L.layerGroup().addTo(map);
 const monLayer = L.layerGroup().addTo(map);
 const monLabel = L.layerGroup().addTo(map);
+const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format: "image/png", transparent: true, version: "1.3.0", opacity: 0.5 });
+minuutplanLayer.addTo(map);
+
+// MENU + INFO fix
+const menuBtn = document.getElementById("menuBtn");
+const closeMenuBtn = document.getElementById("closeMenuBtn");
+const sideMenu = document.getElementById("sideMenu");
+const menuOverlay = document.getElementById("menuOverlay");
+const infoBtn = document.getElementById("infoBtn");
+const closeInfoBtn = document.getElementById("closeInfoBtn");
+const infoModal = document.getElementById("infoModal");
+const infoOverlay = document.getElementById("infoOverlay");
+const toggleMinuutplan = document.getElementById("toggleMinuutplan");
+const opacitySlider = document.getElementById("historischeOpacity");
+const opacityValue = document.getElementById("historischeOpacityValue");
+const toggleMIP = document.getElementById("toggleMIP");
+const toggleMIPBtn = document.getElementById("toggleMIPBtn");
+const toggleBAGBtn = document.getElementById("toggleBAGBtn");
+
+function openMenu() { if (sideMenu) sideMenu.classList.add("open"); if (menuOverlay) menuOverlay.classList.remove("hidden"); }
+function closeMenu() { if (sideMenu) sideMenu.classList.remove("open"); if (menuOverlay) menuOverlay.classList.add("hidden"); }
+function openInfo() { if (infoModal) infoModal.classList.remove("hidden"); if (infoOverlay) infoOverlay.classList.remove("hidden"); }
+function closeInfo() { if (infoModal) infoModal.classList.add("hidden"); if (infoOverlay) infoOverlay.classList.add("hidden"); }
+
+if (menuBtn) menuBtn.addEventListener("click", openMenu);
+if (closeMenuBtn) closeMenuBtn.addEventListener("click", closeMenu);
+if (menuOverlay) menuOverlay.addEventListener("click", closeMenu);
+if (infoBtn) infoBtn.addEventListener("click", openInfo);
+if (closeInfoBtn) closeInfoBtn.addEventListener("click", closeInfo);
+if (infoOverlay) infoOverlay.addEventListener("click", closeInfo);
+if (toggleMinuutplan) toggleMinuutplan.addEventListener("change", e => { if (e.target.checked) minuutplanLayer.addTo(map); else map.removeLayer(minuutplanLayer); });
+if (opacitySlider) opacitySlider.addEventListener("input", function () {
+  const o = Number(this.value) / 100;
+  if (window.histLayer) window.histLayer.setOpacity(o);
+  if (minuutplanLayer) minuutplanLayer.setOpacity(o);
+  if (opacityValue) opacityValue.textContent = this.value + "%";
+});
+if (toggleBAGBtn) toggleBAGBtn.addEventListener("click", () => {
+  const has = map.hasLayer(bagLayer);
+  if (has) { map.removeLayer(bagLayer); map.removeLayer(bagLabel); toggleBAGBtn.classList.remove("active"); }
+  else { bagLayer.addTo(map); bagLabel.addTo(map); toggleBAGBtn.classList.add("active"); }
+});
+if (toggleMIPBtn) toggleMIPBtn.addEventListener("click", () => {
+  const has = map.hasLayer(monLayer);
+  if (has) { map.removeLayer(monLayer); map.removeLayer(monLabel); toggleMIPBtn.classList.remove("active"); if (toggleMIP) toggleMIP.checked = false; }
+  else { monLayer.addTo(map); monLabel.addTo(map); toggleMIPBtn.classList.add("active"); if (toggleMIP) toggleMIP.checked = true; }
+});
+if (toggleMIP) toggleMIP.addEventListener("change", e => {
+  if (e.target.checked) { monLayer.addTo(map); monLabel.addTo(map); if (toggleMIPBtn) toggleMIPBtn.classList.add("active"); }
+  else { map.removeLayer(monLayer); map.removeLayer(monLabel); if (toggleMIPBtn) toggleMIPBtn.classList.remove("active"); }
+});
 
 const locateBtn = document.getElementById("locateBtn");
 const radiusSel = document.getElementById("radius");
 const statusBox = document.getElementById("status");
-
-function setStatus(t) { statusBox.textContent = t; }
+function setStatus(t) { if (statusBox) statusBox.textContent = t; }
 function esc(s) { return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
 function yearClass(y) { const n = parseInt(y, 10); if (isNaN(n)) return "unknown"; if (n < 1850) return "very-old"; if (n < 1920) return "old"; return ""; }
 function dist(lat1, lon1, lat2, lon2) {
@@ -30,9 +80,7 @@ function centerOf(f) {
   if (!pts.length) return null; let slng = 0, slat = 0; pts.forEach(p => { slng += p[0]; slat += p[1]; }); return { lat: slat / pts.length, lng: slng / pts.length };
 }
 
-// 40 gemeentelijk + 12 rijks Ommen plaats - echt bouwjaar
 const MONUMENTEN = [
-  // gemeentelijk Ommen plaats 25
   {n:"Woonhuis", b:"1910", a:"Bouwstraat 6/7, Ommen", t:"Gemeentelijk", lat:52.5194, lng:6.4242},
   {n:"Winkel De Bakoven", b:"1905", a:"Brugstraat 17, Ommen", t:"Gemeentelijk", lat:52.5183, lng:6.4225},
   {n:"Woonhuis", b:"1938", a:"De Kamp 38, Ommen", t:"Gemeentelijk", lat:52.508, lng:6.4245},
@@ -58,7 +106,6 @@ const MONUMENTEN = [
   {n:"De Ark", b:"1940", a:"Wolfskuil 41, Ommen", t:"Gemeentelijk", lat:52.5061, lng:6.4042},
   {n:"Piet Hein", b:"1905", a:"Zeesserweg 5, Ommen", t:"Gemeentelijk", lat:52.5158, lng:6.4244},
   {n:"Ada's Hoeve", b:"1853", a:"Zwolseweg 17, Ommen", t:"Gemeentelijk", lat:52.5142, lng:6.4019},
-  // rijks Ommen plaats 12
   {n:"Besthmenermolen", b:"1862", a:"Hammerweg 59a, Ommen", t:"Rijks", lat:52.4969, lng:6.4231},
   {n:"Stadhuis", b:"1828", a:"Markt 1-5, Ommen", t:"Rijks", lat:52.5189, lng:6.4239},
   {n:"Brigitta Kerk", b:"15e eeuw", a:"Kerkplein 2, Ommen", t:"Rijks", lat:52.5186, lng:6.4233},
@@ -88,30 +135,30 @@ async function loadBAG(lat, lng, radius) {
     list.forEach(o => {
       const y = String(o.f.properties.bouwjaar || "Onbekend");
       const cls = yearClass(y);
-      L.geoJSON(o.f, { style: { weight: 1.2, color: "#0b5cab", fillOpacity: 0.15 } }).bindPopup(`<b>BAG</b><br>Bouwjaar BAG: <b>${esc(y)}</b><br>Afstand: ${Math.round(o.d)}m<br>${esc(o.f.properties.gebruiksdoel || "")}`).addTo(bagLayer);
+      L.geoJSON(o.f, { style: { weight: 1.2, color: "#0b5cab", fillOpacity: 0.15 } }).bindPopup(`<b>BAG</b><br>Bouwjaar BAG: <b>${esc(y)}</b><br>Afstand: ${Math.round(o.d)}m`).addTo(bagLayer);
       const icon = L.divIcon({ className: "", html: `<div class="year-badge ${cls}">${esc(y)}</div>` });
       L.marker([o.c.lat, o.c.lng], { icon }).addTo(bagLabel);
     });
-    loadMonumentenInRadius(lat, lng, radius);
+    loadMonInRadius(lat, lng, radius);
     setStatus(`${list.length} BAG + ${monLayer.getLayers().length} monumenten binnen ${radius}m`);
   } catch (e) { console.error(e); }
 }
 
-function loadMonumentenInRadius(lat, lng, radius) {
+function loadMonInRadius(lat, lng, radius) {
   monLayer.clearLayers(); monLabel.clearLayers();
   MONUMENTEN.forEach(m => {
     const d = dist(lat, lng, m.lat, m.lng);
     if (d > radius) return;
     const cls = yearClass(m.b);
     const color = m.t === "Rijks" ? "#c0392b" : "#27ae60";
-    const dot = L.circleMarker([m.lat, m.lng], { radius: 7, color: "white", weight: 2, fillColor: color, fillOpacity: 0.95 }).bindPopup(`<b style="color:${color}">${esc(m.n)} (${esc(m.t)})</b><br>${esc(m.a)}<br><b>Echt bouwjaar:</b> <span style="font-size:18px;font-weight:800;color:${color}">${esc(m.b)}</span><br><small>Afstand: ${Math.round(d)}m</small><br><div style="margin-top:6px;font-size:11px;background:#f4f6f7;padding:6px;border-radius:6px">Vergelijk met blauw BAG badge eronder: verschil = verbouw vs origineel</div>`);
+    const dot = L.circleMarker([m.lat, m.lng], { radius: 7, color: "white", weight: 2, fillColor: color, fillOpacity: 0.95 }).bindPopup(`<b style="color:${color}">${esc(m.n)} (${esc(m.t)})</b><br>${esc(m.a)}<br><b>Echt bouwjaar:</b> <span style="font-size:18px;font-weight:800;color:${color}">${esc(m.b)}</span><br><small>${Math.round(d)}m</small>`);
     monLayer.addLayer(dot);
     const icon = L.divIcon({ className: "", html: `<div class="year-badge ${cls}" style="background:${color};border-color:${color}">${esc(m.b.substring(0, 4))}</div>` });
     L.marker([m.lat, m.lng], { icon, interactive: false }).addTo(monLabel);
   });
 }
 
-locateBtn.addEventListener("click", () => {
+if (locateBtn) locateBtn.addEventListener("click", () => {
   if (!navigator.geolocation) { setStatus("Geen geolocatie"); return; }
   setStatus("Locatie bepalen...");
   locateBtn.disabled = true;
@@ -124,23 +171,19 @@ locateBtn.addEventListener("click", () => {
     curMarker = L.marker([lat, lng]).addTo(map).bindPopup("Huidige positie").openPopup();
     accCircle = L.circle([lat, lng], { radius: acc, color: "#0b5cab", fillOpacity: 0.08 }).addTo(map);
     loadBAG(lat, lng, r);
+    if (sideMenu) closeMenu();
   }, () => { locateBtn.disabled = false; setStatus("Locatie geweigerd"); }, { enableHighAccuracy: true, timeout: 15000 });
 });
 
-radiusSel.addEventListener("change", () => {
+if (radiusSel) radiusSel.addEventListener("change", () => {
   const r = Number(radiusSel.value);
-  if (lastLat) { loadBAG(lastLat, lastLng, r); }
+  if (lastLat) loadBAG(lastLat, lastLng, r);
 });
-
-// minuutplan
-const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format: "image/png", transparent: true, version: "1.3.0", opacity: 0.5 });
-minuutplanLayer.addTo(map);
-document.getElementById("toggleMinuutplan")?.addEventListener("change", e => { if (e.target.checked) minuutplanLayer.addTo(map); else map.removeLayer(minuutplanLayer); });
 
 function wgs84ToRD(lat, lon) {
   const dF = 0.36 * (lat - 52.15517440), dL = 0.36 * (lon - 5.38720621);
-  const x = 155000 + 190094.945 * dL - 11832.228 * dF * dL - 114.221 * Math.pow(dF, 2) * dL - 32.391 * Math.pow(dL, 3);
-  const y = 463000 + 309056.544 * dF + 3638.893 * Math.pow(dL, 2) + 73.077 * Math.pow(dF, 2);
+  const x = 155000 + 190094.945 * dL - 11832.228 * dF * dL;
+  const y = 463000 + 309056.544 * dF;
   return { x, y };
 }
 async function loadMinuutplanAuto(lat, lng) {
@@ -157,12 +200,13 @@ async function loadMinuutplanAuto(lat, lng) {
 
 window.addEventListener("load", () => {
   setTimeout(() => {
-    loadBAG(52.516, 6.42, Number(radiusSel.value));
+    const r = Number(document.getElementById("radius")?.value || 100);
+    loadBAG(52.516, 6.42, r);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(p => {
         const lat = p.coords.latitude, lng = p.coords.longitude;
         map.setView([lat, lng], 18);
-        loadBAG(lat, lng, Number(radiusSel.value));
+        loadBAG(lat, lng, r);
       });
     }
   }, 600);
