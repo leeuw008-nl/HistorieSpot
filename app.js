@@ -1,31 +1,20 @@
-// HistorieSpot - fullscreen kaart, sticky header, fab, bouwjaar op kaart + B02/B03 fix
+// HistorieSpot - fullscreen + bottom opacity slider + B02/B03 fix
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: "&copy; OpenStreetMap contributors"
-}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
 
 let currentMarker = null;
 let accuracyCircle = null;
 const objectLayer = L.layerGroup().addTo(map);
 const yearLabelLayer = L.layerGroup().addTo(map);
 
-// Fix voor verwisselde minuutplanbladen Ommen - Stad Ommen Sectie B
-const MINUUTPLAN_CORRECTIES = {
-  "MIN04041B02": "MIN04041B03",
-  "MIN04041B03": "MIN04041B02"
-};
-function corrigeerMinuutplanCode(code){
-  return MINUUTPLAN_CORRECTIES[code] || code;
-}
+const MINUUTPLAN_CORRECTIES = { "MIN04041B02": "MIN04041B03", "MIN04041B03": "MIN04041B02" };
+function corrigeerMinuutplanCode(code){ return MINUUTPLAN_CORRECTIES[code] || code; }
 
 const locateBtn = document.getElementById("locateBtn");
 const radiusSelect = document.getElementById("radius");
 const statusBox = document.getElementById("status");
 
-// Menu & info logic
 const menuBtn = document.getElementById("menuBtn");
 const closeMenuBtn = document.getElementById("closeMenuBtn");
 const sideMenu = document.getElementById("sideMenu");
@@ -35,6 +24,10 @@ const closeInfoBtn = document.getElementById("closeInfoBtn");
 const infoModal = document.getElementById("infoModal");
 const infoOverlay = document.getElementById("infoOverlay");
 const toggleMinuutplan = document.getElementById("toggleMinuutplan");
+
+const opacityBar = document.getElementById("opacityBar");
+const opacitySlider = document.getElementById("historischeOpacity");
+const opacityValue = document.getElementById("historischeOpacityValue");
 
 function openMenu(){ sideMenu.classList.add("open"); menuOverlay.classList.remove("hidden"); }
 function closeMenu(){ sideMenu.classList.remove("open"); menuOverlay.classList.add("hidden"); }
@@ -66,10 +59,7 @@ radiusSelect.addEventListener("change", ()=>{
 });
 
 function locateUser(){
-  if(!navigator.geolocation){
-    setStatus("Deze browser ondersteunt geen locatiebepaling.");
-    return;
-  }
+  if(!navigator.geolocation){ setStatus("Deze browser ondersteunt geen locatiebepaling."); return; }
   setStatus("📍 Locatie wordt bepaald...");
   locateBtn.disabled = true;
   navigator.geolocation.getCurrentPosition(
@@ -90,7 +80,7 @@ function locateUser(){
     },
     function(error){
       locateBtn.disabled = false;
-      if(error.code===1) setStatus("⚠️ Locatietoegang geweigerd. Geef toestemming in je browser.");
+      if(error.code===1) setStatus("⚠️ Locatietoegang geweigerd.");
       else if(error.code===2) setStatus("⚠️ Locatie kon niet worden bepaald.");
       else if(error.code===3) setStatus("⚠️ Locatiebepaling duurde te lang.");
       else setStatus("⚠️ Onbekende locatiefout.");
@@ -109,9 +99,7 @@ async function loadBAG(latitude, longitude, radius){
   objectLayer.clearLayers();
   yearLabelLayer.clearLayers();
   const box = createBoundingBox(latitude, longitude, radius);
-  const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items" +
-    `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}` +
-    "&limit=100&f=json";
+  const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items" + `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}` + "&limit=100&f=json";
   try{
     const response = await fetch(url);
     if(!response.ok) throw new Error(`PDOK HTTP-fout ${response.status}`);
@@ -126,7 +114,7 @@ async function loadBAG(latitude, longitude, radius){
     displayResults(nearbyObjects);
   }catch(error){
     console.error("Fout bij ophalen BAG:", error);
-    setStatus("⚠️ PDOK kon niet worden bereikt. Controleer je verbinding.");
+    setStatus("⚠️ PDOK kon niet worden bereikt.");
   }
 }
 
@@ -143,7 +131,6 @@ function calculateFeatureCenter(feature){
   points.forEach(p=>{ totalLongitude+=p[0]; totalLatitude+=p[1]; });
   return { longitude: totalLongitude/points.length, latitude: totalLatitude/points.length };
 }
-
 function calculateDistance(lat1, lon1, lat2, lon2){
   const earthRadius=6371000;
   const dLat=(lat2-lat1)*Math.PI/180;
@@ -152,7 +139,6 @@ function calculateDistance(lat1, lon1, lat2, lon2){
   const c=2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return earthRadius*c;
 }
-
 function getYearClass(year){
   const y = parseInt(year,10);
   if(isNaN(y)) return "unknown";
@@ -160,15 +146,11 @@ function getYearClass(year){
   if(y < 1920) return "old";
   return "";
 }
-
 function displayResults(objects){
   objectLayer.clearLayers();
   yearLabelLayer.clearLayers();
-  if(!objects.length){
-    setStatus("Geen BAG-gebouwen binnen radius.");
-    return;
-  }
-  objects.forEach(function(object, index){
+  if(!objects.length){ setStatus("Geen BAG-gebouwen binnen radius."); return; }
+  objects.forEach(function(object){
     const feature = object.feature;
     const properties = feature.properties || {};
     const identification = properties.identificatie || "Onbekend";
@@ -178,40 +160,24 @@ function displayResults(objects){
     const yearStr = String(constructionYear);
     const yearClass = getYearClass(yearStr);
     L.geoJSON(feature, { style:{ weight:1.5, color:"#0b5cab", fillColor:"#0b5cab", fillOpacity:0.18 } })
-      .bindPopup(`
-        <strong>HistorieSpot BAG-object</strong><br>
-        <span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>
-        Gebruiksdoel: ${escapeHTML(String(purpose))}<br>
-        Status: ${escapeHTML(String(status))}<br>
-        <small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>
-      `)
+      .bindPopup(`<strong>BAG-object</strong><br><span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>Gebruiksdoel: ${escapeHTML(String(purpose))}<br>Status: ${escapeHTML(String(status))}<br><small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>`)
       .addTo(objectLayer);
     if(object.center){
-      const icon = L.divIcon({
-        className: "",
-        html: `<div class="year-badge ${yearClass}">${escapeHTML(yearStr)}</div>`,
-        iconSize: null
-      });
+      const icon = L.divIcon({ className: "", html: `<div class="year-badge ${yearClass}">${escapeHTML(yearStr)}</div>`, iconSize: null });
       L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
     }
   });
-  setStatus(`${objects.length} gebouwen · bouwjaar getoond op kaart`);
+  setStatus(`${objects.length} gebouwen · bouwjaar op kaart`);
 }
+function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-function escapeHTML(value){
-  return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-}
-
-// HISTORISCHE KAART - KADASTRALE MINUUTPLANS
-const minuutplanLayer = L.tileLayer.wms(
-    "https://services.rce.geovoorziening.nl/misc/wms",
-    { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.75, attribution:"© Rijksdienst voor het Cultureel Erfgoed" }
-);
+// HISTORISCHE KAART
+const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.75, attribution:"© RCE" });
 minuutplanLayer.addTo(map);
-
 toggleMinuutplan.addEventListener("change", ()=>{
   if(toggleMinuutplan.checked) minuutplanLayer.addTo(map);
   else map.removeLayer(minuutplanLayer);
+  updateOpacityBarVisibility();
 });
 
 function wgs84ToRD(lat, lon){
@@ -221,53 +187,43 @@ function wgs84ToRD(lat, lon){
   return {x,y};
 }
 
+function updateOpacityBarVisibility(){
+  const hasHistorical = !!window.historischeMinuutplanLayer;
+  if(hasHistorical){ opacityBar.classList.remove("hidden"); }
+  else { /* keep visible to allow control even before first click, but dim if no layer? We keep visible */ }
+}
+
 map.on("click", async function(e){
   if(!map.hasLayer(minuutplanLayer)) return;
   try{
     const rd=wgs84ToRD(e.latlng.lat, e.latlng.lng);
-    const minX=rd.x-20, maxX=rd.x+20, minY=rd.y-20, maxY=rd.y+20;
-    const bbox=[minX,minY,maxX,maxY].join(",");
+    const bbox=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(",");
     const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
     const response=await fetch(url);
     if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
     const data=await response.json();
     if(!data.features || data.features.length===0) return;
     const p=data.features[0].properties;
-    
     const origineleCode = p.CODE;
     const minuutplanCode = corrigeerMinuutplanCode(origineleCode);
     const isGecorrigeerd = origineleCode !== minuutplanCode;
-    if(isGecorrigeerd){
-      console.log(`Minuutplan correctie Ommen: ${origineleCode} -> ${minuutplanCode}`);
-    }
-
     if(minuutplanCode){
-      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); window.historischeMinuutplanLayer=null; }
-      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:0.55,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
+      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
+      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
       window.historischeMinuutplanLayer.addTo(map);
-      ensureOpacityControl();
+      updateOpacityBarVisibility();
     }
-
-    let correctieNote = isGecorrigeerd ? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠️ Correctie toegepast: broncode <b>${origineleCode}</b> verwisseld met <b>${minuutplanCode}</b> (Ommen B02 ↔ B03)</div>` : "";
-    let popupContent=`<div style="min-width:240px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>Rijksdienst voor het Cultureel Erfgoed</small>${correctieNote}<hr><strong>Periode:</strong><br>1811–1832<br><br><strong>Gemeente:</strong><br>${p.GEMEENTE||"onbekend"}<br><br><strong>Sectie:</strong> ${p.SECTIE||""}<br><strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong><br>${p.CODE||""}${isGecorrigeerd ? ` → <b>${minuutplanCode}</b>` : ""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
+    let correctieNote = isGecorrigeerd ? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠️ Correctie: ${origineleCode} → ${minuutplanCode} (Ommen B02↔B03 verwisseld)</div>` : "";
+    let popupContent=`<div style="min-width:240px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>RCE</small>${correctieNote}<hr><strong>Periode:</strong> 1811–1832<br><br><strong>Gemeente:</strong> ${p.GEMEENTE||"onbekend"}<br><strong>Sectie:</strong> ${p.SECTIE||""} <strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong> ${p.CODE||""}${isGecorrigeerd?` → <b>${minuutplanCode}</b>`:""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
     L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
   }catch(error){ console.error("Fout bij ophalen minuutplan:", error); }
 });
 
-function ensureOpacityControl(){
-  const container=document.getElementById("opacityControlContainer");
-  if(document.getElementById("historischeOpacity")) return;
-  container.innerHTML=`<div style="margin-top:10px"><label style="font-size:12px">Transparantie historische kaart: <span id="historischeOpacityValue">55</span>%</label><input id="historischeOpacity" type="range" min="0" max="100" value="55" style="width:100%"></div>`;
-  setTimeout(()=>{
-    const slider=document.getElementById("historischeOpacity");
-    const value=document.getElementById("historischeOpacityValue");
-    if(slider){
-      slider.addEventListener("input", function(){
-        const opacity=Number(this.value)/100;
-        if(window.historischeMinuutplanLayer) window.historischeMinuutplanLayer.setOpacity(opacity);
-        if(value) value.textContent=this.value;
-      });
-    }
-  },100);
-}
-ensureOpacityControl();
+// Opacity slider on map bottom
+opacitySlider.addEventListener("input", function(){
+  const opacity=Number(this.value)/100;
+  if(window.historischeMinuutplanLayer) window.historischeMinuutplanLayer.setOpacity(opacity);
+  opacityValue.textContent=this.value+"%";
+});
+opacityValue.textContent=opacitySlider.value+"%";
+updateOpacityBarVisibility();
