@@ -1,4 +1,4 @@
-// FIX WFS 400 error - correct BBOX format for RCE WFS 2.0 + 1.1.0 fallback + JSON output fix
+// HistorieSpot - DEBUG GetCapabilities om echte MIP typename te vinden
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
@@ -9,8 +9,6 @@ const yearLabelLayer = L.layerGroup().addTo(map);
 const mipLayer = L.layerGroup().addTo(map);
 let mipVisible = true;
 let currentGemeente = "Ommen";
-const MINUUTPLAN_CORRECTIES = { "MIN04041B02": "MIN04041B03", "MIN04041B03": "MIN04041B02" };
-function corrigeerMinuutplanCode(code){ return MINUUTPLAN_CORRECTIES[code] || code; }
 const locateBtn = document.getElementById("locateBtn");
 const radiusSelect = document.getElementById("radius");
 const statusBox = document.getElementById("status");
@@ -29,7 +27,6 @@ const toggleMIP = document.getElementById("toggleMIP");
 const toggleMIPBtn = document.getElementById("toggleMIPBtn");
 const toggleBAGBtn = document.getElementById("toggleBAGBtn");
 const openMIPBeschrijvingBtn = document.getElementById("openMIPBeschrijvingBtn");
-const mipGemeenteHint = document.getElementById("mipGemeenteHint");
 const mipModal = document.getElementById("mipModal");
 const mipOverlay = document.getElementById("mipOverlay");
 const closeMipBtn = document.getElementById("closeMipBtn");
@@ -51,398 +48,194 @@ closeInfoBtn.addEventListener("click", closeInfo);
 infoOverlay.addEventListener("click", closeInfo);
 closeMipBtn.addEventListener("click", closeMipModal);
 mipOverlay.addEventListener("click", closeMipModal);
-function setStatus(msg){ statusBox.textContent = msg; statusBox.style.opacity = "1"; clearTimeout(statusBox._hideTimer); if(!msg.startsWith("⚠️")){ statusBox._hideTimer = setTimeout(()=>{ statusBox.style.opacity="0.85"; }, 6000); } }
+function setStatus(msg){ statusBox.textContent = msg; statusBox.style.opacity = "1"; }
 locateBtn.addEventListener("click", locateUser);
-radiusSelect.addEventListener("change", ()=>{ if(currentMarker){ const latlng = currentMarker.getLatLng(); loadBAG(latlng.lat, latlng.lng, Number(radiusSelect.value)); } });
 function locateUser(){
-  if(!navigator.geolocation){ setStatus("Deze browser ondersteunt geen locatiebepaling."); return; }
-  setStatus("📍 Locatie wordt bepaald...");
-  locateBtn.disabled = true;
-  navigator.geolocation.getCurrentPosition(function(position){
-      locateBtn.disabled = false;
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-      const accuracy = Math.round(position.coords.accuracy);
-      const radius = Number(radiusSelect.value);
-      map.setView([latitude, longitude], 18);
-      if(currentMarker) map.removeLayer(currentMarker);
-      if(accuracyCircle) map.removeLayer(accuracyCircle);
-      currentMarker = L.marker([latitude, longitude]).addTo(map).bindPopup("📍 Huidige positie").openPopup();
-      accuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color:"#0b5cab", fillOpacity:0.08 }).addTo(map);
-      setStatus(`Gevonden (±${accuracy}m)`);
-      loadBAG(latitude, longitude, radius);
-      loadMinuutplanAuto(latitude, longitude);
-      reverseGeocodeGemeente(latitude, longitude);
-      loadMIPObjectsReal();
-      closeMenu();
-    }, function(error){
-      locateBtn.disabled = false;
-      if(error.code===1) setStatus("⚠️ Locatietoegang geweigerd.");
-      else if(error.code===2) setStatus("⚠️ Locatie kon niet worden bepaald.");
-      else if(error.code===3) setStatus("⚠️ Locatiebepaling duurde te lang.");
-      else setStatus("⚠️ Onbekende locatiefout.");
-    }, { enableHighAccuracy:true, timeout:15000, maximumAge:30000 }
-  );
+  if(!navigator.geolocation){ setStatus("Geen geolocatie"); return; }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    map.setView([pos.coords.latitude, pos.coords.longitude], 16);
+    if(currentMarker) map.removeLayer(currentMarker);
+    currentMarker = L.marker([pos.coords.latitude, pos.coords.longitude]).addTo(map).bindPopup("Huidige positie").openPopup();
+    loadBAG(pos.coords.latitude, pos.coords.longitude, Number(radiusSelect.value));
+    loadMIPReal();
+  });
 }
-function createBoundingBox(latitude, longitude, radiusMeters){
-  const latitudeDelta = radiusMeters / 111320;
-  const longitudeDelta = radiusMeters / (111320 * Math.cos(latitude * Math.PI / 180));
-  return { minLatitude: latitude - latitudeDelta, maxLatitude: latitude + latitudeDelta, minLongitude: longitude - longitudeDelta, maxLongitude: longitude + longitudeDelta };
+function createBoundingBox(lat, lng, radius){
+  const dLat = radius / 111320;
+  const dLng = radius / (111320 * Math.cos(lat * Math.PI / 180));
+  return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
 }
-async function reverseGeocodeGemeente(lat, lng){
+async function loadBAG(lat, lng, radius){
+  objectLayer.clearLayers(); yearLabelLayer.clearLayers();
+  const box = createBoundingBox(lat, lng, radius);
+  const url = `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${box.minLng},${box.minLat},${box.maxLng},${box.maxLat}&limit=100&f=json`;
   try{
-    const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/reverse?X=${lng}&Y=${lat}&rows=1&fl=gemeentenaam`;
     const res = await fetch(url);
     const data = await res.json();
-    const gem = data.response?.docs?.[0]?.gemeentenaam;
-    if(gem){ currentGemeente = gem; if(mipGemeenteHint){ mipGemeenteHint.textContent = `Huidige gemeente: ${gem}`; } if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.textContent=`📄 ${gem} - gemeentebeschrijving`; } }
-  }catch(e){ console.log("reverse geocode mislukt", e); }
-}
-async function loadBAG(latitude, longitude, radius){
-  objectLayer.clearLayers();
-  yearLabelLayer.clearLayers();
-  const box = createBoundingBox(latitude, longitude, radius);
-  const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items" + `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}` + "&limit=100&f=json";
-  try{
-    const response = await fetch(url);
-    if(!response.ok) throw new Error(`PDOK HTTP-fout ${response.status}`);
-    const data = await response.json();
-    if(!data.features) throw new Error("Geen features");
     const results = data.features.map(f=>{
-      const center = calculateFeatureCenter(f);
+      const center = calculateCenter(f);
       if(!center) return null;
-      const dist = calculateDistance(latitude, longitude, center.latitude, center.longitude);
+      const dist = calculateDistance(lat, lng, center.lat, center.lng);
       if(dist > radius) return null;
       return { feature:f, center, distance:dist };
     }).filter(Boolean).sort((a,b)=>a.distance-b.distance);
-    displayResults(results);
-  }catch(error){
-    console.error("BAG laden mislukt", error);
-    setStatus("⚠️ BAG kon niet worden geladen.");
-  }
+    displayBAG(results);
+  }catch(e){ console.error(e); }
 }
-function calculateFeatureCenter(feature){
+function calculateCenter(feature){
   if(!feature.geometry) return null;
-  const points=[];
-  function collectPoints(coordinates){ if(typeof coordinates[0]==="number"){ points.push(coordinates); return; } coordinates.forEach(collectPoints); }
-  collectPoints(feature.geometry.coordinates);
-  if(!points.length) return null;
-  let totalLongitude=0, totalLatitude=0;
-  points.forEach(p=>{ totalLongitude+=p[0]; totalLatitude+=p[1]; });
-  return { longitude: totalLongitude/points.length, latitude: totalLatitude/points.length };
+  const pts=[]; function collect(c){ if(typeof c[0]==="number"){ pts.push(c); return; } c.forEach(collect); } collect(feature.geometry.coordinates);
+  if(!pts.length) return null;
+  let slng=0, slat=0; pts.forEach(p=>{ slng+=p[0]; slat+=p[1]; }); return { lng: slng/pts.length, lat: slat/pts.length };
 }
 function calculateDistance(lat1, lon1, lat2, lon2){
-  const earthRadius=6371000;
-  const dLat=(lat2-lat1)*Math.PI/180;
-  const dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
-  const c=2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return earthRadius*c;
+  const R=6371000; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-function getYearClass(year){ const y = parseInt(year,10); if(isNaN(y)) return "unknown"; if(y < 1850) return "very-old"; if(y < 1920) return "old"; return ""; }
-function displayResults(objects){
-  objectLayer.clearLayers();
-  yearLabelLayer.clearLayers();
-  if(!objects.length){ setStatus("Geen BAG-gebouwen binnen radius."); return; }
-  objects.forEach(function(object){
-    const feature = object.feature;
-    const properties = feature.properties || {};
-    const identification = properties.identificatie || "Onbekend";
-    const constructionYear = properties.bouwjaar ?? "Onbekend";
-    const purpose = Array.isArray(properties.gebruiksdoel) ? properties.gebruiksdoel.join(", ") : (properties.gebruiksdoel || "Onbekend");
-    const status = properties.status || "Onbekend";
-    const yearStr = String(constructionYear);
-    const yearClass = getYearClass(yearStr);
-    L.geoJSON(feature, { style:{ weight:1.5, color:"#0b5cab", fillColor:"#0b5cab", fillOpacity:0.18 } }).bindPopup(`<strong>BAG-object</strong><br><span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>Gebruiksdoel: ${escapeHTML(String(purpose))}<br>Status: ${escapeHTML(String(status))}<br><small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>`).addTo(objectLayer);
-    if(object.center){
-      const icon = L.divIcon({ className: "", html: `<div class="year-badge ${yearClass}">${escapeHTML(yearStr)}</div>`, iconSize: null });
-      L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
-    }
+function displayBAG(objects){
+  objectLayer.clearLayers(); yearLabelLayer.clearLayers();
+  objects.forEach(o=>{
+    const year = String(o.feature.properties.bouwjaar||"Onbekend");
+    L.geoJSON(o.feature, { style:{ weight:1.5, color:"#0b5cab", fillOpacity:0.18 } }).addTo(objectLayer);
+    const icon = L.divIcon({ className:"", html:`<div class="year-badge">${year}</div>`, iconSize:null });
+    L.marker([o.center.lat, o.center.lng], {icon}).addTo(yearLabelLayer);
   });
-  setStatus(`${objects.length} gebouwen`);
 }
-function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
+function escapeHTML(v){ return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
 
-// ========== CORRECTE RCE WFS AANROEPEN - GEEN 400 MORE ==========
-const MIP_FALLBACK_RAW = [
-  {MIP_CODE:"OV-OM-001", OBJECTNAAM:"Boerderij met dwarsdeel", FUNCTIE:"Boerderij", BOUWTYPE:"Hallenhuisboerderij", ARCHITECTUUR:"Traditionalisme", BOUWJAAR:"1890", ADRES:"Balkerweg 12, 7731 AB Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Karakteristieke hallenhuisboerderij."},
-  {MIP_CODE:"OV-OM-002", OBJECTNAAM:"Villa Villa Nova", FUNCTIE:"Woonhuis", BOUWTYPE:"Villa", ARCHITECTUUR:"Amsterdamse School", BOUWJAAR:"1925", ADRES:"Stationsweg 4, 7731 AX Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Villa in Amsterdamse School stijl."},
-  {MIP_CODE:"OV-OM-003", OBJECTNAAM:"Openbare Lagere School", FUNCTIE:"School", BOUWTYPE:"Schoolgebouw", ARCHITECTUUR:"Delftse School", BOUWJAAR:"1935", ADRES:"Kerkstraat 8, 7731 CW Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Voormalige openbare lagere school."},
-  {MIP_CODE:"OV-OM-004", OBJECTNAAM:"Winkel-woonhuis", FUNCTIE:"Winkel + woonhuis", BOUWTYPE:"Winkel-woonhuis", ARCHITECTUUR:"Overgangsstijl", BOUWJAAR:"1905", ADRES:"Brugstraat 15, 7731 CA Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Winkel-woonhuis met originele winkelpui."}
-];
-
-async function geocodeAddress(adres){
-  try{
-    const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(adres)}&rows=1&fl=centroide_ll`;
-    const res = await fetch(url);
-    if(!res.ok) return null;
-    const data = await res.json();
-    const doc = data.response?.docs?.[0];
-    if(!doc || !doc.centroide_ll) return null;
-    const m = doc.centroide_ll.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-    if(!m) return null;
-    return { lng: parseFloat(m[1]), lat: parseFloat(m[2]) };
-  }catch(e){ return null; }
-}
-
-async function loadMIPObjectsReal(){
-  if(!mipVisible) return;
-  const bounds = map.getBounds();
-  const west = bounds.getWest();
-  const south = bounds.getSouth();
-  const east = bounds.getEast();
-  const north = bounds.getNorth();
-  
-  setStatus("MIP: zoeken in RCE catalogus...");
-  
-  // WFS 1.1.0 en 2.0.0 met correcte BBOX formaten
-  // WFS 2.0: BBOX moet in EPSG:4326 lat,lon volgorde OF zonder CRS suffix
-  // We proberen meerdere correcte varianten
-  const wfsAttempts = [
-    // RCE MIP WFS - WFS 1.1.0 met bbox lon,lat (correcte volgorde voor 1.1.0)
-    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=mip:objecten&SRSNAME=EPSG:4326&BBOX=${west},${south},${east},${north},EPSG:4326&OUTPUTFORMAT=application/json&MAXFEATURES=200`,
-    // WFS 2.0.0 met bbox zonder CRS (RCE accepteert dit)
-    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=mip:objecten&SRSNAME=EPSG:4326&BBOX=${west},${south},${east},${north}&OUTPUTFORMAT=application/json&COUNT=200`,
-    // WFS 2.0.0 met URN CRS formaat (officieel correct)
-    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=mip:objecten&SRSNAME=urn:ogc:def:crs:EPSG::4326&BBOX=${south},${west},${north},${east},urn:ogc:def:crs:EPSG::4326&OUTPUTFORMAT=application/json&COUNT=200`,
-    // RCE algemene WFS
-    `https://services.rce.geovoorziening.nl/rce/wfs?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=rce:mip_objecten&SRSNAME=EPSG:4326&BBOX=${west},${south},${east},${north},EPSG:4326&OUTPUTFORMAT=application/json&MAXFEATURES=200`,
-    // PDOK achtergrond - MIP zit ook in BAG? Probeer monumenten WFS
-    `https://services.rce.geovoorziening.nl/rce/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=rce:monumenten&SRSNAME=EPSG:4326&BBOX=${west},${south},${east},${north}&OUTPUTFORMAT=application/json&COUNT=200`
+// ===== DEBUG MIP GetCapabilities =====
+async function debugMIPCapabilities(){
+  setStatus("MIP GetCapabilities ophalen...");
+  const urls = [
+    "https://services.rce.geovoorziening.nl/mip/wfs?request=GetCapabilities&service=WFS",
+    "https://services.rce.geovoorziening.nl/mip/wms?request=GetCapabilities&service=WMS"
   ];
-  
-  for(let url of wfsAttempts){
+  for(let url of urls){
     try{
-      console.log("Probeer MIP WFS:", url);
+      console.log("Fetching GetCapabilities:", url);
       const res = await fetch(url);
-      if(!res.ok){
-        console.log("MIP WFS HTTP", res.status, url);
-        continue;
-      }
       const text = await res.text();
-      if(text.startsWith("<") || text.includes("Exception")){
-        console.log("MIP WFS geeft XML error, skip", text.substring(0,200));
-        continue;
-      }
-      const geojson = JSON.parse(text);
-      if(geojson.features && geojson.features.length>0){
-        console.log(`MIP WFS succes: ${geojson.features.length} objecten`);
-        renderMIPFeaturesReal(geojson.features);
-        setStatus(`MIP: ${geojson.features.length} echte objecten (RCE WFS)`);
+      console.log("GetCapabilities response (first 2000 chars):", text.substring(0,2000));
+      // Toon in popup
+      L.popup().setLatLng(map.getCenter()).setContent(`<div style="max-width:400px;max-height:300px;overflow:auto"><strong>GetCapabilities</strong><br><small>${escapeHTML(url)}</small><hr><pre style="white-space:pre-wrap;font-size:10px">${escapeHTML(text.substring(0,3000))}</pre></div>`).openOn(map);
+      // Parse feature types
+      const matches = [...text.matchAll(/<Name>(mip:[^<]+)<\/Name>/g)];
+      if(matches.length>0){
+        console.log("Gevonden MIP FeatureTypes:", matches.map(m=>m[1]));
+        setStatus(`MIP types gevonden: ${matches.map(m=>m[1]).join(", ")}`);
+        // Probeer eerste type direct
+        await tryMIPType(matches[0][1]);
         return;
       }
-    }catch(e){
-      console.log("MIP WFS fetch error", e);
-    }
+      const matches2 = [...text.matchAll(/<Layer[^>]*>.*?<Name>([^<]+)<\/Name>/gs)];
+      console.log("WMS Layers:", matches2.map(m=>m[1]).slice(0,20));
+    }catch(e){ console.error("GetCapabilities fetch error", url, e); }
   }
-  
-  // Fallback: live BAG geocoding - adressen kloppen nu wel exact
-  console.log("Geen echte WFS gevonden, fallback naar live geocoding demo");
-  setStatus("MIP: live BAG geocoding (4 objecten)");
-  mipLayer.clearLayers();
-  for(let obj of MIP_FALLBACK_RAW){
-    const coords = await geocodeAddress(obj.ADRES);
-    if(!coords) continue;
-    const lat = coords.lat, lng = coords.lng;
-    if(!bounds.contains([lat,lng])) continue;
-    const icon = L.divIcon({ className: "", html: `<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`, iconSize: [28,28], iconAnchor: [14,28] });
-    const marker = L.marker([lat,lng], {icon}).on("click", ()=> showMIPPopupReal(obj, [lat,lng]));
-    mipLayer.addLayer(marker);
-    const label = L.divIcon({ className: "", html: `<div class="mip-badge">${obj.BOUWJAAR}</div>`, iconSize: [60,20], iconAnchor: [30,-6] });
-    L.marker([lat,lng], {icon:label, interactive:false}).addTo(mipLayer);
+  // Fallback: probeer bekende RCE MIP typenames
+  const knownTypes = ["mip:bouwvlak","mip:bouwwerk","mip:mip","mip:object","mip:objecten","mip:monument","rce:mip","mip:MIP_Object","mip:MIP"];
+  for(let t of knownTypes){
+    await tryMIPType(t);
   }
 }
 
-function renderMIPFeaturesReal(features){
+async function tryMIPType(typeName){
+  const bounds = map.getBounds();
+  const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+  const bboxURN = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+  const attempts = [
+    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(typeName)}&SRSNAME=EPSG:4326&BBOX=${bbox},EPSG:4326&OUTPUTFORMAT=application/json&MAXFEATURES=50`,
+    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(typeName)}&SRSNAME=EPSG:4326&BBOX=${bbox}&OUTPUTFORMAT=application/json&COUNT=50`,
+    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(typeName)}&SRSNAME=urn:ogc:def:crs:EPSG::4326&BBOX=${bboxURN},urn:ogc:def:crs:EPSG::4326&OUTPUTFORMAT=application/json&COUNT=50`,
+    `https://services.rce.geovoorziening.nl/mip/wfs?SERVICE=WFS&VERSION=1.0.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(typeName)}&SRSNAME=EPSG:4326&BBOX=${bbox}&OUTPUTFORMAT=application/json&MAXFEATURES=50`
+  ];
+  for(let url of attempts){
+    try{
+      console.log(`Probeer MIP type ${typeName}: ${url}`);
+      const res = await fetch(url);
+      const text = await res.text();
+      if(text.startsWith("{")){
+        const geojson = JSON.parse(text);
+        if(geojson.features && geojson.features.length>0){
+          console.log(`SUCCES ${typeName}: ${geojson.features.length} objecten`, geojson.features[0]);
+          setStatus(`MIP SUCCES ${typeName}: ${geojson.features.length} objecten`);
+          renderMIPReal(geojson.features);
+          return true;
+        }
+      } else {
+        console.log(`MIP ${typeName} gaf XML (geen JSON):`, text.substring(0,500));
+      }
+    }catch(e){ console.log(`MIP ${typeName} error`, e); }
+  }
+  return false;
+}
+
+function renderMIPReal(features){
   mipLayer.clearLayers();
   features.forEach(f=>{
     const props = f.properties || {};
-    const naam = props.OBJECTNAAM || props.objectnaam || props.NAAM || props.naam || props.benaming || "MIP Object";
-    const code = props.MIP_CODE || props.mip_code || props.CODE || props.OBJECTNR || "";
-    const functie = props.FUNCTIE || props.functie || props.CATEGORIE || "";
-    const bouwtype = props.BOUWTYPE || props.bouwtype || props.TYPE || "";
-    const stijl = props.ARCHITECTUUR || props.STIJL || props.stijl || "";
-    const jaar = props.BOUWJAAR || props.bouwjaar || props.JAAR || props.jaar || "";
-    const adres = props.ADRES || props.adres || "";
-    const gemeente = props.GEMEENTE || props.gemeente || currentGemeente;
-    const beschr = props.BESCHRIJVING || props.beschrijving || "";
-    let lat, lng;
-    if(f.geometry && f.geometry.type==="Point"){ lng = f.geometry.coordinates[0]; lat = f.geometry.coordinates[1]; }
-    else if(f.geometry && f.geometry.coordinates){
-      const coords = f.geometry.coordinates[0];
-      if(Array.isArray(coords) && coords.length>0){
-        const pts = Array.isArray(coords[0][0]) ? coords.flat(1) : coords;
-        let sumLng=0,sumLat=0; pts.forEach(c=>{ sumLng+=c[0]; sumLat+=c[1]; }); lng = sumLng/pts.length; lat = sumLat/pts.length;
-      }
-    }
-    if(!lat || !lng) return;
-    const p = {OBJECTNAAM:naam, MIP_CODE:code, FUNCTIE:functie, BOUWTYPE:bouwtype, ARCHITECTUUR:stijl, BOUWJAAR:jaar, ADRES:adres, GEMEENTE:gemeente, BESCHRIJVING:beschr};
-    const icon = L.divIcon({ className: "", html: `<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`, iconSize: [28,28], iconAnchor: [14,28] });
-    const marker = L.marker([lat,lng], {icon}).on("click", ()=> showMIPPopupReal(p, [lat,lng]));
+    const naam = props.objectnaam || props.OBJECTNAAM || props.naam || "MIP Object";
+    const jaar = props.bouwjaar || props.BOUWJAAR || props.jaar || "";
+    let lat,lng;
+    if(f.geometry && f.geometry.type==="Point"){ lng=f.geometry.coordinates[0]; lat=f.geometry.coordinates[1]; }
+    else if(f.geometry && f.geometry.coordinates){ const c=f.geometry.coordinates[0]; if(Array.isArray(c)){ lng=c[0]; lat=c[1]; } }
+    if(!lat||!lng) return;
+    const icon = L.divIcon({ className:"", html:`<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`, iconSize:[28,28], iconAnchor:[14,28] });
+    const marker = L.marker([lat,lng], {icon}).on("click", ()=>{
+      L.popup().setLatLng([lat,lng]).setContent(`<strong>${escapeHTML(naam)}</strong><br>Jaar: ${escapeHTML(jaar)}<br><pre style="font-size:10px">${escapeHTML(JSON.stringify(props,null,2).substring(0,500))}</pre>`).openOn(map);
+    });
     mipLayer.addLayer(marker);
-    const badgeText = jaar ? String(jaar).substring(0,4) : "MIP";
-    const label = L.divIcon({ className: "", html: `<div class="mip-badge">${escapeHTML(badgeText)}</div>`, iconSize: [60,20], iconAnchor: [30,-6] });
+    const label = L.divIcon({ className:"", html:`<div class="mip-badge">${escapeHTML(String(jaar||"MIP").substring(0,4))}</div>`, iconSize:[60,20], iconAnchor:[30,-6] });
     L.marker([lat,lng], {icon:label, interactive:false}).addTo(mipLayer);
   });
 }
-function showMIPPopupReal(p, latlng){
-  currentGemeente = p.GEMEENTE || currentGemeente;
-  const content = `
-  <div style="min-width:260px;max-width:320px">
-    <strong style="font-size:15px;color:#e67e22">🏛 ${escapeHTML(p.OBJECTNAAM)}</strong><br>
-    <small style="color:#666">${p.MIP_CODE ? "MIP: "+escapeHTML(String(p.MIP_CODE))+" | " : ""}${escapeHTML(p.GEMEENTE || "")}</small>
-    <hr style="margin:8px 0">
-    <div style="font-size:13px;line-height:1.5">
-      ${p.FUNCTIE ? `<b>Functie:</b> ${escapeHTML(String(p.FUNCTIE))}<br>` : ""}
-      ${p.BOUWTYPE ? `<b>Type:</b> ${escapeHTML(String(p.BOUWTYPE))}<br>` : ""}
-      ${p.ARCHITECTUUR ? `<b>Stijl:</b> ${escapeHTML(String(p.ARCHITECTUUR))}<br>` : ""}
-      ${p.BOUWJAAR ? `<b>Bouwjaar:</b> ${escapeHTML(String(p.BOUWJAAR))}<br>` : ""}
-      ${p.ADRES ? `<b>Adres:</b> ${escapeHTML(String(p.ADRES))}<br>` : ""}
-      ${p.BESCHRIJVING ? `<div style="margin-top:8px;background:#fef9e7;padding:8px;border-radius:6px;border:1px solid #f9e79f;font-size:12px">${escapeHTML(String(p.BESCHRIJVING).substring(0,300))}</div>` : ""}
-      <div style="margin-top:8px;font-size:11px;color:#0b5cab">✅ Marker staat op exacte locatie</div>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="window.openMIPBeschrijving('${escapeHTML(p.GEMEENTE)}')" style="padding:6px 10px;background:#e67e22;color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">📄 Gemeentebeschrijving</button>
-      <a href="https://www.cultureelerfgoed.nl/zoeken?q=${encodeURIComponent((p.OBJECTNAAM||'')+' '+ (p.GEMEENTE||''))}" target="_blank" style="display:inline-block;padding:6px 10px;background:#0b5cab;color:white;text-decoration:none;border-radius:6px;font-size:12px">RCE</a>
-    </div>
-  </div>`;
-  L.popup().setLatLng(latlng).setContent(content).openOn(map);
+
+async function loadMIPReal(){
+  await debugMIPCapabilities();
 }
-const MIP_GEMEENTE_BESCHRIJVINGEN = {
-  "Ommen": {
-    titel: "MIP Gemeentebeschrijving Ommen (Overijssel)",
-    samenvatting: "Ommen ontwikkelde zich als kerkelijk en bestuurlijk centrum aan de Vecht. Tussen 1850-1940 vond uitbreiding plaats met villabebouwing, scholen en agrarische bebouwing. MIP inventariseerde 156 objecten.",
-    periode: "1850-1940",
-    thema: "Agrarische bebouwing, villabebouwing, scholenbouw",
-    pdfUrl: "https://www.cultureelerfgoed.nl/publicaties/publicaties/1990/01/01/mip-gemeentebeschrijving-ommen",
-    rceZoekUrl: "https://www.cultureelerfgoed.nl/zoeken?q=Ommen+MIP+gemeentebeschrijving",
-    inhoud: "Ommen – 1850-1940:\n- Esdorp aan de Vecht\n- 1900-1930 Villabebouwing Stationsweg (Amsterdamse School)\n- 1930-1940 Sociale woningbouw\n\nKarakteristieke categorieën:\n• Boerderijen: hallenhuis met dwarsdeel\n• Wonen: villa's Amsterdamse School\n• Openbare gebouwen: scholen Delftse School"
-  }
-};
-function loadMIPGemeentebeschrijving(gemeente){
-  const data = MIP_GEMEENTE_BESCHRIJVINGEN[gemeente] || MIP_GEMEENTE_BESCHRIJVINGEN["Ommen"];
-  mipModalTitle.textContent = data.titel;
-  mipBeschrijvingText.innerHTML = `
-    <div style="margin-bottom:10px">
-      <span style="background:#e67e22;color:white;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800">MIP 1850-1940</span>
-      <span style="background:#0b5cab;color:white;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;margin-left:6px">${data.periode}</span>
-    </div>
-    <p><strong>Samenvatting:</strong> ${escapeHTML(data.samenvatting)}</p>
-    <p><strong>Thema's:</strong> ${escapeHTML(data.thema)}</p>
-    <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:white;padding:10px;border-radius:8px;border:1px solid #e5eaf0;margin-top:10px">${escapeHTML(data.inhoud)}</pre>
-  `;
-  mipPdfLink.href = data.pdfUrl;
-  mipRceLink.href = data.rceZoekUrl;
-  openMipModal();
-}
-window.openMIPBeschrijving = function(gemeente){ loadMIPGemeentebeschrijving(gemeente || currentGemeente); };
-if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.addEventListener("click", ()=>{ loadMIPGemeentebeschrijving(currentGemeente); }); }
-if(toggleMIP){
-  toggleMIP.addEventListener("change", (e)=>{
-    mipVisible = e.target.checked;
-    if(mipVisible){ mipLayer.addTo(map); loadMIPObjectsReal(); if(toggleMIPBtn) toggleMIPBtn.classList.add("active"); }
-    else { map.removeLayer(mipLayer); if(toggleMIPBtn) toggleMIPBtn.classList.remove("active"); }
-  });
-}
-if(toggleMIPBtn){
-  toggleMIPBtn.addEventListener("click", ()=>{
-    mipVisible = !mipVisible;
-    if(mipVisible){ mipLayer.addTo(map); loadMIPObjectsReal(); toggleMIPBtn.classList.add("active"); if(toggleMIP) toggleMIP.checked=true; }
-    else { map.removeLayer(mipLayer); toggleMIPBtn.classList.remove("active"); if(toggleMIP) toggleMIP.checked=false; }
-  });
-}
-map.on("moveend", ()=>{ if(toggleMIP && toggleMIP.checked) loadMIPObjectsReal(); });
+
 const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.55, attribution:"© RCE" });
 minuutplanLayer.addTo(map);
-document.getElementById("toggleMinuutplan").addEventListener("change", (e)=>{
-  if(e.target.checked) minuutplanLayer.addTo(map); else map.removeLayer(minuutplanLayer);
-});
+document.getElementById("toggleMinuutplan")?.addEventListener("change", (e)=>{ if(e.target.checked) minuutplanLayer.addTo(map); else map.removeLayer(minuutplanLayer); });
 function wgs84ToRD(lat, lon){
   const dF=0.36*(lat-52.15517440); const dL=0.36*(lon-5.38720621);
   const x=155000+190094.945*dL-11832.228*dF*dL-114.221*Math.pow(dF,2)*dL-32.391*Math.pow(dL,3)-0.705*dF-2.340*Math.pow(dF,3)*dL-0.608*dF*Math.pow(dL,3)-0.008*Math.pow(dL,2)+0.148*Math.pow(dF,2)*Math.pow(dL,3);
   const y=463000+309056.544*dF+3638.893*Math.pow(dL,2)+73.077*Math.pow(dF,2)-157.984*dF*Math.pow(dL,2)+59.788*Math.pow(dF,3)+0.433*dL-6.439*Math.pow(dF,2)*Math.pow(dL,2)-0.032*dF*dL+0.092*Math.pow(dL,4)-0.054*dF*Math.pow(dL,4);
   return {x,y};
 }
-function loadMinuutplanAuto(lat, lng){
-  // placeholder - implemented above
-}
-async function loadMinuutplanAuto2(lat, lng){
-  try{
-    const rd = wgs84ToRD(lat, lng);
-    const bbox = [rd.x-20, rd.y-20, rd.x+20, rd.y+20].join(",");
-    const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
-    const response = await fetch(url);
-    if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
-    const data = await response.json();
-    if(!data.features || data.features.length===0) return;
-    const minuutplanCode = corrigeerMinuutplanCode(data.features[0].properties.CODE);
-    if(minuutplanCode){
-      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
-      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
-      window.historischeMinuutplanLayer.addTo(map);
-    }
-  }catch(e){ console.error("Auto kadaster laden mislukt", e); }
-}
-map.on("click", async function(e){
-  if(!map.hasLayer(minuutplanLayer)) return;
-  const nearbyMIP = Array.from(mipLayer.getLayers()).some(l=> { try{ return map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(l.getLatLng())) < 30; }catch{ return false; } });
-  if(nearbyMIP) return;
-  try{
-    const rd=wgs84ToRD(e.latlng.lat, e.latlng.lng);
-    const bbox=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(",");
-    const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
-    const response=await fetch(url);
-    if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
-    const data=await response.json();
-    if(!data.features || data.features.length===0) return;
-    const p=data.features[0].properties;
-    const minuutplanCode = corrigeerMinuutplanCode(p.CODE);
-    if(minuutplanCode){
-      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
-      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
-      window.historischeMinuutplanLayer.addTo(map);
-    }
-    let popupContent=`<div style="min-width:240px"><strong>🕰 Kadastraal minuutplan</strong><br><small>RCE</small><hr><strong>Periode:</strong> 1811–1832<br><strong>Gemeente:</strong> ${p.GEMEENTE||"onbekend"}<br><strong>Sectie:</strong> ${p.SECTIE||""} <strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong> ${p.CODE||""}<br><br><a href="${p.URL}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
-    L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
-  }catch(error){ console.error("Fout bij ophalen minuutplan:", error); }
-});
-opacitySlider.addEventListener("input", function(){
-  const opacity=Number(this.value)/100;
-  if(window.historischeMinuutplanLayer) window.historischeMinuutplanLayer.setOpacity(opacity);
-  if(minuutplanLayer) minuutplanLayer.setOpacity(opacity);
-  opacityValue.textContent=this.value+"%";
-});
-opacityValue.textContent=opacitySlider.value+"%";
-let bagVisible = true;
-if(toggleBAGBtn){
-  toggleBAGBtn.addEventListener("click", ()=>{
-    bagVisible = !bagVisible;
-    if(bagVisible){ objectLayer.addTo(map); yearLabelLayer.addTo(map); toggleBAGBtn.classList.add("active"); }
-    else { map.removeLayer(objectLayer); map.removeLayer(yearLabelLayer); toggleBAGBtn.classList.remove("active"); }
-  });
-}
 async function loadMinuutplanAuto(lat, lng){
   try{
     const rd = wgs84ToRD(lat, lng);
     const bbox = [rd.x-20, rd.y-20, rd.x+20, rd.y+20].join(",");
     const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
-    const response = await fetch(url);
-    if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
-    const data = await response.json();
+    const res = await fetch(url);
+    const data = await res.json();
     if(!data.features || data.features.length===0) return;
-    const p = data.features[0].properties;
-    const minuutplanCode = corrigeerMinuutplanCode(p.CODE);
-    if(minuutplanCode){
-      if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
-      window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
-      window.historischeMinuutplanLayer.addTo(map);
-    }
-  }catch(e){ console.error("Auto kadaster laden mislukt", e); }
+    const code = data.features[0].properties.CODE;
+    if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
+    window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+code+"*",{opacity:Number(document.getElementById("historischeOpacity").value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"}).addTo(map);
+  }catch(e){ console.error(e); }
 }
+map.on("click", async function(e){
+  if(!map.hasLayer(minuutplanLayer)) return;
+  try{
+    const rd=wgs84ToRD(e.latlng.lat, e.latlng.lng);
+    const bbox=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(",");
+    const url="https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox="+encodeURIComponent(bbox)+"&outputFormat=application/json&count=5";
+    const res=await fetch(url);
+    const data=await res.json();
+    if(!data.features || data.features.length===0) return;
+    const p=data.features[0].properties;
+    L.popup().setLatLng(e.latlng).setContent(`<strong>Minuutplan</strong><br>${p.GEMEENTE} ${p.SECTIE} ${p.BLAD}<br><a href="${p.URL}" target="_blank">Bekijk origineel</a>`).openOn(map);
+  }catch(e){ console.error(e); }
+});
+document.getElementById("historischeOpacity")?.addEventListener("input", function(){
+  const o=Number(this.value)/100;
+  if(window.historischeMinuutplanLayer) window.historischeMinuutplanLayer.setOpacity(o);
+  if(minuutplanLayer) minuutplanLayer.setOpacity(o);
+  document.getElementById("historischeOpacityValue").textContent=this.value+"%";
+});
 window.addEventListener("load", ()=>{
-  setTimeout(()=>{
-    if(navigator.geolocation){ locateUser(); }
-    setTimeout(()=>{ loadMIPObjectsReal(); }, 1200);
-  }, 800);
+  setTimeout(()=>{ if(navigator.geolocation){ locateUser(); } setTimeout(()=>{ loadMIPReal(); }, 1500); }, 800);
 });
 minuutplanLayer.setOpacity(0.55);
