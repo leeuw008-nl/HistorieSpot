@@ -167,7 +167,7 @@ function displayResults(objects){
       L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
     }
   });
-  setStatus(`${objects.length} gebouwen · bouwjaar op kaart`);
+  setStatus(`${objects.length} gebouwen`);
 }
 function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
@@ -227,3 +227,15 @@ opacitySlider.addEventListener("input", function(){
 });
 opacityValue.textContent=opacitySlider.value+"%";
 updateOpacityBarVisibility();
+
+// Default: auto inzoomen op huidige locatie bij opstart
+window.addEventListener("load", ()=>{
+  // Kleine delay zodat kaart klaar is
+  setTimeout(()=>{ 
+    if(navigator.geolocation){ locateUser(); }
+  }, 800);
+});
+
+// Default kadasterkaart op 55% - zorg dat beide lagen 55% gebruiken
+minuutplanLayer.setOpacity(0.55);
+if(window.historischeMinuutplanLayer){ window.historischeMinuutplanLayer.setOpacity(0.55); }
