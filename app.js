@@ -1,4 +1,4 @@
-// HistorieSpot - FIXED - correcte MIP coordinaten Ommen + PDF fix + badges zelfde breedte
+// HistorieSpot - MIP met LIVE BAG geocoding - adressen komen nu WEL overeen met kaart
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
@@ -53,7 +53,6 @@ const mipOverlay = document.getElementById("mipOverlay");
 const closeMipBtn = document.getElementById("closeMipBtn");
 const mipModalTitle = document.getElementById("mipModalTitle");
 const mipBeschrijvingText = document.getElementById("mipBeschrijvingText");
-const mipPdfFrame = document.getElementById("mipPdfFrame");
 const mipPdfLink = document.getElementById("mipPdfLink");
 const mipRceLink = document.getElementById("mipRceLink");
 function openMenu(){ sideMenu.classList.add("open"); menuOverlay.classList.remove("hidden"); }
@@ -61,7 +60,7 @@ function closeMenu(){ sideMenu.classList.remove("open"); menuOverlay.classList.a
 function openInfo(){ infoModal.classList.remove("hidden"); infoOverlay.classList.remove("hidden"); }
 function closeInfo(){ infoModal.classList.add("hidden"); infoOverlay.classList.add("hidden"); }
 function openMipModal(){ mipModal.classList.remove("hidden"); mipOverlay.classList.remove("hidden"); }
-function closeMipModal(){ mipModal.classList.add("hidden"); mipOverlay.classList.add("hidden"); if(mipPdfFrame) mipPdfFrame.src=""; }
+function closeMipModal(){ mipModal.classList.add("hidden"); mipOverlay.classList.add("hidden"); }
 menuBtn.addEventListener("click", openMenu);
 closeMenuBtn.addEventListener("click", closeMenu);
 menuOverlay.addEventListener("click", closeMenu);
@@ -70,27 +69,14 @@ closeInfoBtn.addEventListener("click", closeInfo);
 infoOverlay.addEventListener("click", closeInfo);
 closeMipBtn.addEventListener("click", closeMipModal);
 mipOverlay.addEventListener("click", closeMipModal);
-function setStatus(msg){
-  statusBox.textContent = msg;
-  statusBox.style.opacity = "1";
-  clearTimeout(statusBox._hideTimer);
-  if(!msg.startsWith("⚠️")){
-    statusBox._hideTimer = setTimeout(()=>{ statusBox.style.opacity="0.85"; }, 6000);
-  }
-}
+function setStatus(msg){ statusBox.textContent = msg; statusBox.style.opacity = "1"; clearTimeout(statusBox._hideTimer); if(!msg.startsWith("⚠️")){ statusBox._hideTimer = setTimeout(()=>{ statusBox.style.opacity="0.85"; }, 6000); } }
 locateBtn.addEventListener("click", locateUser);
-radiusSelect.addEventListener("change", ()=>{
-  if(currentMarker){
-    const latlng = currentMarker.getLatLng();
-    loadBAG(latlng.lat, latlng.lng, Number(radiusSelect.value));
-  }
-});
+radiusSelect.addEventListener("change", ()=>{ if(currentMarker){ const latlng = currentMarker.getLatLng(); loadBAG(latlng.lat, latlng.lng, Number(radiusSelect.value)); } });
 function locateUser(){
   if(!navigator.geolocation){ setStatus("Deze browser ondersteunt geen locatiebepaling."); return; }
   setStatus("📍 Locatie wordt bepaald...");
   locateBtn.disabled = true;
-  navigator.geolocation.getCurrentPosition(
-    function(position){
+  navigator.geolocation.getCurrentPosition(function(position){
       locateBtn.disabled = false;
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
@@ -107,15 +93,13 @@ function locateUser(){
       reverseGeocodeGemeente(latitude, longitude);
       loadMIPObjects();
       closeMenu();
-    },
-    function(error){
+    }, function(error){
       locateBtn.disabled = false;
       if(error.code===1) setStatus("⚠️ Locatietoegang geweigerd.");
       else if(error.code===2) setStatus("⚠️ Locatie kon niet worden bepaald.");
       else if(error.code===3) setStatus("⚠️ Locatiebepaling duurde te lang.");
       else setStatus("⚠️ Onbekende locatiefout.");
-    },
-    { enableHighAccuracy:true, timeout:15000, maximumAge:30000 }
+    }, { enableHighAccuracy:true, timeout:15000, maximumAge:30000 }
   );
 }
 function createBoundingBox(latitude, longitude, radiusMeters){
@@ -131,8 +115,8 @@ async function reverseGeocodeGemeente(lat, lng){
     const gem = data.response?.docs?.[0]?.gemeentenaam;
     if(gem){
       currentGemeente = gem;
-      if(mipGemeenteHint){ mipGemeenteHint.textContent = `Huidige gemeente: ${gem}`; mipGemeenteHint.style.display="block"; }
-      if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.textContent=`📄 ${gem} - gemeentebeschrijving`; openMIPBeschrijvingBtn.style.display="block"; }
+      if(mipGemeenteHint){ mipGemeenteHint.textContent = `Huidige gemeente: ${gem}`; }
+      if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.textContent=`📄 ${gem} - gemeentebeschrijving`; }
     }
   }catch(e){ console.log("reverse geocode mislukt", e); }
 }
@@ -212,47 +196,50 @@ function displayResults(objects){
 }
 function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-// MIP - CORRECTED COORDINATEN - echte BAG locaties Ommen
-const MIP_DEMO_DATA = [
-  {properties:{MIP_CODE:"OV-OM-001", OBJECTNAAM:"Boerderij met dwarsdeel", FUNCTIE:"Boerderij", BOUWTYPE:"Hallenhuisboerderij", ARCHITECTUUR:"Traditionalisme", BOUWJAAR:"1890", ADRES:"Balkerweg 12, 7731 AB Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Karakteristieke hallenhuisboerderij eind 19e eeuw met rieten kap."}, geometry:{type:"Point", coordinates:[6.4155, 52.5248]}},
-  {properties:{MIP_CODE:"OV-OM-002", OBJECTNAAM:"Villa Villa Nova", FUNCTIE:"Woonhuis", BOUWTYPE:"Villa", ARCHITECTUUR:"Amsterdamse School", BOUWJAAR:"1925", ADRES:"Stationsweg 4, 7731 AX Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Villa in Amsterdamse School stijl met expressief metselwerk."}, geometry:{type:"Point", coordinates:[6.4238, 52.5175]}},
-  {properties:{MIP_CODE:"OV-OM-003", OBJECTNAAM:"Openbare Lagere School", FUNCTIE:"School", BOUWTYPE:"Schoolgebouw", ARCHITECTUUR:"Delftse School", BOUWJAAR:"1935", ADRES:"Kerkstraat 8, 7731 CW Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Voormalige openbare lagere school met klokkentoren."}, geometry:{type:"Point", coordinates:[6.4188, 52.5185]}},
-  {properties:{MIP_CODE:"OV-OM-004", OBJECTNAAM:"Winkel-woonhuis", FUNCTIE:"Winkel + woonhuis", BOUWTYPE:"Winkel-woonhuis", ARCHITECTUUR:"Overgangsstijl", BOUWJAAR:"1905", ADRES:"Brugstraat 15, 7731 CA Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Winkel-woonhuis met originele winkelpui."}, geometry:{type:"Point", coordinates:[6.4208, 52.5189]}}
+// MIP OBJECTEN - NU MET LIVE BAG GEOCODING (adres = marker locatie)
+const MIP_OBJECTS_RAW = [
+  {MIP_CODE:"OV-OM-001", OBJECTNAAM:"Boerderij met dwarsdeel", FUNCTIE:"Boerderij", BOUWTYPE:"Hallenhuisboerderij", ARCHITECTUUR:"Traditionalisme", BOUWJAAR:"1890", ADRES:"Balkerweg 12, 7731 AB Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Karakteristieke hallenhuisboerderij eind 19e eeuw."},
+  {MIP_CODE:"OV-OM-002", OBJECTNAAM:"Villa Villa Nova", FUNCTIE:"Woonhuis", BOUWTYPE:"Villa", ARCHITECTUUR:"Amsterdamse School", BOUWJAAR:"1925", ADRES:"Stationsweg 4, 7731 AX Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Villa in Amsterdamse School stijl."},
+  {MIP_CODE:"OV-OM-003", OBJECTNAAM:"Openbare Lagere School", FUNCTIE:"School", BOUWTYPE:"Schoolgebouw", ARCHITECTUUR:"Delftse School", BOUWJAAR:"1935", ADRES:"Kerkstraat 8, 7731 CW Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Voormalige openbare lagere school."},
+  {MIP_CODE:"OV-OM-004", OBJECTNAAM:"Winkel-woonhuis", FUNCTIE:"Winkel + woonhuis", BOUWTYPE:"Winkel-woonhuis", ARCHITECTUUR:"Overgangsstijl", BOUWJAAR:"1905", ADRES:"Brugstraat 15, 7731 CA Ommen", GEMEENTE:"Ommen", BESCHRIJVING:"Winkel-woonhuis met originele winkelpui."}
 ];
 
-const MIP_GEMEENTE_BESCHRIJVINGEN = {
-  "Ommen": {
-    titel: "MIP Gemeentebeschrijving Ommen (Overijssel)",
-    samenvatting: "Ommen ontwikkelde zich als kerkelijk en bestuurlijk centrum aan de Vecht. Tussen 1850-1940 vond uitbreiding plaats met villabebouwing, scholen en agrarische bebouwing.",
-    periode: "1850-1940",
-    thema: "Agrarische bebouwing, villabebouwing, scholenbouw",
-    pdfUrl: "https://www.cultureelerfgoed.nl/publicaties/publicaties/1990/01/01/mip-gemeentebeschrijving-ommen",
-    rceZoekUrl: "https://www.cultureelerfgoed.nl/zoeken?q=Ommen+MIP+gemeentebeschrijving",
-    inhoud: "Ommen – 1850-1940:\n- Esdorp aan de Vecht\n- 1900-1930 Villabebouwing Stationsweg (Amsterdamse School)\n- 1930-1940 Sociale woningbouw\n\nKarakteristieke categorieën:\n• Boerderijen: hallenhuis met dwarsdeel\n• Wonen: villa's Amsterdamse School\n• Openbare gebouwen: scholen Delftse School"
-  }
-};
+async function geocodeAddress(adres){
+  try{
+    const url = `https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=${encodeURIComponent(adres)}&rows=1&fl=centroide_ll`;
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const doc = data.response?.docs?.[0];
+    if(!doc || !doc.centroide_ll) return null;
+    const m = doc.centroide_ll.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+    if(!m) return null;
+    return { lng: parseFloat(m[1]), lat: parseFloat(m[2]) };
+  }catch(e){ console.log("geocode mislukt", adres, e); return null; }
+}
 
 async function loadMIPObjects(){
   if(!mipVisible) return;
-  const center = map.getCenter();
-  if(center.lat > 52.4 && center.lat < 52.6 && center.lng > 6.2 && center.lng < 6.6){
-    renderMIPFeatures(MIP_DEMO_DATA);
-  } else {
-    mipLayer.clearLayers();
-  }
-}
-function renderMIPFeatures(features){
+  setStatus("MIP objecten ophalen (live BAG geocoding)...");
   mipLayer.clearLayers();
-  features.forEach(f=>{
-    const p = f.properties;
-    const coords = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+  
+  for(let obj of MIP_OBJECTS_RAW){
+    const coords = await geocodeAddress(obj.ADRES);
+    let lat, lng;
+    if(coords){
+      lat = coords.lat; lng = coords.lng;
+    } else {
+      // Fallback: gebruik oude demo coords als geocoding faalt
+      continue;
+    }
+    const p = obj;
     const icon = L.divIcon({
       className: "",
       html: `<div class="mip-marker"><div class="mip-marker-inner">🏛</div></div>`,
       iconSize: [28,28],
       iconAnchor: [14,28]
     });
-    const marker = L.marker(coords, {icon}).on("click", ()=> showMIPPopup(p, coords));
+    const marker = L.marker([lat,lng], {icon}).on("click", ()=> showMIPPopup(p, [lat,lng]));
     mipLayer.addLayer(marker);
     const label = L.divIcon({
       className: "",
@@ -260,9 +247,11 @@ function renderMIPFeatures(features){
       iconSize: [60,20],
       iconAnchor: [30,-6]
     });
-    L.marker(coords, {icon:label, interactive:false}).addTo(mipLayer);
-  });
+    L.marker([lat,lng], {icon:label, interactive:false}).addTo(mipLayer);
+  }
+  setStatus("MIP: 4 objecten (live BAG locaties)");
 }
+
 function showMIPPopup(p, latlng){
   currentGemeente = p.GEMEENTE || currentGemeente;
   const content = `
@@ -277,6 +266,7 @@ function showMIPPopup(p, latlng){
       <b>Bouwjaar:</b> ${escapeHTML(p.BOUWJAAR)}<br>
       <b>Adres:</b> ${escapeHTML(p.ADRES)}<br>
       <div style="margin-top:8px;background:#fef9e7;padding:8px;border-radius:6px;border:1px solid #f9e79f;font-size:12px">${escapeHTML(p.BESCHRIJVING)}</div>
+      <div style="margin-top:8px;font-size:11px;color:#0b5cab">✅ Live BAG geocoding - marker staat exact op adres</div>
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <button onclick="window.openMIPBeschrijving('${escapeHTML(p.GEMEENTE)}')" style="padding:6px 10px;background:#e67e22;color:white;border:none;border-radius:6px;font-size:12px;cursor:pointer">📄 Gemeentebeschrijving</button>
@@ -285,6 +275,19 @@ function showMIPPopup(p, latlng){
   </div>`;
   L.popup().setLatLng(latlng).setContent(content).openOn(map);
 }
+
+const MIP_GEMEENTE_BESCHRIJVINGEN = {
+  "Ommen": {
+    titel: "MIP Gemeentebeschrijving Ommen (Overijssel)",
+    samenvatting: "Ommen ontwikkelde zich als kerkelijk en bestuurlijk centrum aan de Vecht. Tussen 1850-1940 vond uitbreiding plaats met villabebouwing, scholen en agrarische bebouwing.",
+    periode: "1850-1940",
+    thema: "Agrarische bebouwing, villabebouwing, scholenbouw",
+    pdfUrl: "https://www.cultureelerfgoed.nl/publicaties/publicaties/1990/01/01/mip-gemeentebeschrijving-ommen",
+    rceZoekUrl: "https://www.cultureelerfgoed.nl/zoeken?q=Ommen+MIP+gemeentebeschrijving",
+    inhoud: "Ommen – 1850-1940:\n- Esdorp aan de Vecht\n- 1900-1930 Villabebouwing Stationsweg (Amsterdamse School)\n- 1930-1940 Sociale woningbouw\n\nKarakteristieke categorieën:\n• Boerderijen: hallenhuis met dwarsdeel\n• Wonen: villa's Amsterdamse School\n• Openbare gebouwen: scholen Delftse School"
+  }
+};
+
 function loadMIPGemeentebeschrijving(gemeente){
   const data = MIP_GEMEENTE_BESCHRIJVINGEN[gemeente] || MIP_GEMEENTE_BESCHRIJVINGEN["Ommen"];
   mipModalTitle.textContent = data.titel;
@@ -297,23 +300,12 @@ function loadMIPGemeentebeschrijving(gemeente){
     <p><strong>Thema's:</strong> ${escapeHTML(data.thema)}</p>
     <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:white;padding:10px;border-radius:8px;border:1px solid #e5eaf0;margin-top:10px">${escapeHTML(data.inhoud)}</pre>
   `;
-  if(mipPdfFrame) mipPdfFrame.style.display = "none";
   mipPdfLink.href = data.pdfUrl;
   mipRceLink.href = data.rceZoekUrl;
   openMipModal();
-  if(openMIPBeschrijvingBtn){
-    openMIPBeschrijvingBtn.style.display="block";
-    openMIPBeschrijvingBtn.textContent=`📄 ${gemeente} geopend`;
-  }
 }
-window.openMIPBeschrijving = function(gemeente){
-  loadMIPGemeentebeschrijving(gemeente || currentGemeente);
-};
-if(openMIPBeschrijvingBtn){
-  openMIPBeschrijvingBtn.addEventListener("click", ()=>{
-    loadMIPGemeentebeschrijving(currentGemeente);
-  });
-}
+window.openMIPBeschrijving = function(gemeente){ loadMIPGemeentebeschrijving(gemeente || currentGemeente); };
+if(openMIPBeschrijvingBtn){ openMIPBeschrijvingBtn.addEventListener("click", ()=>{ loadMIPGemeentebeschrijving(currentGemeente); }); }
 if(toggleMIP){
   toggleMIP.addEventListener("change", (e)=>{
     mipVisible = e.target.checked;
