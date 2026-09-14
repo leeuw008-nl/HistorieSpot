@@ -116,28 +116,7 @@ function createBoundingBox(latitude, longitude, radiusMeters){
   return { minLatitude: latitude - latitudeDelta, maxLatitude: latitude + latitudeDelta, minLongitude: longitude - longitudeDelta, maxLongitude: longitude + longitudeDelta };
 }
 
-async function loadBAG(latitude, longitude, radius){
-  objectLayer.clearLayers();
-  yearLabelLayer.clearLayers();
-  const box = createBoundingBox(latitude, longitude, radius * 1.5);
-  const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items" + `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}` + "&limit=1000&f=json&bbox-crs=http://www.opengis.net/def/crs/EPSG/0/4326";
-  try{
-    const response = await fetch(url);
-    if(!response.ok) throw new Error(`PDOK HTTP-fout ${response.status}`);
-    const data = await response.json();
-    const features = data.features || [];
-    const nearbyObjects = features.map(function(feature){
-      const center = calculateFeatureCenter(feature);
-      let distance = Infinity;
-      if(center) distance = calculateDistance(latitude, longitude, center.latitude, center.longitude);
-      return { feature, center, distance };
-    }).filter(o=>o.distance <= radius).sort((a,b)=>a.distance-b.distance);
-    displayResults(nearbyObjects);
-  }catch(error){
-    console.error("Fout bij ophalen BAG:", error);
-    setStatus("⚠️ PDOK kon niet worden bereikt.");
-  }
-}
+async function loadBAG(latitude,longitude,radius){objectLayer.clearLayers();yearLabelLayer.clearLayers();const box=createBoundingBox(latitude,longitude,radius*1.5);const url="https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox="+box.minLongitude+","+box.minLatitude+","+box.maxLongitude+","+box.maxLatitude+"&limit=1000&f=json";try{const r=await fetch(url);if(!r.ok)throw new Error("PDOK "+r.status);const d=await r.json();const f=d.features||[];const n=f.map(function(fe){const c=calculateFeatureCenter(fe);let di=Infinity;if(c)di=calculateDistance(latitude,longitude,c.latitude,c.longitude);return{feature:fe,center:c,distance:di}}).filter(function(o){return o.distance<=radius}).sort(function(a,b){return a.distance-b.distance});displayResults(n)}catch(e){console.error(e);setStatus("⚠️ PDOK kon niet worden bereikt.");}}
 
 function calculateFeatureCenter(feature){
   if(!feature.geometry) return null;
