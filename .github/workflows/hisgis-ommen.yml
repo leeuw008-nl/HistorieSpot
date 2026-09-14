@@ -1,9 +1,9 @@
 name: HisGIS Ommen 1832 - structureel
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 4 * * 0'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,69 +13,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - run: pip install requests
 
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Download en filter Ommen
+      - name: Download Ommen via BBOX
         run: |
           mkdir -p data
           python << 'PY'
-          import requests, json, sys, os
-          base = "https://geoserver.hisgis.nl/geoserver/overijssel/ows"
+          import requests, json
+          # BBOX om Ommen centrum + buitengebied: min_lon, min_lat, max_lon, max_lat
+          # Ommen: 6.40 - 6.47, 52.48 - 52.55
           params = {
             "SERVICE": "WFS",
             "VERSION": "2.0.0",
             "REQUEST": "GetFeature",
             "TYPENAME": "overijssel:percelen_1832",
             "OUTPUTFORMAT": "application/json",
-            "CQL_FILTER": "kadastrale_gemeente IN ('Ommen','Ambt Ommen','Stad Ommen')",
-            "SRSNAME": "EPSG:4326"
+            "SRSNAME": "EPSG:4326",
+            "BBOX": "6.39,52.48,6.48,52.56,EPSG:4326",
+            "COUNT": "10000"
           }
-          headers = {"User-Agent": "HistorieSpot/1.0"}
-          try:
-              print("Downloaden van HisGIS...")
-              r = requests.get(base, params=params, headers=headers, timeout=90)
-              print(f"Status: {r.status_code}")
-              r.raise_for_status()
-              data = r.json()
-              count = len(data.get('features',[]))
-              print(f"Gedownload: {count} percelen")
-              if count == 0:
-                  raise Exception("Geen features ontvangen")
-              # Klein maken
-              for f in data.get('features',[]):
-                  p = f.get('properties',{})
-                  f['properties'] = {
-                    'sectie': p.get('sectie',''),
-                    'perceelnummer': p.get('perceelnummer') or p.get('perceel') or '',
-                    'eigenaar': p.get('eigenaar',''),
-                    'beroep': p.get('beroep',''),
-                    'gebruik': p.get('gebruik',''),
-                    'kadastrale_gemeente': p.get('kadastrale_gemeente','Ommen')
-                  }
-              with open('data/ommen-1832.geojson','w', encoding='utf-8') as out:
-                  json.dump(data, out)
-          except Exception as e:
-              print(f"Waarschuwing: {e}")
-              # BELANGRIJK: faal niet, maak leeg bestand als fallback zodat commit wel werkt
-              if not os.path.exists('data/ommen-1832.geojson'):
-                  with open('data/ommen-1832.geojson','w') as out:
-                      json.dump({"type":"FeatureCollection","features":[]}, out)
+          url = "https://geoserver.hisgis.nl/geoserver/overijssel/ows"
+          print(f"Fetching {url} with BBOX")
+          r = requests.get(url, params=params, headers={"User-Agent":"HistorieSpot/1.0"}, timeout=120)
+          print(f"Status {r.status_code}, size {len(r.text)}")
+          r.raise_for_status()
+          data = r.json()
+          print(f"Features: {len(data.get('features',[]))}")
+          # Opschonen
+          for f in data.get('features',[]):
+              p=f.get('properties',{})
+              f['properties']={
+                'sectie': p.get('sectie') or p.get('SECTIE') or p.get('section') or '',
+                'perceelnummer': p.get('perceelnummer') or p.get('perceel') or p.get('PERCEELNR') or str(p.get('perceelnr','')),
+                'eigenaar': p.get('eigenaar') or p.get('eigenaar_1832') or p.get('EIGENAAR') or '',
+                'beroep': p.get('beroep') or '',
+                'gebruik': p.get('gebruik') or p.get('grondgebruik') or p.get('GEBRUIK') or '',
+              }
+          with open('data/ommen-1832.geojson','w',encoding='utf-8') as out:
+              json.dump(data,out)
           PY
-          ls -lh data/
+          ls -lh data/ommen-1832.geojson
+          wc -l data/ommen-1832.geojson
 
-      - name: Commit naar repo
+      - name: Commit
         run: |
           git config user.name "HistorieSpot bot"
           git config user.email "actions@github.com"
           git add data/ommen-1832.geojson
-          git diff --staged --quiet && echo "Geen wijzigingen" || git commit -m "HisGIS Ommen 1832 auto-update"
+          git diff --staged --quiet || git commit -m "HisGIS Ommen 1832 BBOX update"
           git push
