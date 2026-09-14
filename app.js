@@ -29,34 +29,26 @@ minuutLayer.addTo(map);
 toggleMin&&toggleMin.addEventListener("change",e=>{e.target.checked?minuutLayer.addTo(map):map.removeLayer(minuutLayer);});
 opSlider&&opSlider.addEventListener("input",function(){const o=Number(this.value)/100;if(window.histLayer)window.histLayer.setOpacity(o);if(minuutLayer)minuutLayer.setOpacity(o);if(opVal)opVal.textContent=this.value+"%";});
 toggleBAGBtn&&toggleBAGBtn.addEventListener("click",()=>{const h=map.hasLayer(bagLayer);if(h){map.removeLayer(bagLayer);map.removeLayer(bagLabel);toggleBAGBtn.classList.remove("active");}else{bagLayer.addTo(map);bagLabel.addTo(map);toggleBAGBtn.classList.add("active");}});
-async function loadBAG(latitude, longitude, radius){
-  objectLayer.clearLayers();
-  yearLabelLayer.clearLayers();
-  const box = createBoundingBox(latitude, longitude, radius);
-  let allFeatures = [];
+async function loadBAG(lat,lng,radius){
+  bagLayer.clearLayers();bagLabel.clearLayers();
+  const b=box(lat,lng,radius);
+  let all=[];
   try{
-    for(let start=0; start<4000; start+=1000){
-      const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items"
-        + `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}`
-        + `&limit=1000&f=json&startIndex=${start}`;
-      const r = await fetch(url);
-      if(!r.ok) break;
-      const data = await r.json();
-      const feats = data.features||[];
-      allFeatures = allFeatures.concat(feats);
-      if(feats.length < 1000) break; // klaar
+    for(let i=0;i<4;i++){
+      const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json&startIndex=${i*1000}`;
+      const res=await fetch(url);if(!res.ok)break;const data=await res.json();const feats=data.features||[];all=all.concat(feats);if(feats.length<1000)break;
     }
-    const nearby = allFeatures.map(function(f){
-      const c = calculateFeatureCenter(f);
-      let d = Infinity;
-      if(c) d = calculateDistance(latitude, longitude, c.latitude, c.longitude);
-      return {feature:f, center:c, distance:d};
-    }).filter(o=>o.distance <= radius).sort((a,b)=>a.distance-b.distance);
-    displayResults(nearby);
-  }catch(e){
-    console.error(e);
-    setStatus("⚠️ PDOK kon niet worden bereikt.");
-  }
+    const list=all.map(f=>{const c=centerOf(f);if(!c)return null;const d=dist(lat,lng,c.lat,c.lng);if(d>radius)return null;return{f,c,d};}).filter(Boolean).sort((a,b)=>a.d-b.d);
+    list.forEach(o=>{
+      const y=String(o.f.properties.bouwjaar||"Onb");const cl=yearClass(y);
+      const poly=L.geoJSON(o.f,{style:{weight:1.2,color:"#0b5cab",fillOpacity:0.15}}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
+      bagLayer.addLayer(poly);
+      const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="cursor:pointer">${esc(y)}</div>`});
+      const lab=L.marker([o.c.lat,o.c.lng],{icon:ic}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
+      bagLabel.addLayer(lab);
+    });
+    setStatus(`${list.length} BAG binnen ${radius}m`);
+  }catch(e){console.error(e);setStatus("BAG fout");}
 }
 locateBtn&&locateBtn.addEventListener("click",()=>{
   if(!navigator.geolocation){setStatus("Geen geolocatie");return;}
