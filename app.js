@@ -1,5 +1,6 @@
 // HistorieSpot - FINAL versie vanmorgen: sticky header, fullscreen, fab, bouwjaar, B02/B03 fix, bottom slider, auto kadaster
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
+window.map = map; // nodig voor HisGIS 1832 laag
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
 
