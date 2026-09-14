@@ -1,0 +1,76 @@
+name: HisGIS Ommen 1832 - structureel
+
+on:
+  schedule:
+    - cron: '0 4 * * 0' # zondag 04:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download en filter Ommen
+        run: |
+          mkdir -p data
+          python << 'PY'
+          import requests, json, sys
+          # Nieuwe HisGIS GeoServer - werkt wel vanaf GitHub
+          base = "https://geoserver.hisgis.nl/geoserver/overijssel/ows"
+          params = {
+            "SERVICE": "WFS",
+            "VERSION": "2.0.0",
+            "REQUEST": "GetFeature",
+            "TYPENAME": "overijssel:percelen_1832",
+            "OUTPUTFORMAT": "application/json",
+            "CQL_FILTER": "kadastrale_gemeente IN ('Ommen','Ambt Ommen','Stad Ommen')",
+            "SRSNAME": "EPSG:4326"
+          }
+          headers = {"User-Agent": "HistorieSpot/1.0 (Ommen; +https://leeuw008-nl.github.io/HistorieSpot/)"}
+          try:
+              r = requests.get(base, params=params, headers=headers, timeout=60)
+              r.raise_for_status()
+              data = r.json()
+              print(f"Gedownload: {len(data.get('features',[]))} percelen")
+              # Behoud alleen relevante properties om bestand klein te houden
+              for f in data.get('features',[]):
+                  p = f.get('properties',{})
+                  # Normalizeer velden
+                  f['properties'] = {
+                    'sectie': p.get('sectie') or p.get('SECTIE') or '',
+                    'perceelnummer': p.get('perceelnummer') or p.get('PERCEEL') or p.get('perceelnr') or '',
+                    'eigenaar': p.get('eigenaar') or p.get('EIGENAAR') or p.get('naam') or '',
+                    'beroep': p.get('beroep') or p.get('BEROEP') or '',
+                    'gebruik': p.get('gebruik') or p.get('GEBRUIK') or p.get('grondgebruik') or '',
+                    'kadastrale_gemeente': p.get('kadastrale_gemeente') or p.get('GEMEENTE') or 'Ommen'
+                  }
+              with open('data/ommen-1832.geojson','w') as out:
+                  json.dump(data, out)
+          except Exception as e:
+              print(f"FOUT: {e}", file=sys.stderr)
+              # Als WFS faalt, laat bestaande file staan, faal niet de hele Action
+              import os
+              if not os.path.exists('data/ommen-1832.geojson'):
+                  with open('data/ommen-1832.geojson','w') as out:
+                      json.dump({"type":"FeatureCollection","features":[]}, out)
+              sys.exit(0)
+          PY
+
+      - name: Commit naar repo
+        run: |
+          git config user.name "HistorieSpot bot"
+          git config user.email "actions@github.com"
+          git add data/ommen-1832.geojson
+          git diff --staged --quiet || git commit -m "HisGIS Ommen 1832 auto-update"
+          git push
