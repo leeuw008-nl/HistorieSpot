@@ -116,7 +116,8 @@ function createBoundingBox(latitude, longitude, radiusMeters){
   return { minLatitude: latitude - latitudeDelta, maxLatitude: latitude + latitudeDelta, minLongitude: longitude - longitudeDelta, maxLongitude: longitude + longitudeDelta };
 }
 
-async function loadBAG(latitude,longitude,radius){objectLayer.clearLayers();yearLabelLayer.clearLayers();const box=createBoundingBox(latitude,longitude,radius*1.5);const url="https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox="+box.minLongitude+","+box.minLatitude+","+box.maxLongitude+","+box.maxLatitude+"&limit=1000&f=json";try{const r=await fetch(url);if(!r.ok)throw new Error("PDOK "+r.status);const d=await r.json();const f=d.features||[];const n=f.map(function(fe){const c=calculateFeatureCenter(fe);let di=Infinity;if(c)di=calculateDistance(latitude,longitude,c.latitude,c.longitude);return{feature:fe,center:c,distance:di}}).filter(function(o){return o.distance<=radius}).sort(function(a,b){return a.distance-b.distance});displayResults(n)}catch(e){console.error(e);setStatus("⚠️ PDOK kon niet worden bereikt.");}}
+async function loadBAG(a,b,c){objectLayer.clearLayers();yearLabelLayer.clearLayers();const d=createBoundingBox(a,b,c);const e="https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox="+d.minLongitude+","+d.minLatitude+","+d.maxLongitude+","+d.maxLatitude+"&limit=1000&f=json";try{const f=await fetch(e);if(!f.ok)throw new Error("PDOK "+f.status);const g=await f.json();const h=g.features||[];const i=h.map(function(j){const k=calculateFeatureCenter(j);let l=Infinity;if(k)l=calculateDistance(a,b,k.latitude,k.longitude);return{feature:j,center:k,distance:l}}).filter(function(m){return m.distance<=c}).sort(function(n,o){return n.distance-o.distance});displayResults(i)}catch(p){console.error(p);setStatus("⚠️ PDOK kon niet worden bereikt.");}}
+
 
 function calculateFeatureCenter(feature){
   if(!feature.geometry) return null;
