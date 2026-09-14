@@ -31,14 +31,11 @@ opSlider&&opSlider.addEventListener("input",function(){const o=Number(this.value
 toggleBAGBtn&&toggleBAGBtn.addEventListener("click",()=>{const h=map.hasLayer(bagLayer);if(h){map.removeLayer(bagLayer);map.removeLayer(bagLabel);toggleBAGBtn.classList.remove("active");}else{bagLayer.addTo(map);bagLabel.addTo(map);toggleBAGBtn.classList.add("active");}});
 async function loadBAG(lat,lng,radius){
   bagLayer.clearLayers();bagLabel.clearLayers();
-  const b=box(lat,lng,radius);
-  let all=[];
+  const b=box(lat,lng,radius*1.5);
+  const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
   try{
-    for(let i=0;i<4;i++){
-      const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json&startIndex=${i*1000}`;
-      const res=await fetch(url);if(!res.ok)break;const data=await res.json();const feats=data.features||[];all=all.concat(feats);if(feats.length<1000)break;
-    }
-    const list=all.map(f=>{const c=centerOf(f);if(!c)return null;const d=dist(lat,lng,c.lat,c.lng);if(d>radius)return null;return{f,c,d};}).filter(Boolean).sort((a,b)=>a.d-b.d);
+    const res=await fetch(url);const data=await res.json();
+    const list=data.features.map(f=>{const c=centerOf(f);if(!c)return null;const d=dist(lat,lng,c.lat,c.lng);if(d>radius)return null;return{f,c,d};}).filter(Boolean).sort((a,b)=>a.d-b.d);
     list.forEach(o=>{
       const y=String(o.f.properties.bouwjaar||"Onb");const cl=yearClass(y);
       const poly=L.geoJSON(o.f,{style:{weight:1.2,color:"#0b5cab",fillOpacity:0.15}}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
