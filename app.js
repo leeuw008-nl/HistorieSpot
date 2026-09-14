@@ -1,4 +1,4 @@
-// HistorieSpot - FINAL versie vanmorgen: sticky header, fullscreen, fab, bouwjaar, B02/B03 fix, bottom slider, auto kadaster
+// HistorieSpot - FINAL versie vanmorgen: sticky header, fullscreen, fab, bouwjaar, B02/B03 fix, bottom slider, auto kadaster + HisGIS 1832
 const map = L.map("map", { zoomControl:false }).setView([52.516, 6.420], 15);
 window.map = map; // nodig voor HisGIS 1832 laag
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
@@ -28,8 +28,7 @@ async function loadMinuutplanAuto(lat, lng){
       if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
       window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
       window.historischeMinuutplanLayer.addTo(map);
-      console.log(`Auto kadasterkaart geladen: ${origineleCode} -> ${minuutplanCode} op 55%`);
-      updateOpacityBarVisibility();
+      console.log(`Auto kadasterkaart geladen: ${origineleCode} -> ${minuutplanCode} op ${opacitySlider.value}%`);
     }
   }catch(e){ console.error("Auto kadaster laden mislukt", e); }
 }
@@ -46,6 +45,7 @@ const closeInfoBtn = document.getElementById("closeInfoBtn");
 const infoModal = document.getElementById("infoModal");
 const infoOverlay = document.getElementById("infoOverlay");
 const toggleMinuutplan = document.getElementById("toggleMinuutplan");
+const toggleHisGIS = document.getElementById("toggleHisGIS");
 const opacityBar = document.getElementById("opacityBar");
 const opacitySlider = document.getElementById("historischeOpacity");
 const opacityValue = document.getElementById("historischeOpacityValue");
@@ -66,7 +66,7 @@ function setStatus(msg){
   statusBox.textContent = msg;
   statusBox.style.opacity = "1";
   clearTimeout(statusBox._hideTimer);
-  if(!msg.startsWith("⚠️")){
+  if(!msg.startsWith("⚠")){
     statusBox._hideTimer = setTimeout(()=>{ statusBox.style.opacity="0.85"; }, 6000);
   }
 }
@@ -79,6 +79,7 @@ radiusSelect.addEventListener("change", ()=>{
   }
 });
 
+// LOCATIE
 function locateUser(){
   if(!navigator.geolocation){ setStatus("Deze browser ondersteunt geen locatiebepaling."); return; }
   setStatus("📍 Locatie wordt bepaald...");
@@ -102,10 +103,10 @@ function locateUser(){
     },
     function(error){
       locateBtn.disabled = false;
-      if(error.code===1) setStatus("⚠️ Locatietoegang geweigerd.");
-      else if(error.code===2) setStatus("⚠️ Locatie kon niet worden bepaald.");
-      else if(error.code===3) setStatus("⚠️ Locatiebepaling duurde te lang.");
-      else setStatus("⚠️ Onbekende locatiefout.");
+      if(error.code===1) setStatus("⚠ Locatietoegang geweigerd.");
+      else if(error.code===2) setStatus("⚠ Locatie kon niet worden bepaald.");
+      else if(error.code===3) setStatus("⚠ Locatiebepaling duurde te lang.");
+      else setStatus("⚠ Onbekende locatiefout.");
     },
     { enableHighAccuracy:true, timeout:15000, maximumAge:30000 }
   );
@@ -136,7 +137,7 @@ async function loadBAG(latitude, longitude, radius){
     displayResults(nearbyObjects);
   }catch(error){
     console.error("Fout bij ophalen BAG:", error);
-    setStatus("⚠️ PDOK kon niet worden bereikt.");
+    setStatus("⚠ PDOK kon niet worden bereikt.");
   }
 }
 
@@ -176,14 +177,14 @@ function displayResults(objects){
     const feature = object.feature;
     const properties = feature.properties || {};
     const identification = properties.identificatie || "Onbekend";
-    const constructionYear = properties.bouwjaar ?? "Onbekend";
-    const purpose = Array.isArray(properties.gebruiksdoel) ? properties.gebruiksdoel.join(", ") : (properties.gebruiksdoel || "Onbekend");
+    const constructionYear = properties.bouwjaar?? "Onbekend";
+    const purpose = Array.isArray(properties.gebruiksdoel)? properties.gebruiksdoel.join(", ") : (properties.gebruiksdoel || "Onbekend");
     const status = properties.status || "Onbekend";
     const yearStr = String(constructionYear);
     const yearClass = getYearClass(yearStr);
     L.geoJSON(feature, { style:{ weight:1.5, color:"#0b5cab", fillColor:"#0b5cab", fillOpacity:0.18 } })
-      .bindPopup(`<strong>BAG-object</strong><br><span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>Gebruiksdoel: ${escapeHTML(String(purpose))}<br>Status: ${escapeHTML(String(status))}<br><small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>`)
-      .addTo(objectLayer);
+     .bindPopup(`<strong>BAG-object</strong><br><span style="font-size:18px;font-weight:800">🕰 ${escapeHTML(yearStr)}</span><br>Gebruiksdoel: ${escapeHTML(String(purpose))}<br>Status: ${escapeHTML(String(status))}<br><small>BAG-ID: ${escapeHTML(String(identification))}<br>Afstand: ${Math.round(object.distance)}m</small>`)
+     .addTo(objectLayer);
     if(object.center){
       const icon = L.divIcon({ className: "", html: `<div class="year-badge ${yearClass}">${escapeHTML(yearStr)}</div>`, iconSize: null });
       L.marker([object.center.latitude, object.center.longitude], { icon: icon }).addTo(yearLabelLayer);
@@ -193,9 +194,30 @@ function displayResults(objects){
 }
 function escapeHTML(value){ return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-// HISTORISCHE KAART
+// HISTORISCHE KAARTEN - MINUUTPLAN + HisGIS PERCELEN
 const minuutplanLayer = L.tileLayer.wms("https://services.rce.geovoorziening.nl/misc/wms", { layers: "Minuutplanbegrenzingen", format:"image/png", transparent:true, version:"1.3.0", opacity:0.55, attribution:"© RCE" });
 minuutplanLayer.addTo(map);
+
+// HisGIS Overijssel percelen 1832 - WMS (proberen, valt terug op link als WMS leeg is)
+const hisgisPerceelLayer = L.tileLayer.wms("https://geoserver.hisgis.nl/geoserver/overijssel/wms", {
+  layers: "overijssel:overijssel_percelen_1832",
+  format: "image/png",
+  transparent: true,
+  version: "1.1.0",
+  opacity: 0.65,
+  attribution: "© HisGIS Overijssel"
+});
+
+if(toggleHisGIS && toggleHisGIS.checked){
+  hisgisPerceelLayer.addTo(map);
+}
+if(toggleHisGIS){
+  toggleHisGIS.addEventListener("change", ()=>{
+    if(toggleHisGIS.checked) hisgisPerceelLayer.addTo(map);
+    else map.removeLayer(hisgisPerceelLayer);
+  });
+}
+
 toggleMinuutplan.addEventListener("change", ()=>{
   if(toggleMinuutplan.checked) minuutplanLayer.addTo(map);
   else map.removeLayer(minuutplanLayer);
@@ -207,12 +229,14 @@ function wgs84ToRD(lat, lon){
   const y=463000+309056.544*dF+3638.893*Math.pow(dL,2)+73.077*Math.pow(dF,2)-157.984*dF*Math.pow(dL,2)+59.788*Math.pow(dF,3)+0.433*dL-6.439*Math.pow(dF,2)*Math.pow(dL,2)-0.032*dF*dL+0.092*Math.pow(dL,4)-0.054*dF*Math.pow(dL,4);
   return {x,y};
 }
-function updateOpacityBarVisibility(){
-  // altijd zichtbaar, default 55%
-}
 
+// CLICK - COMBINED MINUUTPLAN + HisGIS LINK
 map.on("click", async function(e){
-  if(!map.hasLayer(minuutplanLayer)) return;
+  // Alleen als minuutplan of HisGIS aan staat
+  const minuutAan =!toggleMinuutplan || toggleMinuutplan.checked;
+  const hisgisAan = toggleHisGIS && toggleHisGIS.checked;
+  if(!minuutAan &&!hisgisAan) return;
+
   try{
     const rd=wgs84ToRD(e.latlng.lat, e.latlng.lng);
     const bbox=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(",");
@@ -220,18 +244,40 @@ map.on("click", async function(e){
     const response=await fetch(url);
     if(!response.ok) throw new Error("RCE WFS HTTP "+response.status);
     const data=await response.json();
-    if(!data.features || data.features.length===0) return;
+    if(!data.features || data.features.length===0){
+      // Geen minuutplan, wel HisGIS link tonen
+      if(hisgisAan){
+        const hisgisUrl = `https://www.hisgis.nl/hisgis/gewesten/overijssel/overijssel?lat=${e.latlng.lat.toFixed(6)}&lon=${e.latlng.lng.toFixed(6)}&zoom=18`;
+        L.popup().setLatLng(e.latlng).setContent(`
+          <div style="min-width:240px">
+            <strong>📍 ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}</strong><br><br>
+            <a href="${hisgisUrl}" target="_blank" style="display:block;background:#0b5cab;color:white;padding:10px 12px;text-align:center;border-radius:6px;text-decoration:none;font-weight:600">🔍 Bekijk echte eigenaar 1832 in HisGIS Overijssel</a>
+            <small style="display:block;margin-top:8px;color:#666">Opent HisGIS viewer met OAT: eigenaar, beroep, grondgebruik</small>
+          </div>
+        `).openOn(map);
+      }
+      return;
+    }
     const p=data.features[0].properties;
     const origineleCode = p.CODE;
     const minuutplanCode = corrigeerMinuutplanCode(origineleCode);
-    const isGecorrigeerd = origineleCode !== minuutplanCode;
+    const isGecorrigeerd = origineleCode!== minuutplanCode;
     if(minuutplanCode){
       if(window.historischeMinuutplanLayer){ map.removeLayer(window.historischeMinuutplanLayer); }
       window.historischeMinuutplanLayer=L.tileLayer("https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut"+minuutplanCode+"*",{opacity:Number(opacitySlider.value)/100,maxZoom:20,attribution:"Historische kaart: HisGIS / RCE"});
       window.historischeMinuutplanLayer.addTo(map);
     }
-    let correctieNote = isGecorrigeerd ? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠️ Correctie: ${origineleCode} → ${minuutplanCode} (Ommen B02↔B03)</div>` : "";
-    let popupContent=`<div style="min-width:240px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>RCE</small>${correctieNote}<hr><strong>Periode:</strong> 1811–1832<br><br><strong>Gemeente:</strong> ${p.GEMEENTE||"onbekend"}<br><strong>Sectie:</strong> ${p.SECTIE||""} <strong>Blad:</strong> ${p.BLAD||""}<br><br><strong>Code:</strong> ${p.CODE||""}${isGecorrigeerd?` → <b>${minuutplanCode}</b>`:""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a></div>`;
+    let correctieNote = isGecorrigeerd? `<div style='background:#fff3cd;padding:6px 8px;border-radius:6px;margin:8px 0;font-size:12px;border:1px solid #ffe69c'>⚠ Correctie: ${origineleCode} → ${minuutplanCode} (Ommen B02↔B03)</div>` : "";
+
+    // HisGIS link voor deze locatie
+    const hisgisUrl = `https://www.hisgis.nl/hisgis/gewesten/overijssel/overijssel?lat=${e.latlng.lat.toFixed(6)}&lon=${e.latlng.lng.toFixed(6)}&zoom=18`;
+    const hisgisButton = hisgisAan? `
+      <hr style="margin:10px 0">
+      <a href="${hisgisUrl}" target="_blank" style="display:block;background:#8B4513;color:white;padding:10px 12px;text-align:center;border-radius:6px;text-decoration:none;font-weight:600">🔍 Bekijk echte eigenaar 1832 in HisGIS</a>
+      <small style="display:block;margin-top:6px;color:#666">OAT 1832: eigenaar, beroep, gebruik, oppervlakte</small>
+    ` : `<small style="color:#888">Vink HisGIS aan voor eigenaar 1832</small>`;
+
+    let popupContent=`<div style="min-width:250px"><strong style="font-size:16px">🕰 Kadastraal minuutplan</strong><br><small>RCE 1811-1832</small>${correctieNote}<hr><strong>Gemeente:</strong> ${p.GEMEENTE||"onbekend"}<br><strong>Sectie:</strong> ${p.SECTIE||""} <strong>Blad:</strong> ${p.BLAD||""}<br><strong>Code:</strong> ${p.CODE||""}${isGecorrigeerd?` → <b>${minuutplanCode}</b>`:""}<br><br><a href="${p.URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:6px 10px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Bekijk originele minuutplan</a>${hisgisButton}</div>`;
     L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
   }catch(error){ console.error("Fout bij ophalen minuutplan:", error); }
 });
@@ -240,11 +286,11 @@ opacitySlider.addEventListener("input", function(){
   const opacity=Number(this.value)/100;
   if(window.historischeMinuutplanLayer) window.historischeMinuutplanLayer.setOpacity(opacity);
   if(minuutplanLayer) minuutplanLayer.setOpacity(opacity);
+  if(hisgisPerceelLayer) hisgisPerceelLayer.setOpacity(opacity);
   opacityValue.textContent=this.value+"%";
 });
 opacityValue.textContent=opacitySlider.value+"%";
 
-// Default: auto inzoomen op huidige locatie + default kadasterkaart 55%
 window.addEventListener("load", ()=>{
   setTimeout(()=>{
     if(navigator.geolocation){ locateUser(); }
@@ -252,12 +298,12 @@ window.addEventListener("load", ()=>{
 });
 minuutplanLayer.setOpacity(0.55);
 
-// BAG aan/uit toggle - alleen toegevoegd, rest ongewijzigd
+// BAG aan/uit
 const toggleBAGBtn = document.getElementById("toggleBAGBtn");
 let bagVisible = true;
 if(toggleBAGBtn){
   toggleBAGBtn.addEventListener("click", ()=>{
-    bagVisible = !bagVisible;
+    bagVisible =!bagVisible;
     if(bagVisible){
       objectLayer.addTo(map);
       yearLabelLayer.addTo(map);
