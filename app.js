@@ -119,8 +119,8 @@ function createBoundingBox(latitude, longitude, radiusMeters){
 async function loadBAG(latitude, longitude, radius){
   objectLayer.clearLayers();
   yearLabelLayer.clearLayers();
-  const box = createBoundingBox(latitude, longitude, radius);
-  const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items" + `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}` + "&limit=100&f=json";
+  const box = createBoundingBox(latitude, longitude, radius * 1.5);
+  const url = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items" + `?bbox=${box.minLongitude},${box.minLatitude},${box.maxLongitude},${box.maxLatitude}` + "&limit=1000&f=json&bbox-crs=http://www.opengis.net/def/crs/EPSG/0/4326";
   try{
     const response = await fetch(url);
     if(!response.ok) throw new Error(`PDOK HTTP-fout ${response.status}`);
