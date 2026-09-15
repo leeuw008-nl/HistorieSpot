@@ -45,9 +45,9 @@ async function loadBAG(lat,lng,radius){
     list.forEach(o=>{
       const y=String(o.f.properties.bouwjaar||"Onb"); if(!matchesYearFilter(y)) return;
       const cl=yearClass(y); const col=useKadaster?kadasterColor(y):"#0b5cab";
-      const poly=L.geoJSON(o.f,{style:{weight:1.2,color:col,fillColor:col,fillOpacity:0.18}}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
+      const poly=L.geoJSON(o.f,{style:{weight:1.2,color:col,fillColor:useKadaster?col:"#0b5cab",fillOpacity:0.15}}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
       bagLayer.addLayer(poly);
-      const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="cursor:pointer;background:${col}">${esc(y)}</div>`});
+      const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="cursor:pointer">${esc(y)}</div>`, iconSize:null});
       const lab=L.marker([o.c.lat,o.c.lng],{icon:ic}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
       bagLabel.addLayer(lab);
     });
