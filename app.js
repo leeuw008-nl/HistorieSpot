@@ -22,7 +22,7 @@ function esc(s){return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").
 
 function getYearCat(y){const n=parseInt(y,10); if(isNaN(n)) return null; if(n<1800) return "pre1800"; if(n<1900) return "1800-1900"; if(n<1950) return "1900-1950"; if(n<1965) return "1950-1965"; if(n<1980) return "1965-1980"; if(n<2000) return "1980-2000"; return "na2000";}
 function kadasterColor(y){const n=parseInt(y,10); if(isNaN(n)) return "#0b5cab"; if(n<1800) return "#7a1d1d"; if(n<1900) return "#d26e00"; if(n<1950) return "#b89a00"; if(n<1965) return "#5a9a4a"; if(n<1980) return "#4a8ab5"; if(n<2000) return "#7a5ab5"; return "#a0a0a0";}
-let activeYearFilter="all", useKadaster=false;
+let activeYearFilter="all", useKadaster=true;
 function matchesYearFilter(y){if(activeYearFilter==="all") return true; return getYearCat(y)===activeYearFilter;}
 
 function yearClass(y){const n=parseInt(y,10);if(isNaN(n))return"unknown";if(n<1850)return"very-old";if(n<1920)return"old";return"";}
@@ -63,7 +63,10 @@ locateBtn&&locateBtn.addEventListener("click",()=>{
     map.setView([lat,lng],18);
     if(curMarker)map.removeLayer(curMarker);
     if(accCircle)map.removeLayer(accCircle);
+    if(selectedMarker){map.removeLayer(selectedMarker); selectedMarker=null;}
+    if(curMarker)map.removeLayer(curMarker);
     curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie").openPopup();
+    curMarker.on("click",()=>{ loadBAG(lat,lng,r); loadHistForLocation(lat,lng); setStatus("Huidige positie – BAG laden..."); });
     accCircle=L.circle([lat,lng],{radius:acc,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
     loadBAG(lat,lng,r);closeMenu();
   },()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},{enableHighAccuracy:true,timeout:15000});
@@ -81,16 +84,26 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
+let selectedMarker=null;
 map.on("click",async e=>{
-  if(!map.hasLayer(minuutLayer))return;
+  const lat=e.latlng.lat, lng=e.latlng.lng, r=Number(radiusSel.value);
+  // Toon BAG voor geklikte positie
+  if(selectedMarker) map.removeLayer(selectedMarker);
+  selectedMarker=L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
+  setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
+  loadBAG(lat,lng,r);
+  loadHistForLocation(lat,lng);
   try{
-    const rd=wgs84ToRD(e.latlng.lat,e.latlng.lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-    const res=await fetch(url),data=await res.json();if(!data.features||!data.features.length)return;
-    let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
-    if(window.histLayer)map.removeLayer(window.histLayer);
-    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
-    const p=data.features[0].properties;
-    L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a></div>`).openOn(map);
+    if(map.hasLayer(minuutLayer)){
+      const rd=wgs84ToRD(lat,lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
+      const res=await fetch(url),data=await res.json();if(data.features&&data.features.length){
+        let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
+        if(window.histLayer)map.removeLayer(window.histLayer);
+        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
+        const p=data.features[0].properties;
+        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><small>Geklikte positie wordt nu gebruikt voor BAG</small></div>`).openOn(map);
+      }
+    }
   }catch(err){console.error(err);}
 });
 
@@ -98,6 +111,8 @@ yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.ta
 toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked; const r=Number(radiusSel.value); if(curMarker){const ll=curMarker.getLatLng(); loadBAG(ll.lat,ll.lng,r);} else loadBAG(52.516,6.42,r);});
 
 window.addEventListener("load",()=>{
+  if(toggleKadasterColors) toggleKadasterColors.checked=true;
+
   setTimeout(()=>{
     if(navigator.geolocation){
       navigator.geolocation.getCurrentPosition(p=>{
