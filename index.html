@@ -23,6 +23,22 @@
     <div class="side-menu-header"><strong>Menu</strong><button id="closeMenuBtn" class="icon-btn small" aria-label="Sluiten"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
     <div class="side-menu-content">
       <div class="menu-section"><h3>Zoeken</h3><label for="radius">Zoekradius</label><select id="radius"><option value="25">25 meter</option><option value="50" selected>50 meter</option><option value="100">100 meter</option><option value="250">250 meter</option><option value="500">500 meter</option></select><p class="menu-hint">Gebouwen binnen deze radius tonen hun bouwjaar direct op de kaart.</p></div>
+      <div style="margin-top:12px">
+  <label>Toon jaartallen:</label>
+  <select id="yearFilter" style="width:100%;margin-top:4px">
+    <option value="all">Alles</option>
+    <option value="pre1800">Vóór 1800</option>
+    <option value="1800-1900">1800-1900</option>
+    <option value="1900-1950">1900-1950</option>
+    <option value="1950-1965">1950-1965</option>
+    <option value="1965-1980">1965-1980</option>
+    <option value="1980-2000">1980-2000</option>
+    <option value="na2000">Na 2000</option>
+  </select>
+  <label style="display:flex;gap:6px;margin-top:8px;align-items:center">
+    <input type="checkbox" id="toggleKadasterColors"> Kadaster-kleuren
+  </label>
+</div>
       <div class="menu-section"><h3>Kaartlagen</h3><label class="toggle"><input type="checkbox" id="toggleMinuutplan" checked><span>Kadastrale minuutplan 1811-1832</span></label><label class="toggle"><input type="checkbox" id="toggleHisGIS" checked><span>HisGIS percelen 1832 (eigenaar + gebruik)</span></label><p class="menu-hint">Transparantie regel je onderin de kaart.</p></div>
       <div class="menu-section small"><p>Data: PDOK / Kadaster BAG · RCE minuutplans · HisGIS<br>Ommen B02↔B03 automatisch gecorrigeerd.</p></div>
     </div>
