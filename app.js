@@ -69,6 +69,18 @@ locateBtn&&locateBtn.addEventListener("click",()=>{
   },()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},{enableHighAccuracy:true,timeout:15000});
 });
 radiusSel&&radiusSel.addEventListener("change",()=>{const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else{loadBAG(52.516,6.42,r);}});
+
+async function loadHistForLocation(lat,lng){
+  try{
+    if(!map.hasLayer(minuutLayer)) minuutLayer.addTo(map);
+    const rd=wgs84ToRD(lat,lng), b=[rd.x-50,rd.y-50,rd.x+50,rd.y+50].join(","), url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
+    const res=await fetch(url); const data=await res.json(); if(!data.features||!data.features.length) return;
+    let code=data.features[0].properties.CODE; const orig=code; code=corr(code);
+    if(window.histLayer) map.removeLayer(window.histLayer);
+    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
+  }catch(e){console.error("hist 1832 load fail",e);}
+}
+
 map.on("click",async e=>{
   if(!map.hasLayer(minuutLayer))return;
   try{
@@ -93,12 +105,12 @@ window.addEventListener("load",()=>{
         map.setView([lat,lng],18);
         curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
         accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);
+        loadBAG(lat,lng,r); loadHistForLocation(lat,lng);
       },()=>{
-        loadBAG(52.516,6.42,Number(radiusSel.value));
+        loadBAG(52.516,6.42,Number(radiusSel.value)); loadHistForLocation(52.516,6.42);
       },{enableHighAccuracy:true,timeout:8000});
     }else{
-      loadBAG(52.516,6.42,Number(radiusSel.value));
+      loadBAG(52.516,6.42,Number(radiusSel.value)); loadHistForLocation(52.516,6.42);
     }
   },600);
 });
