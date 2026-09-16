@@ -37,23 +37,100 @@ toggleMin&&toggleMin.addEventListener("change",e=>{e.target.checked?minuutLayer.
 opSlider&&opSlider.addEventListener("input",function(){const o=Number(this.value)/100;if(window.histLayer)window.histLayer.setOpacity(o);if(minuutLayer)minuutLayer.setOpacity(o);if(opVal)opVal.textContent=this.value+"%";});
 toggleBAGBtn&&toggleBAGBtn.addEventListener("click",()=>{const h=map.hasLayer(bagLayer);if(h){map.removeLayer(bagLayer);map.removeLayer(bagLabel);toggleBAGBtn.classList.remove("active");}else{bagLayer.addTo(map);bagLabel.addTo(map);toggleBAGBtn.classList.add("active");}});
 async function loadBAG(lat,lng,radius){
-  bagLayer.clearLayers();bagLabel.clearLayers();
+  bagLayer.clearLayers();
+  bagLabel.clearLayers();
+
   const b=box(lat,lng,radius);
   const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
+
   try{
-    const res=await fetch(url);const data=await res.json();
-    const list=data.features.map(f=>{const c=centerOf(f);if(!c)return null;const d=dist(lat,lng,c.lat,c.lng);if(d>radius)return null;return{f,c,d};}).filter(Boolean).sort((a,b)=>a.d-b.d);
+    const res=await fetch(url);
+    if(!res.ok) throw new Error(`BAG HTTP ${res.status}`);
+
+    const data=await res.json();
+
+    const list=data.features.map(f=>{
+      const c=centerOf(f);
+      if(!c) return null;
+
+      const d=dist(lat,lng,c.lat,c.lng);
+      if(d>radius) return null;
+
+      return {f,c,d};
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.d-b.d);
+
     list.forEach(o=>{
-      const y=String(o.f.properties.bouwjaar||"Onb"); if(!matchesYearFilter(y)) return;
-      const cl=yearClass(y); const col=useKadaster?kadasterColor(y):"#0b5cab";
-      const poly=L.geoJSON(o.f,{style:{weight:1.2,color:col,fillColor:useKadaster?col:"#0b5cab",fillOpacity:0.15}}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
+
+      const p=o.f.properties || {};
+
+      // BAG-bouwjaar
+      const y=(p.bouwjaar!==null && p.bouwjaar!==undefined && p.bouwjaar!=="")
+        ? String(p.bouwjaar)
+        : "Onbekend";
+
+      if(!matchesYearFilter(y)) return;
+
+      // Extra BAG-metadata
+      const bagId=p.identificatie || "Onbekend";
+      const documentdatum=p.documentdatum || "Onbekend";
+      const documentnummer=p.documentnummer || "Onbekend";
+      const status=p.status || "Onbekend";
+      const geconstateerd=p.geconstateerd || "Onbekend";
+      const gebruiksdoel=p.gebruiksdoel || "Onbekend";
+
+      const cl=yearClass(y);
+      const col=useKadaster?kadasterColor(y):"#0b5cab";
+
+      const popup=`
+        <div style="min-width:250px">
+          <b>BAG-pand</b><br>
+          Bouwjaar: <b>${esc(y)}</b><br>
+          Afstand: ${Math.round(o.d)} m
+          <hr style="margin:8px 0">
+          <small>
+            BAG-identificatie: ${esc(bagId)}<br>
+            Status: ${esc(status)}<br>
+            Gebruiksdoel: ${esc(gebruiksdoel)}<br>
+            Geconstateerd: ${esc(geconstateerd)}<br>
+            BAG-document: ${esc(documentnummer)}<br>
+            Documentdatum: ${esc(documentdatum)}
+          </small>
+        </div>
+      `;
+
+      const poly=L.geoJSON(o.f,{
+        style:{
+          weight:1.2,
+          color:col,
+          fillColor:useKadaster?col:"#0b5cab",
+          fillOpacity:0.15
+        }
+      }).bindPopup(popup);
+
       bagLayer.addLayer(poly);
-      const ic=L.divIcon({className:"",html:`<div class="year-badge ${cl}" style="cursor:pointer">${esc(y)}</div>`, iconSize:null});
-      const lab=L.marker([o.c.lat,o.c.lng],{icon:ic}).bindPopup(`<b>BAG</b><br>Bouwjaar: <b>${esc(y)}</b><br>${Math.round(o.d)}m`);
+
+      const ic=L.divIcon({
+        className:"",
+        html:`<div class="year-badge ${cl}" style="cursor:pointer">${esc(y)}</div>`,
+        iconSize:null
+      });
+
+      const lab=L.marker(
+        [o.c.lat,o.c.lng],
+        {icon:ic}
+      ).bindPopup(popup);
+
       bagLabel.addLayer(lab);
     });
+
     setStatus(`${list.length} BAG binnen ${radius}m`);
-  }catch(e){console.error(e);setStatus("BAG fout");}
+
+  }catch(e){
+    console.error("BAG fout:",e);
+    setStatus("BAG fout");
+  }
 }
 locateBtn&&locateBtn.addEventListener("click",()=>{
   if(!navigator.geolocation){setStatus("Geen geolocatie");return;}
