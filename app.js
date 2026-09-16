@@ -159,6 +159,7 @@ map.on("click",async e=>{
   setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
   loadBAG(lat,lng,r);
   loadHistForLocation(lat,lng);
+  testMIP(lat,lng);
   try{
     if(map.hasLayer(minuutLayer)){
       const rd=wgs84ToRD(lat,lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
