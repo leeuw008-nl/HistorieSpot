@@ -135,20 +135,19 @@ async function testMIP(lat,lng){
   const url=`https://services.rce.geovoorziening.nl/mip/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=MIP_Objecten&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json`;
   try{
     const res=await fetch(url),data=await res.json();
+
     if(!data.features?.length){
-      L.popup().setLatLng([lat,lng]).setContent("<b>MIP-test</b><br>Geen MIP-object binnen 50 meter.").openOn(map);
+      setStatus("MIP-test: geen object binnen 50 meter");
       return;
     }
-    const html=data.features.map((f,i)=>{
-      const p=f.properties||{};
-      return `<b>MIP-object ${i+1}</b><br>`+
-        Object.entries(p).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join("<br>");
-    }).join("<hr>");
-    L.popup({maxWidth:450}).setLatLng([lat,lng])
-      .setContent("<b>MIP-test</b><br>"+html).openOn(map);
+
+    setStatus("MIP gevonden: " + data.features.length + " object(en) — " +
+      Object.entries(data.features[0].properties || {})
+        .map(([k,v]) => `${k}: ${v}`)
+        .join(" | "));
+
   }catch(err){
-    L.popup().setLatLng([lat,lng])
-      .setContent("<b>MIP-test fout</b><br>"+esc(err.message)).openOn(map);
+    setStatus("MIP-test fout: "+err.message);
   }
 }
 map.on("click",async e=>{
