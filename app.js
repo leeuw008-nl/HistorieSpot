@@ -129,6 +129,28 @@ async function testMIPForBAG(lat, lng) {
 }
 
 let selectedMarker=null;
+async function testMIP(lat,lng){
+  const rd=wgs84ToRD(lat,lng),d=50;
+  const b=[rd.x-d,rd.y-d,rd.x+d,rd.y+d].join(",");
+  const url=`https://services.rce.geovoorziening.nl/mip/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=MIP_Objecten&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json`;
+  try{
+    const res=await fetch(url),data=await res.json();
+    if(!data.features?.length){
+      L.popup().setLatLng([lat,lng]).setContent("<b>MIP-test</b><br>Geen MIP-object binnen 50 meter.").openOn(map);
+      return;
+    }
+    const html=data.features.map((f,i)=>{
+      const p=f.properties||{};
+      return `<b>MIP-object ${i+1}</b><br>`+
+        Object.entries(p).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join("<br>");
+    }).join("<hr>");
+    L.popup({maxWidth:450}).setLatLng([lat,lng])
+      .setContent("<b>MIP-test</b><br>"+html).openOn(map);
+  }catch(err){
+    L.popup().setLatLng([lat,lng])
+      .setContent("<b>MIP-test fout</b><br>"+esc(err.message)).openOn(map);
+  }
+}
 map.on("click",async e=>{
   const lat=e.latlng.lat, lng=e.latlng.lng, r=Number(radiusSel.value);
   // Toon BAG voor geklikte positie
