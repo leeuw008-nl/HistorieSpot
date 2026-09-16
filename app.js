@@ -85,6 +85,49 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
+async function testMIPForBAG(lat, lng) {
+  const rd = wgs84ToRD(lat, lng);
+  const d = 50;
+  const bbox = `${rd.x-d},${rd.y-d},${rd.x+d},${rd.y+d}`;
+
+  const url =
+    `https://services.rce.geovoorziening.nl/mip/wfs?service=WFS&version=2.0.0` +
+    `&request=GetFeature&typeNames=MIP_Objecten&srsName=EPSG:28992` +
+    `&bbox=${bbox}&outputFormat=application/json`;
+
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+
+    if (!data.features?.length) {
+      L.popup()
+        .setLatLng([lat, lng])
+        .setContent("<b>MIP-test</b><br>Geen MIP-object binnen 50 meter.")
+        .openOn(map);
+      return;
+    }
+
+    const html = data.features.map((f, i) => {
+      const p = f.properties || {};
+      return `<b>MIP-object ${i + 1}</b><br>` +
+             Object.entries(p)
+               .map(([k,v]) => `${k}: ${v}`)
+               .join("<br>");
+    }).join("<hr>");
+
+    L.popup({maxWidth:450})
+      .setLatLng([lat, lng])
+      .setContent("<b>MIP-test vanuit BAG-pand</b><br>" + html)
+      .openOn(map);
+
+  } catch (e) {
+    L.popup()
+      .setLatLng([lat, lng])
+      .setContent("<b>MIP-test fout</b><br>" + e.message)
+      .openOn(map);
+  }
+}
+
 let selectedMarker=null;
 map.on("click",async e=>{
   const lat=e.latlng.lat, lng=e.latlng.lng, r=Number(radiusSel.value);
