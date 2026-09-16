@@ -130,3 +130,37 @@ window.addEventListener("load",()=>{
     }
   },600);
 });
+// ===== TIJDELIJKE MIP-TEST KRUISSTRAAT 1 =====
+async function testMIPKruisstraat1() {
+  const lat = 52.519098;
+  const lng = 6.423525;
+  const rd = wgs84ToRD(lat, lng);
+  const d = 50;
+  const bbox = `${rd.x-d},${rd.y-d},${rd.x+d},${rd.y+d}`;
+
+  try {
+    const cap = await fetch(
+      "https://services.rce.geovoorziening.nl/mip/wfs?service=WFS&version=2.0.0&request=GetCapabilities"
+    ).then(r => r.text());
+
+    const names = [...cap.matchAll(/<Name>([^<]*MIP[^<]*)<\/Name>/gi)]
+      .map(m => m[1]);
+    if (!names.length) return setStatus("MIP: geen MIP-laag gevonden");
+
+    const url =
+      `https://services.rce.geovoorziening.nl/mip/wfs?service=WFS&version=2.0.0` +
+      `&request=GetFeature&typeNames=${encodeURIComponent(names[0])}` +
+      `&srsName=EPSG:28992&bbox=${bbox}&outputFormat=application/json`;
+
+    const data = await fetch(url).then(r => r.json());
+    const p = data.features?.[0]?.properties;
+
+    setStatus(p
+      ? `MIP gevonden: ${JSON.stringify(p)}`
+      : "MIP: geen object binnen 50 meter");
+  } catch (e) {
+    setStatus("MIP-test fout: " + e.message);
+  }
+}
+
+testMIPKruisstraat1();
