@@ -1,0 +1,38 @@
+name: Patch RCE URL diagnostic
+
+on:
+  push:
+    paths:
+      - RCE_URL_PATCH_TRIGGER.txt
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add RCE URL diagnostic
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+          needle = '''    const url=\n      "https://api.linkeddata.cultureelerfgoed.nl/" +\n      "queries/rce/rest-api-rijksmonumenten/run?" +\n      params.toString();'''
+          addition = needle + '''\n\n    if(window.rceFlowDebug)\n      window.rceFlowDebug(`RCE URL: ${url}`);'''
+          if 'window.rceFlowDebug(`RCE URL: ${url}`);' not in s:
+              if needle not in s:
+                  raise SystemExit('RCE URL construction not found')
+              s = s.replace(needle, addition, 1)
+              p.write_text(s, encoding='utf-8')
+          else:
+              print('RCE URL diagnostic already present')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js
+          git commit -m "Show full RCE URL in flow diagnostic" || exit 0
+          git push
