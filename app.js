@@ -367,7 +367,6 @@ async function findRCEByAddress(address){
     const postcode=String(address.postcode || "")
       .replace(/\s+/g,"")
       .toUpperCase();
-    const woonplaats=String(address.woonplaats || "").trim();
 
     const volledigAdres=
       `${straat} ${huisnummer}${huisletter}${toevoeging}`.trim();
@@ -381,105 +380,224 @@ async function findRCEByAddress(address){
     if(postcode)
       params.set("postcode",postcode);
 
-    if(woonplaats)
-      params.set("woonplaatsnaam",woonplaats);
-
     const url=
       "https://api.linkeddata.cultureelerfgoed.nl/" +
       "queries/rce/rest-api-rijksmonumenten/run?" +
       params.toString();
 
     const res=await fetch(url);
-    const contentType=res.headers.get("content-type") || "(geen content-type)";
+    const contentType=res.headers.get("content-type") || "";
     const raw=await res.text();
 
     const diagnose=
-      `RCE HTTP ${res.status} | type: ${contentType} | lengte: ${raw.length} | RAW: ${raw.slice(0,500)}`;
+      `RCE HTTP ${res.status} | type: ${contentType} | lengte: ${raw.length}`;
 
     console.log(diagnose);
+
     if(window.rceFlowDebug)
       window.rceFlowDebug(diagnose);
+
     setStatus(diagnose);
 
-    if(!res.ok)
+    if(!res.ok || !raw.trim())
       return [];
 
-    if(!raw.trim())
-      return [];
+    /*
+     * De RCE API levert hier N-Triples, geen JSON.
+     * Daarom eerst de RDF-triples uitlezen.
+     */
 
-    try{
-      const data=JSON.parse(raw);
+    const triples=[];
 
-      if(!Array.isArray(data))
-        return [];
+    const lines=raw.split(/\r?\n/);
 
-      const normalizedAdres=volledigAdres
+    for(const line of lines){
+
+      const m=line.match(
+        /^<([^>]+)>\s+<([^>]+)>\s+(?:"([^"]*)"|<([^>]+)>)(?:\^\^<[^>]+>)?\s*\.$/
+      );
+
+      if(!m)
+        continue;
+
+      triples.push({
+        subject:m[1],
+        predicate:m[2],
+        literal:m[3] !== undefined ? m[3] : null,
+        uri:m[4] !== undefined ? m[4] : null
+      });
+    }
+
+    /*
+     * Alle triples per subject verzamelen.
+     */
+
+    const subjects=new Map();
+
+    function addTriple(t){
+      if(!subjects.has(t.subject))
+        subjects.set(t.subject,[]);
+
+      subjects.get(t.subject).push(t);
+    }
+
+    for(const t of triples)
+      addTriple(t);
+
+    function getLiteral(subject,predicate){
+      const list=subjects.get(subject) || [];
+
+      const t=list.find(x =>
+        x.predicate.endsWith("#"+predicate)
+      );
+
+      return t ? (t.literal !== null ? t.literal : t.uri) : "";
+    }
+
+    function getUri(subject,predicate){
+      const list=subjects.get(subject) || [];
+
+      const t=list.find(x =>
+        x.predicate.endsWith("#"+predicate)
+      );
+
+      return t ? t.uri : "";
+    }
+
+    function normalize(value){
+      return String(value || "")
         .toLowerCase()
         .replace(/\s+/g," ")
         .trim();
-
-      return data.filter(rce=>{
-        const bag=rce && rce.heeftBAGRelatie
-          ? rce.heeftBAGRelatie
-          : null;
-
-        if(!bag)
-          return false;
-
-        const rceAdres=String(bag.volledigAdres || "")
-          .toLowerCase()
-          .replace(/\s+/g," ")
-          .trim();
-
-        const rcePostcode=String(bag.postcode || "")
-          .replace(/\s+/g,"")
-          .toUpperCase();
-
-        const rceWoonplaats=String(bag.woonplaatsnaam || "")
-          .trim()
-          .toLowerCase();
-
-        const adresMatch=
-          normalizedAdres &&
-          rceAdres === normalizedAdres;
-
-        const postcodeMatch=
-          postcode &&
-          rcePostcode === postcode;
-
-        const woonplaatsMatch=
-          woonplaats &&
-          rceWoonplaats === woonplaats.toLowerCase();
-
-        return adresMatch &&
-               (!postcode || postcodeMatch) &&
-               (!woonplaats || woonplaatsMatch);
-      });
-
-    }catch(parseError){
-      console.error("RCE JSON parse fout:",parseError,"RAW:",raw);
-
-      if(window.rceFlowDebug)
-        window.rceFlowDebug(
-          "RCE JSON parse fout: " +
-          parseError.message +
-          " | RAW: " +
-          raw.slice(0,500)
-        );
-
-      return [];
     }
 
+    /*
+     * Rijksmonumenten zoeken.
+     */
+
+    const results=[];
+
+    for(const [monumentSubject,monumentTriples] of subjects){
+
+      const isRijksmonument=monumentTriples.some(t =>
+        t.predicate.endsWith("#type") &&
+        t.uri &&
+        t.uri.endsWith("#Rijksmonument")
+      );
+
+      if(!isRijksmonument)
+        continue;
+
+      /*
+       * Rijksmonument
+       *   -> heeftBasisregistratieRelatie
+       *      -> heeftBAGRelatie
+       */
+
+      const basisSubject=getUri(
+        monumentSubject,
+        "heeftBasisregistratieRelatie"
+      );
+
+      if(!basisSubject)
+        continue;
+
+      const bagSubject=getUri(
+        basisSubject,
+        "heeftBAGRelatie"
+      );
+
+      if(!bagSubject)
+        continue;
+
+      const rceStraat=getLiteral(
+        bagSubject,
+        "openbareRuimte"
+      );
+
+      const rceHuisnummer=getLiteral(
+        bagSubject,
+        "huisnummer"
+      );
+
+      const rcePostcode=getLiteral(
+        bagSubject,
+        "postcode"
+      );
+
+      /*
+       * Vergelijk straat + huisnummer + postcode.
+       * Huisletter/toevoeging wordt niet geëist omdat deze
+       * niet in deze RCE-BAGRelatie aanwezig hoeft te zijn.
+       */
+
+      const straatMatch=
+        normalize(rceStraat) === normalize(straat);
+
+      const huisnummerMatch=
+        String(rceHuisnummer).trim() ===
+        String(huisnummer).trim();
+
+      const postcodeMatch=
+        !postcode ||
+        String(rcePostcode)
+          .replace(/\s+/g,"")
+          .toUpperCase() === postcode;
+
+      if(!straatMatch || !huisnummerMatch || !postcodeMatch)
+        continue;
+
+      /*
+       * Zelfde datastructuur teruggeven als showRCE()
+       * al verwacht.
+       */
+
+      const rijksmonumentnummer=getLiteral(
+        monumentSubject,
+        "rijksmonumentnummer"
+      );
+
+      const cultuurhistorischObjectnummer=getLiteral(
+        monumentSubject,
+        "cultuurhistorischObjectnummer"
+      );
+
+      results.push({
+        rijksmonumentnummer:
+          rijksmonumentnummer ||
+          cultuurhistorischObjectnummer,
+
+        cultuurhistorischObjectnummer,
+
+        heeftBAGRelatie:{
+          huisnummer:rceHuisnummer,
+          openbareRuimte:rceStraat,
+          postcode:rcePostcode,
+          heeftVerblijfsobject:
+            getUri(bagSubject,"heeftVerblijfsobject")
+        }
+      });
+    }
+
+    if(window.rceFlowDebug)
+      window.rceFlowDebug(
+        `RCE match: ${results.length} monument(en)`
+      );
+
+    return results;
+
   }catch(e){
+
     console.error("RCE Rijksmonumenten fout:",e);
 
     if(window.rceFlowDebug)
-      window.rceFlowDebug("RCE fetch fout: "+e.message);
+      window.rceFlowDebug(
+        "RCE fetch/parse fout: "+e.message
+      );
 
     return [];
   }
 }
-
 /* =========================================================
    RCE FUNCTIE 3
    Toon gevonden Rijksmonumenten als aparte marker.
