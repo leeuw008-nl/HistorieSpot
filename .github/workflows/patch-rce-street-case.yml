@@ -1,6 +1,9 @@
 name: Patch RCE street case
 
 on:
+  push:
+    paths:
+      - ".github/workflows/patch-rce-street-case.yml"
   workflow_dispatch:
 
 jobs:
