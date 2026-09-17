@@ -543,6 +543,7 @@ async function loadRCEForPand(o){
       `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}, ${address.postcode || "postcode onbekend"}, ${address.woonplaats}`;
 
     window.rceDiagnosisShown=true;
+    window.rceDiagnosisShown=true;
     setStatus(
       `RCE-diagnose: BAG verblijfsobject → ${adresDiagnose} → ${monuments.length} RCE-resultaat/resultaten`
     );
