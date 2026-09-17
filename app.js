@@ -290,7 +290,7 @@ async function getBAGAddresses(p,o){
   }
 
   if(results.length) return results;
-  if(!p || !o || !o.c) return [];
+  if(!p || !p.identificatie || !o || !o.c) return [];
 
   try{
     const b=box(o.c.lat,o.c.lng,50);
@@ -300,16 +300,10 @@ async function getBAGAddresses(p,o){
     const data=await res.json();
     const features=Array.isArray(data.features) ? data.features : [];
 
-    const clickedPandId=
-      o.f && o.f.id
-        ? String(o.f.id)
-        : '';
-
     for(const f of features){
       const v=f.properties || {};
       const rel=v.pand;
       const hrefs=[];
-
       if(Array.isArray(rel)) rel.forEach(r=>{
         if(typeof r==='string') hrefs.push(r);
         else if(r && r.href) hrefs.push(r.href);
@@ -324,11 +318,7 @@ async function getBAGAddresses(p,o){
           hrefs.push(v["pand.href"]);
       }
 
-      const matchesClickedPand=
-        clickedPandId &&
-        hrefs.some(h=>String(h).endsWith('/'+clickedPandId));
-
-      if(!matchesClickedPand) continue;
+      if(!hrefs.some(h=>String(h).includes(String(p.identificatie)))) continue;
       if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
 
       results.push({
@@ -462,60 +452,806 @@ function showRCE(rce,address,lat,lng){
 
       <b>${esc(adres)}</b><br>
       ${address.postcode
-        ? esc(address.postcode)+" "
-        : ""}${esc(address.woonplaats)}
-
-      ${functie
-        ? `<br><br><b>Oorspronkelijke functie:</b><br>${esc(functie)}`
+        ? esc(address.postcode)+"<br>"
         : ""}
+      ${esc(address.woonplaats)}
 
-      ${inschrijving
-        ? `<br><br><b>Ingeschreven:</b> ${esc(inschrijving)}`
-        : ""}
+      ${
+        inschrijving
+          ? `<br><br>Inschrijving Monumentenregister:
+             ${esc(inschrijving)}`
+          : ""
+      }
 
-      ${omschrijving
-        ? `<br><br><b>Omschrijving:</b><br>${esc(omschrijving)}`
-        : ""}
+      ${
+        functie
+          ? `<br><br>Oorspronkelijke functie:
+             ${esc(functie)}`
+          : ""
+      }
+
+      ${
+        omschrijving
+          ? `<hr style="margin:8px 0">
+             <small>${esc(omschrijving)}</small>`
+          : ""
+      }
+
+      <hr style="margin:8px 0">
+
+      <small>
+        Bron: Rijksdienst voor het Cultureel Erfgoed
+      </small>
     </div>
   `;
 
-  L.circleMarker([lat,lng],{
-    radius:9,
-    color:'#b00000',
-    weight:3,
-    fillColor:'#ff4444',
-    fillOpacity:0.9
-  }).bindPopup(popup).addTo(rceLayer);
+  const icon=L.divIcon({
+    className:"",
+    html:
+      `<div style="
+        background:#7b1e1e;
+        color:white;
+        width:28px;
+        height:28px;
+        border-radius:50%;
+        border:2px solid white;
+        box-shadow:0 1px 5px rgba(0,0,0,.45);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:13px;
+        font-weight:bold;
+        cursor:pointer;
+      ">RM</div>`,
+    iconSize:[28,28],
+    iconAnchor:[14,14]
+  });
+
+  const marker=L.marker(
+    [lat,lng],
+    {icon:icon}
+  ).bindPopup(popup);
+
+  rceLayer.addLayer(marker);
 }
 
+
+/* =========================================================
+   RCE FUNCTIE 4
+   BAG-pand -> verblijfsobject -> adres -> RCE.
+   ========================================================= */
+
 async function loadRCEForPand(o){
+
   if(!o || !o.f)
     return;
+
   const p=o.f.properties || {};
+
   const addresses=
     await getBAGAddresses(p,o);
-  if(window.rceFlowDebug) window.rceFlowDebug(
-    "FLOW → BAG-adressen terug: " + addresses.length
-  );
+
   if(!addresses.length){
     return;
   }
+
   for(const address of addresses){
-    if(window.rceFlowDebug) window.rceFlowDebug(
-      "FLOW → findRCEByAddress aanroep voor " +
-      address.straat + " " + address.huisnummer
-    );
+
     const monuments=
       await findRCEByAddress(address);
+
+    /*
+      ZICHTBARE DIAGNOSE:
+      toon exact welk BAG-adres via
+      pand.properties.verblijfsobject -> href
+      aan de RCE-adreszoekopdracht is aangeboden.
+      De bestaande RCE-matchlogica blijft ongewijzigd.
+    */
     const adresDiagnose=
       `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}, ${address.postcode || "postcode onbekend"}, ${address.woonplaats}`;
+
     setStatus(
       `RCE-diagnose: BAG verblijfsobject → ${adresDiagnose} → ${monuments.length} RCE-resultaat/resultaten`
     );
+
     if(!monuments.length)
       continue;
+
     monuments.forEach(rce=>{
-      showRCE(rce,address,o.c.lat,o.c.lng);
+      showRCE(
+        rce,
+        address,
+        o.c.lat,
+        o.c.lng
+      );
     });
+
   }
 }
+
+
+/* =========================================================
+   BESTAANDE BAG-FUNCTIE
+   ========================================================= */
+
+async function loadBAG(lat,lng,radius){
+  window.rceDiagnosisShown=false;
+
+  bagLayer.clearLayers();
+  bagLabel.clearLayers();
+
+  /*
+    Alleen RCE-laag leegmaken.
+    BAG zelf wordt verder niet gewijzigd.
+  */
+  rceLayer.clearLayers();
+  rceSeen.clear();
+
+  const b=box(lat,lng,radius);
+
+  const url=
+    `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
+
+  try{
+
+    const res=await fetch(url);
+
+    if(!res.ok)
+      throw new Error(`BAG HTTP ${res.status}`);
+
+    const data=await res.json();
+
+    const list=data.features.map(f=>{
+
+      const c=centerOf(f);
+
+      if(!c)
+        return null;
+
+      const d=dist(
+        lat,
+        lng,
+        c.lat,
+        c.lng
+      );
+
+      if(d>radius)
+        return null;
+
+      return{
+        f,
+        c,
+        d
+      };
+
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.d-b.d);
+
+
+    list.forEach(o=>{
+
+      const p=o.f.properties || {};
+
+      // BAG-bouwjaar
+      const y=
+        (p.bouwjaar!==null &&
+         p.bouwjaar!==undefined &&
+         p.bouwjaar!=="")
+          ? String(p.bouwjaar)
+          : "Onbekend";
+
+      if(!matchesYearFilter(y))
+        return;
+
+      // Extra BAG-metadata
+      const bagId=
+        p.identificatie ||
+        "Onbekend";
+
+      const documentdatum=
+        p.documentdatum ||
+        "Onbekend";
+
+      const documentnummer=
+        p.documentnummer ||
+        "Onbekend";
+
+      const status=
+        p.status ||
+        "Onbekend";
+
+      const geconstateerd=
+        p.geconstateerd ||
+        "Onbekend";
+
+      const gebruiksdoel=
+        p.gebruiksdoel ||
+        "Onbekend";
+
+      const cl=yearClass(y);
+
+      const col=
+        useKadaster
+          ? kadasterColor(y)
+          : "#0b5cab";
+
+
+      /*
+        BESTAANDE BAG-POPUP
+        NIET GEWIJZIGD
+      */
+
+      const popup=`
+        <div style="min-width:250px">
+          <b>BAG-pand</b><br>
+          Bouwjaar: <b>${esc(y)}</b><br>
+          Afstand: ${Math.round(o.d)} m
+          <hr style="margin:8px 0">
+          <small>
+            BAG-identificatie: ${esc(bagId)}<br>
+            Status: ${esc(status)}<br>
+            Gebruiksdoel: ${esc(gebruiksdoel)}<br>
+            Geconstateerd: ${esc(geconstateerd)}<br>
+            BAG-document: ${esc(documentnummer)}<br>
+            Documentdatum: ${esc(documentdatum)}
+          </small>
+        </div>
+      `;
+
+
+      const poly=L.geoJSON(
+        o.f,
+        {
+          style:{
+            weight:1.2,
+            color:col,
+            fillColor:
+              useKadaster
+                ? col
+                : "#0b5cab",
+            fillOpacity:0.15
+          }
+        }
+      ).bindPopup(popup);
+
+      bagLayer.addLayer(poly);
+
+
+      const ic=L.divIcon({
+        className:"",
+        html:
+          `<div class="year-badge ${cl}" style="cursor:pointer">
+            ${esc(y)}
+          </div>`,
+        iconSize:null
+      });
+
+      const lab=L.marker(
+        [o.c.lat,o.c.lng],
+        {icon:ic}
+      ).bindPopup(popup);
+
+      bagLabel.addLayer(lab);
+
+
+      /*
+        NIEUW:
+        Nadat het bestaande BAG-pand volledig is verwerkt,
+        zoeken we onafhankelijk naar een eventueel
+        Rijksmonument.
+      */
+
+      loadRCEForPand(o);
+
+    });
+
+
+    setStatus(
+      `${list.length} BAG binnen ${radius}m`
+    );
+
+  }catch(e){
+
+    console.error(
+      "BAG fout:",
+      e
+    );
+
+    setStatus("BAG fout");
+
+  }
+}
+
+
+locateBtn&&locateBtn.addEventListener(
+  "click",
+  ()=>{
+    if(!navigator.geolocation){
+      setStatus("Geen geolocatie");
+      return;
+    }
+
+    setStatus("Locatie bepalen...");
+    locateBtn.disabled=true;
+
+    navigator.geolocation.getCurrentPosition(
+      p=>{
+
+        locateBtn.disabled=false;
+
+        const lat=p.coords.latitude,
+              lng=p.coords.longitude,
+              acc=Math.round(p.coords.accuracy),
+              r=Number(radiusSel.value);
+
+        map.setView(
+          [lat,lng],
+          18
+        );
+
+        if(curMarker)
+          map.removeLayer(curMarker);
+
+        if(accCircle)
+          map.removeLayer(accCircle);
+
+        if(selectedMarker){
+          map.removeLayer(selectedMarker);
+          selectedMarker=null;
+        }
+
+        if(curMarker)
+          map.removeLayer(curMarker);
+
+        curMarker=
+          L.marker([lat,lng])
+          .addTo(map)
+          .bindPopup("Huidige positie")
+          .openPopup();
+
+        curMarker.on(
+          "click",
+          ()=>{
+            loadBAG(
+              lat,
+              lng,
+              r
+            );
+
+            loadHistForLocation(
+              lat,
+              lng
+            );
+
+            setStatus(
+              "Huidige positie – BAG laden..."
+            );
+          }
+        );
+
+        accCircle=
+          L.circle(
+            [lat,lng],
+            {
+              radius:acc,
+              color:"#0b5cab",
+              fillOpacity:0.08
+            }
+          ).addTo(map);
+
+        loadBAG(
+          lat,
+          lng,
+          r
+        );
+
+        closeMenu();
+
+      },
+      ()=>{
+        locateBtn.disabled=false;
+        setStatus("Locatie geweigerd");
+      },
+      {
+        enableHighAccuracy:true,
+        timeout:15000
+      }
+    );
+  }
+);
+
+
+radiusSel&&radiusSel.addEventListener(
+  "change",
+  ()=>{
+    const r=Number(radiusSel.value);
+
+    if(curMarker){
+
+      const ll=curMarker.getLatLng();
+
+      loadBAG(
+        ll.lat,
+        ll.lng,
+        r
+      );
+
+    }else{
+
+      loadBAG(
+        52.516,
+        6.42,
+        r
+      );
+
+    }
+  }
+);
+
+
+async function loadHistForLocation(lat,lng){
+
+  try{
+
+    if(!map.hasLayer(minuutLayer))
+      minuutLayer.addTo(map);
+
+    const rd=wgs84ToRD(
+      lat,
+      lng
+    );
+
+    const b=[
+      rd.x-50,
+      rd.y-50,
+      rd.x+50,
+      rd.y+50
+    ].join(",");
+
+    const url=
+      `https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
+
+    const res=await fetch(url);
+    const data=await res.json();
+
+    if(!data.features ||
+       !data.features.length)
+      return;
+
+    let code=data.features[0].properties.CODE;
+
+    const orig=code;
+
+    code=corr(code);
+
+    if(window.histLayer)
+      map.removeLayer(
+        window.histLayer
+      );
+
+    window.histLayer=
+      L.tileLayer(
+        `https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,
+        {
+          opacity:
+            Number(opSlider.value)/100||0.6,
+          maxZoom:20
+        }
+      ).addTo(map);
+
+  }catch(e){
+
+    console.error(
+      "hist 1832 load fail",
+      e
+    );
+
+  }
+}
+
+
+let selectedMarker=null;
+
+map.on(
+  "click",
+  async e=>{
+
+    const lat=e.latlng.lat,
+          lng=e.latlng.lng,
+          r=Number(radiusSel.value);
+
+    // Toon BAG voor geklikte positie
+    if(selectedMarker)
+      map.removeLayer(
+        selectedMarker
+      );
+
+    selectedMarker=
+      L.marker(
+        [lat,lng],
+        {
+          icon:L.divIcon({
+            className:"",
+            html:
+              '<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize:[14,14],
+            iconAnchor:[7,7]
+          })
+        }
+      ).addTo(map);
+
+    setStatus(
+      `Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`
+    );
+
+    loadBAG(
+      lat,
+      lng,
+      r
+    );
+
+    loadHistForLocation(
+      lat,
+      lng
+    );
+
+    try{
+
+      if(map.hasLayer(minuutLayer)){
+
+        const rd=wgs84ToRD(
+          lat,
+          lng
+        );
+
+        const b=[
+          rd.x-20,
+          rd.y-20,
+          rd.x+20,
+          rd.y+20
+        ].join(",");
+
+        const url=
+          `https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
+
+        const res=await fetch(url),
+              data=await res.json();
+
+        if(
+          data.features &&
+          data.features.length
+        ){
+
+          let code=
+            data.features[0].properties.CODE;
+
+          const orig=code;
+
+          code=corr(code);
+
+          if(window.histLayer)
+            map.removeLayer(
+              window.histLayer
+            );
+
+          window.histLayer=
+            L.tileLayer(
+              `https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,
+              {
+                opacity:
+                  Number(opSlider.value)/100||0.6,
+                maxZoom:20
+              }
+            ).addTo(map);
+
+          const p=
+            data.features[0].properties;
+
+          L.popup()
+            .setLatLng(e.latlng)
+            .setContent(
+              `<div style="min-width:240px">
+                <strong>🕰 Minuutplan 1811-1832</strong><br>
+                ${esc(p.GEMEENTE)}
+                ${esc(p.SECTIE)}
+                ${esc(p.BLAD)}
+                <br>
+                RCE ${esc(orig)}
+                → HisGIS ${esc(code)}
+
+                <br><br>
+
+                <a
+                  href="${esc(p.URL)}"
+                  target="_blank"
+                  style="
+                    display:inline-block;
+                    padding:8px 12px;
+                    background:#1d5d8f;
+                    color:white;
+                    text-decoration:none;
+                    border-radius:5px
+                  "
+                >
+                  Origineel
+                </a>
+
+                <br><br>
+
+                <small>
+                  Geklikte positie wordt nu gebruikt voor BAG
+                </small>
+              </div>`
+            )
+            .openOn(map);
+
+        }
+
+      }
+
+    }catch(err){
+
+      console.error(err);
+
+    }
+  }
+);
+
+
+yearFilterSel&&yearFilterSel.addEventListener(
+  "change",
+  e=>{
+    activeYearFilter=e.target.value;
+
+    const r=Number(radiusSel.value);
+
+    if(curMarker){
+
+      const ll=curMarker.getLatLng();
+
+      loadBAG(
+        ll.lat,
+        ll.lng,
+        r
+      );
+
+    }else{
+
+      loadBAG(
+        52.516,
+        6.42,
+        r
+      );
+
+    }
+  }
+);
+
+
+toggleKadasterColors&&toggleKadasterColors.addEventListener(
+  "change",
+  e=>{
+
+    useKadaster=e.target.checked;
+
+    const r=Number(radiusSel.value);
+
+    if(curMarker){
+
+      const ll=curMarker.getLatLng();
+
+      loadBAG(
+        ll.lat,
+        ll.lng,
+        r
+      );
+
+    }else{
+
+      loadBAG(
+        52.516,
+        6.42,
+        r
+      );
+
+    }
+
+  }
+);
+
+
+window.addEventListener(
+  "load",
+  ()=>{
+
+    if(toggleKadasterColors)
+      toggleKadasterColors.checked=true;
+
+    setTimeout(
+      ()=>{
+
+        if(navigator.geolocation){
+
+          navigator.geolocation.getCurrentPosition(
+            p=>{
+
+              const lat=p.coords.latitude,
+                    lng=p.coords.longitude,
+                    r=Number(radiusSel.value);
+
+              map.setView(
+                [lat,lng],
+                18
+              );
+
+              curMarker=
+                L.marker(
+                  [lat,lng]
+                )
+                .addTo(map)
+                .bindPopup(
+                  "Huidige positie"
+                );
+
+              accCircle=
+                L.circle(
+                  [lat,lng],
+                  {
+                    radius:p.coords.accuracy,
+                    color:"#0b5cab",
+                    fillOpacity:0.08
+                  }
+                ).addTo(map);
+
+              loadBAG(
+                lat,
+                lng,
+                r
+              );
+
+              loadHistForLocation(
+                lat,
+                lng
+              );
+
+            },
+            ()=>{
+              loadBAG(
+                52.516,
+                6.42,
+                Number(radiusSel.value)
+              );
+
+              loadHistForLocation(
+                52.516,
+                6.42
+              );
+            },
+            {
+              enableHighAccuracy:true,
+              timeout:8000
+            }
+          );
+
+        }else{
+
+          loadBAG(
+            52.516,
+            6.42,
+            Number(radiusSel.value)
+          );
+
+          loadHistForLocation(
+            52.516,
+            6.42
+          );
+
+        }
+
+      },
+      600
+    );
+
+  }
+);
