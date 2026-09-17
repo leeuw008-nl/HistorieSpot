@@ -1,0 +1,34 @@
+name: Patch RCE postcodecontrole
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch only postcodecontrole
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+          old = '''      const postcodeMatch=\n        !postcode ||\n        (\n          rcePostcode &&\n          String(rcePostcode)\n            .replace(/\\s+/g,"")\n            .toUpperCase() === postcode\n        );'''
+          new = '''      const postcodeMatch=\n        !rcePostcode ||\n        (\n          postcode &&\n          String(rcePostcode)\n            .replace(/\\s+/g,"")\n            .toUpperCase() === postcode\n        );'''
+          if s.count(old) != 1:
+              raise SystemExit(f'Expected exactly one postcodecontrole, found {s.count(old)}')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
+      - name: Commit app.js and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js
+          git rm .github/workflows/patch-rce-postcode.yml
+          git commit -m "Fix RCE postcodecontrole when RCE postcode is missing"
+          git push
