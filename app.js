@@ -265,14 +265,10 @@ async function getBAGAddresses(p,o){
 
   const results=[];
 
-  /*
-    Eerste mogelijkheid: sommige BAG-responses leveren de
-    verblijfsobject-relatie direct mee.
-  */
   if(p && Array.isArray(p.verblijfsobject)){
 
     const hrefs=p.verblijfsobject
-      .map(v=>v && v.href)
+      .map(v=>v && (v.href || v))
       .filter(Boolean);
 
     for(const href of hrefs){
@@ -286,7 +282,6 @@ async function getBAGAddresses(p,o){
 
         const data=await res.json();
 
-        /* BAG OGC geeft een FeatureCollection terug. */
         const v=
           data && Array.isArray(data.features) && data.features.length
             ? (data.features[0].properties || {})
@@ -318,12 +313,6 @@ async function getBAGAddresses(p,o){
   if(results.length)
     return results;
 
-  /*
-    Belangrijk: de BAG-pand-response bevat in de praktijk niet
-    altijd p.verblijfsobject. Daarom zoeken we de verblijfsobjecten
-    ruimtelijk rond het BAG-pand en koppelen daarna terug via
-    verblijfsobject.properties["pand.href"].
-  */
   if(!p || !p.identificatie || !o || !o.c)
     return [];
 
@@ -347,10 +336,21 @@ async function getBAGAddresses(p,o){
     for(const f of features){
 
       const v=f.properties || {};
-      const rel=v["pand.href"];
-      const hrefs=Array.isArray(rel)
-        ? rel
-        : (rel ? [rel] : []);
+      const rel=v.pand;
+      const hrefs=[];
+
+      if(Array.isArray(rel)){
+        rel.forEach(r=>{
+          if(typeof r==="string")
+            hrefs.push(r);
+          else if(r && r.href)
+            hrefs.push(r.href);
+        });
+      }else if(typeof rel==="string"){
+        hrefs.push(rel);
+      }else if(rel && rel.href){
+        hrefs.push(rel.href);
+      }
 
       const hoortBijPand=hrefs.some(h=>
         String(h).includes(String(p.identificatie))
@@ -397,11 +397,6 @@ async function findRCEByAddress(address){
 
     params.set("page","1");
     params.set("pageSize","10");
-
-    /*
-      De RCE API ondersteunt postcode en volledigAdres.
-      We gebruiken beide wanneer postcode beschikbaar is.
-    */
 
     const volledigAdres=
       `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}`;
@@ -586,7 +581,10 @@ async function loadRCEForPand(o){
     await getBAGAddresses(p,o);
 
   if(!addresses.length){
-    setStatus("RCE-diagnose: BAG-pand heeft geen bruikbaar verblijfsobject-adres");
+    if(!window.rceDiagnosisShown){
+      window.rceDiagnosisShown=true;
+      setStatus("RCE-diagnose: BAG-pand heeft geen bruikbaar verblijfsobject-adres");
+    }
     return;
   }
 
@@ -595,17 +593,9 @@ async function loadRCEForPand(o){
     const monuments=
       await findRCEByAddress(address);
 
-    /*
-      ZICHTBARE DIAGNOSE:
-      toon exact welk BAG-adres via
-      pand.properties.verblijfsobject -> href
-      aan de RCE-adreszoekopdracht is aangeboden.
-      De bestaande RCE-matchlogica blijft ongewijzigd.
-    */
     const adresDiagnose=
       `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}, ${address.postcode || "postcode onbekend"}, ${address.woonplaats}`;
 
-    window.rceDiagnosisShown=true;
     window.rceDiagnosisShown=true;
     setStatus(
       `RCE-diagnose: BAG verblijfsobject → ${adresDiagnose} → ${monuments.length} RCE-resultaat/resultaten`
@@ -632,6 +622,8 @@ async function loadRCEForPand(o){
    ========================================================= */
 
 async function loadBAG(lat,lng,radius){
+
+  window.rceDiagnosisShown=false;
 
   bagLayer.clearLayers();
   bagLabel.clearLayers();
@@ -917,400 +909,3 @@ locateBtn&&locateBtn.addEventListener(
   }
 );
 
-
-radiusSel&&radiusSel.addEventListener(
-  "change",
-  ()=>{
-    const r=Number(radiusSel.value);
-
-    if(curMarker){
-
-      const ll=curMarker.getLatLng();
-
-      loadBAG(
-        ll.lat,
-        ll.lng,
-        r
-      );
-
-    }else{
-
-      loadBAG(
-        52.516,
-        6.42,
-        r
-      );
-
-    }
-  }
-);
-
-
-async function loadHistForLocation(lat,lng){
-
-  /* Tijdelijk uitgeschakeld tijdens BAG-RCE diagnose: RCE WFS/WMS time-out. */
-  return;
-
-  try{
-
-    if(!map.hasLayer(minuutLayer))
-      minuutLayer.addTo(map);
-
-    const rd=wgs84ToRD(
-      lat,
-      lng
-    );
-
-    const b=[
-      rd.x-50,
-      rd.y-50,
-      rd.x+50,
-      rd.y+50
-    ].join(",");
-
-    const url=
-      `https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-
-    const res=await fetch(url);
-    const data=await res.json();
-
-    if(!data.features ||
-       !data.features.length)
-      return;
-
-    let code=data.features[0].properties.CODE;
-
-    const orig=code;
-
-    code=corr(code);
-
-    if(window.histLayer)
-      map.removeLayer(
-        window.histLayer
-      );
-
-    window.histLayer=
-      L.tileLayer(
-        `https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,
-        {
-          opacity:
-            Number(opSlider.value)/100||0.6,
-          maxZoom:20
-        }
-      ).addTo(map);
-
-  }catch(e){
-
-    console.error(
-      "hist 1832 load fail",
-      e
-    );
-
-  }
-}
-
-
-let selectedMarker=null;
-
-map.on(
-  "click",
-  async e=>{
-
-    const lat=e.latlng.lat,
-          lng=e.latlng.lng,
-          r=Number(radiusSel.value);
-
-    // Toon BAG voor geklikte positie
-    if(selectedMarker)
-      map.removeLayer(
-        selectedMarker
-      );
-
-    selectedMarker=
-      L.marker(
-        [lat,lng],
-        {
-          icon:L.divIcon({
-            className:"",
-            html:
-              '<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize:[14,14],
-            iconAnchor:[7,7]
-          })
-        }
-      ).addTo(map);
-
-    setStatus(
-      `Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`
-    );
-
-    loadBAG(
-      lat,
-      lng,
-      r
-    );
-
-    loadHistForLocation(
-      lat,
-      lng
-    );
-
-    try{
-
-      if(map.hasLayer(minuutLayer)){
-
-        const rd=wgs84ToRD(
-          lat,
-          lng
-        );
-
-        const b=[
-          rd.x-20,
-          rd.y-20,
-          rd.x+20,
-          rd.y+20
-        ].join(",");
-
-        const url=
-          `https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-
-        const res=await fetch(url),
-              data=await res.json();
-
-        if(
-          data.features &&
-          data.features.length
-        ){
-
-          let code=
-            data.features[0].properties.CODE;
-
-          const orig=code;
-
-          code=corr(code);
-
-          if(window.histLayer)
-            map.removeLayer(
-              window.histLayer
-            );
-
-          window.histLayer=
-            L.tileLayer(
-              `https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,
-              {
-                opacity:
-                  Number(opSlider.value)/100||0.6,
-                maxZoom:20
-              }
-            ).addTo(map);
-
-          const p=
-            data.features[0].properties;
-
-          L.popup()
-            .setLatLng(e.latlng)
-            .setContent(
-              `<div style="min-width:240px">
-                <strong>🕰 Minuutplan 1811-1832</strong><br>
-                ${esc(p.GEMEENTE)}
-                ${esc(p.SECTIE)}
-                ${esc(p.BLAD)}
-                <br>
-                RCE ${esc(orig)}
-                → HisGIS ${esc(code)}
-
-                <br><br>
-
-                <a
-                  href="${esc(p.URL)}"
-                  target="_blank"
-                  style="
-                    display:inline-block;
-                    padding:8px 12px;
-                    background:#1d5d8f;
-                    color:white;
-                    text-decoration:none;
-                    border-radius:5px
-                  "
-                >
-                  Origineel
-                </a>
-
-                <br><br>
-
-                <small>
-                  Geklikte positie wordt nu gebruikt voor BAG
-                </small>
-              </div>`
-            )
-            .openOn(map);
-
-        }
-
-      }
-
-    }catch(err){
-
-      console.error(err);
-
-    }
-  }
-);
-
-
-yearFilterSel&&yearFilterSel.addEventListener(
-  "change",
-  e=>{
-    activeYearFilter=e.target.value;
-
-    const r=Number(radiusSel.value);
-
-    if(curMarker){
-
-      const ll=curMarker.getLatLng();
-
-      loadBAG(
-        ll.lat,
-        ll.lng,
-        r
-      );
-
-    }else{
-
-      loadBAG(
-        52.516,
-        6.42,
-        r
-      );
-
-    }
-  }
-);
-
-
-toggleKadasterColors&&toggleKadasterColors.addEventListener(
-  "change",
-  e=>{
-
-    useKadaster=e.target.checked;
-
-    const r=Number(radiusSel.value);
-
-    if(curMarker){
-
-      const ll=curMarker.getLatLng();
-
-      loadBAG(
-        ll.lat,
-        ll.lng,
-        r
-      );
-
-    }else{
-
-      loadBAG(
-        52.516,
-        6.42,
-        r
-      );
-
-    }
-
-  }
-);
-
-
-window.addEventListener(
-  "load",
-  ()=>{
-
-    if(toggleKadasterColors)
-      toggleKadasterColors.checked=true;
-
-    setTimeout(
-      ()=>{
-
-        if(navigator.geolocation){
-
-          navigator.geolocation.getCurrentPosition(
-            p=>{
-
-              const lat=p.coords.latitude,
-                    lng=p.coords.longitude,
-                    r=Number(radiusSel.value);
-
-              map.setView(
-                [lat,lng],
-                18
-              );
-
-              curMarker=
-                L.marker(
-                  [lat,lng]
-                )
-                .addTo(map)
-                .bindPopup(
-                  "Huidige positie"
-                );
-
-              accCircle=
-                L.circle(
-                  [lat,lng],
-                  {
-                    radius:p.coords.accuracy,
-                    color:"#0b5cab",
-                    fillOpacity:0.08
-                  }
-                ).addTo(map);
-
-              loadBAG(
-                lat,
-                lng,
-                r
-              );
-
-              loadHistForLocation(
-                lat,
-                lng
-              );
-
-            },
-            ()=>{
-              loadBAG(
-                52.516,
-                6.42,
-                Number(radiusSel.value)
-              );
-
-              loadHistForLocation(
-                52.516,
-                6.42
-              );
-            },
-            {
-              enableHighAccuracy:true,
-              timeout:8000
-            }
-          );
-
-        }else{
-
-          loadBAG(
-            52.516,
-            6.42,
-            Number(radiusSel.value)
-          );
-
-          loadHistForLocation(
-            52.516,
-            6.42
-          );
-
-        }
-
-      },
-      600
-    );
-
-  }
-);
