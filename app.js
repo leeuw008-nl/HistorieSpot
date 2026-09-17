@@ -358,6 +358,8 @@ async function findRCEByAddress(address){
       "queries/rce/rest-api-rijksmonumenten/run?" +
       params.toString();
 
+    setStatus("RCE-aanroep: " + url);
+
     const res=await fetch(url);
 
     if(!res.ok)
