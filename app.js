@@ -182,7 +182,7 @@ function wgs84ToRD(lat,lon){
     32.391*Math.pow(dL,3)-
     0.705*dF-
     2.34*Math.pow(dF,3)*dL-
-    0.608*dF*Math.pow(dL,3)-
+    0.608*Math.pow(dF,2)*Math.pow(dL,3)-
     0.008*Math.pow(dL,2)+
     0.148*Math.pow(dF,2)*Math.pow(dL,3);
 
@@ -511,7 +511,7 @@ function showRCE(rce,address,lat,lng){
 
 /* =========================================================
    RCE FUNCTIE 4
-   BAG-pand -> adres -> RCE.
+   BAG-pand -> verblijfsobject -> adres -> RCE.
    ========================================================= */
 
 async function loadRCEForPand(o){
@@ -524,13 +524,29 @@ async function loadRCEForPand(o){
   const addresses=
     await getBAGAddresses(p);
 
-  if(!addresses.length)
+  if(!addresses.length){
+    setStatus("RCE-diagnose: BAG-pand heeft geen bruikbaar verblijfsobject-adres");
     return;
+  }
 
   for(const address of addresses){
 
     const monuments=
       await findRCEByAddress(address);
+
+    /*
+      ZICHTBARE DIAGNOSE:
+      toon exact welk BAG-adres via
+      pand.properties.verblijfsobject -> href
+      aan de RCE-adreszoekopdracht is aangeboden.
+      De bestaande RCE-matchlogica blijft ongewijzigd.
+    */
+    const adresDiagnose=
+      `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}, ${address.postcode || "postcode onbekend"}, ${address.woonplaats}`;
+
+    setStatus(
+      `RCE-diagnose: BAG verblijfsobject → ${adresDiagnose} → ${monuments.length} RCE-resultaat/resultaten`
+    );
 
     if(!monuments.length)
       continue;
@@ -896,8 +912,7 @@ async function loadHistForLocation(lat,lng){
        !data.features.length)
       return;
 
-    let code=
-      data.features[0].properties.CODE;
+    let code=data.features[0].properties.CODE;
 
     const orig=code;
 
@@ -1073,7 +1088,6 @@ map.on(
       console.error(err);
 
     }
-
   }
 );
 
