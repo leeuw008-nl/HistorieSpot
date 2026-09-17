@@ -62,8 +62,62 @@
     <div id="status" class="status-toast">Druk op het kompas-icoontje om je positie te bepalen.</div>
   </main>
 
+  <!-- TIJDELIJKE RCE-DIAGNOSE: blijft zichtbaar zodat latere statusmeldingen hem niet overschrijven. -->
+  <script>
+  (function(){
+    const originalFetch=window.fetch;
+    const events=[];
+
+    function showDebug(text){
+      let box=document.getElementById('rceDebug');
+      if(!box){
+        box=document.createElement('div');
+        box.id='rceDebug';
+        box.style.cssText='position:fixed;left:8px;right:8px;bottom:70px;z-index:9999;background:rgba(255,255,255,.96);border:2px solid #7b1e1e;border-radius:6px;padding:8px;font:12px/1.35 Arial,sans-serif;max-height:145px;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+        document.body.appendChild(box);
+      }
+      events.push(text);
+      box.innerHTML='<b>RCE-diagnose</b><br>'+events.slice(-6).map(s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;')).join('<br>');
+    }
+
+    window.fetch=async function(input,init){
+      const url=String(input && input.url ? input.url : input || '');
+      const isRCE=url.includes('api.linkeddata.cultureelerfgoed.nl/queries/rce/rest-api-rijksmonumenten/run');
+      const isVO=url.includes('/verblijfsobject/');
+      const isVOCollection=url.includes('/collections/verblijfsobject/items');
+
+      const response=await originalFetch.apply(this,arguments);
+
+      if(!isRCE && !isVO && !isVOCollection) return response;
+
+      try{
+        const data=await response.clone().json();
+
+        if(isRCE){
+          const count=Array.isArray(data) ? data.length : (Array.isArray(data.data) ? data.data.length : 'geen array');
+          let nr='';
+          const first=Array.isArray(data) ? data[0] : (Array.isArray(data.data) ? data.data[0] : null);
+          if(first) nr=first.rijksmonumentnummer || first.cultuurhistorischObjectnummer || '';
+          showDebug('RCE HTTP '+response.status+' → '+count+' resultaat/resultaten'+(nr?' → monument '+nr:''));
+        }else if(isVO){
+          const v=data && Array.isArray(data.features) && data.features.length ? data.features[0].properties || {} : (data.properties || {});
+          const adres=[v.openbare_ruimte_naam,v.huisnummer,v.huisletter||'',v.toevoeging||''].join(' ').replace(/\s+/g,' ').trim();
+          showDebug('BAG verblijfsobject HTTP '+response.status+' → '+(adres || 'adresvelden ontbreken')+(v.postcode?' → '+v.postcode:'')+(v.woonplaats_naam?' '+v.woonplaats_naam:''));
+        }else if(isVOCollection){
+          const n=Array.isArray(data.features)?data.features.length:0;
+          showDebug('BAG verblijfsobject-zoekactie HTTP '+response.status+' → '+n+' objecten in zoekgebied');
+        }
+      }catch(e){
+        showDebug((isRCE?'RCE':'BAG verblijfsobject')+' response kon niet als JSON worden gelezen');
+      }
+
+      return response;
+    };
+  })();
+  </script>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=20260917-1"></script>
+  <script src="app.js?v=20260917-3"></script>
 
   <!-- HisGIS 1832: alleen aanvullende status, geen tweede kaart-popup -->
   <script>
