@@ -1,0 +1,44 @@
+name: Temporary RCE address diagnostic
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-rce-address:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add two temporary RCE flow diagnostics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+          old1 = '  const addresses=\n    await getBAGAddresses(p,o);'
+          new1 = '  const addresses=\n    await getBAGAddresses(p,o);\n  if(window.rceFlowDebug) window.rceFlowDebug(\n    "FLOW → BAG-adressen terug: " + addresses.length\n  );'
+          old2 = '    const monuments=\n      await findRCEByAddress(address);'
+          new2 = '    if(window.rceFlowDebug) window.rceFlowDebug(\n      "FLOW → findRCEByAddress aanroep voor " +\n      address.straat + " " + address.huisnummer\n    );\n    const monuments=\n      await findRCEByAddress(address);'
+          if s.count(old1) != 1:
+              raise SystemExit(f'Expected exactly 1 first occurrence, found {s.count(old1)}')
+          if s.count(old2) != 1:
+              raise SystemExit(f'Expected exactly 1 second occurrence, found {s.count(old2)}')
+          s = s.replace(old1, new1).replace(old2, new2)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit change
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          git commit -m 'Add temporary RCE address diagnostics'
+          git push
