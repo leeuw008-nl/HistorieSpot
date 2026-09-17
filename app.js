@@ -356,17 +356,33 @@ async function getBAGAddresses(p,o){
 async function findRCEByAddress(address){
   try{
     const params=new URLSearchParams();
+
     params.set("page","1");
     params.set("pageSize","10");
 
-    const volledigAdres=
-      `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}`;
+    const straat=String(address.straat || "").trim();
+    const huisnummer=String(address.huisnummer || "").trim();
+    const huisletter=String(address.huisletter || "").trim();
+    const toevoeging=String(address.toevoeging || "").trim();
+    const postcode=String(address.postcode || "")
+      .replace(/\s+/g,"")
+      .toUpperCase();
+    const woonplaats=String(address.woonplaats || "").trim();
 
-    params.set("volledigAdres",volledigAdres);
-    if(address.postcode)
-      params.set("postcode",address.postcode);
-    if(address.woonplaats)
-      params.set("woonplaatsnaam",address.woonplaats);
+    const volledigAdres=
+      `${straat} ${huisnummer}${huisletter}${toevoeging}`.trim();
+
+    if(volledigAdres)
+      params.set("volledigAdres",volledigAdres);
+
+    if(straat)
+      params.set("straat",straat);
+
+    if(postcode)
+      params.set("postcode",postcode);
+
+    if(woonplaats)
+      params.set("woonplaatsnaam",woonplaats);
 
     const url=
       "https://api.linkeddata.cultureelerfgoed.nl/" +
@@ -393,11 +409,56 @@ async function findRCEByAddress(address){
 
     try{
       const data=JSON.parse(raw);
-      return Array.isArray(data)
-        ? data
-        : [];
+
+      if(!Array.isArray(data))
+        return [];
+
+      const normalizedAdres=volledigAdres
+        .toLowerCase()
+        .replace(/\s+/g," ")
+        .trim();
+
+      return data.filter(rce=>{
+        const bag=rce && rce.heeftBAGRelatie
+          ? rce.heeftBAGRelatie
+          : null;
+
+        if(!bag)
+          return false;
+
+        const rceAdres=String(bag.volledigAdres || "")
+          .toLowerCase()
+          .replace(/\s+/g," ")
+          .trim();
+
+        const rcePostcode=String(bag.postcode || "")
+          .replace(/\s+/g,"")
+          .toUpperCase();
+
+        const rceWoonplaats=String(bag.woonplaatsnaam || "")
+          .trim()
+          .toLowerCase();
+
+        const adresMatch=
+          normalizedAdres &&
+          rceAdres === normalizedAdres;
+
+        const postcodeMatch=
+          postcode &&
+          rcePostcode === postcode;
+
+        const woonplaatsMatch=
+          woonplaats &&
+          rceWoonplaats === woonplaats.toLowerCase();
+
+        return adresMatch &&
+               (!postcode || postcodeMatch) &&
+               (!woonplaats || woonplaatsMatch);
+      });
+
     }catch(parseError){
       console.error("RCE JSON parse fout:",parseError,"RAW:",raw);
+
       if(window.rceFlowDebug)
         window.rceFlowDebug(
           "RCE JSON parse fout: " +
@@ -405,16 +466,19 @@ async function findRCEByAddress(address){
           " | RAW: " +
           raw.slice(0,500)
         );
+
       return [];
     }
+
   }catch(e){
     console.error("RCE Rijksmonumenten fout:",e);
+
     if(window.rceFlowDebug)
       window.rceFlowDebug("RCE fetch fout: "+e.message);
+
     return [];
   }
 }
-
 
 /* =========================================================
    RCE FUNCTIE 3
