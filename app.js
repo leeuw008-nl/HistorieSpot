@@ -261,40 +261,110 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
    Haalt het verblijfsobject op dat bij een BAG-pand hoort.
    ========================================================= */
 
-async function getBAGAddresses(p){
-
-  if(!p || !Array.isArray(p.verblijfsobject))
-    return [];
-
-  const hrefs=p.verblijfsobject
-    .map(v=>v && v.href)
-    .filter(Boolean);
-
-  if(!hrefs.length)
-    return [];
+async function getBAGAddresses(p,o){
 
   const results=[];
 
-  for(const href of hrefs){
+  /*
+    Eerste mogelijkheid: sommige BAG-responses leveren de
+    verblijfsobject-relatie direct mee.
+  */
+  if(p && Array.isArray(p.verblijfsobject)){
 
-    try{
+    const hrefs=p.verblijfsobject
+      .map(v=>v && v.href)
+      .filter(Boolean);
 
-      const res=await fetch(href);
+    for(const href of hrefs){
 
-      if(!res.ok)
+      try{
+
+        const res=await fetch(href);
+
+        if(!res.ok)
+          continue;
+
+        const data=await res.json();
+
+        /* BAG OGC geeft een FeatureCollection terug. */
+        const v=
+          data && Array.isArray(data.features) && data.features.length
+            ? (data.features[0].properties || {})
+            : (data.properties || {});
+
+        if(
+          !v.openbare_ruimte_naam ||
+          !v.huisnummer ||
+          !v.woonplaats_naam
+        ){
+          continue;
+        }
+
+        results.push({
+          straat:v.openbare_ruimte_naam,
+          huisnummer:v.huisnummer,
+          huisletter:v.huisletter || "",
+          toevoeging:v.toevoeging || "",
+          postcode:v.postcode || "",
+          woonplaats:v.woonplaats_naam
+        });
+
+      }catch(e){
+        console.error("BAG verblijfsobject fout:",href,e);
+      }
+    }
+  }
+
+  if(results.length)
+    return results;
+
+  /*
+    Belangrijk: de BAG-pand-response bevat in de praktijk niet
+    altijd p.verblijfsobject. Daarom zoeken we de verblijfsobjecten
+    ruimtelijk rond het BAG-pand en koppelen daarna terug via
+    verblijfsobject.properties["pand.href"].
+  */
+  if(!p || !p.identificatie || !o || !o.c)
+    return [];
+
+  try{
+
+    const b=box(o.c.lat,o.c.lng,50);
+
+    const url=
+      `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=100&f=json`;
+
+    const res=await fetch(url);
+
+    if(!res.ok)
+      return [];
+
+    const data=await res.json();
+    const features=Array.isArray(data.features)
+      ? data.features
+      : [];
+
+    for(const f of features){
+
+      const v=f.properties || {};
+      const rel=v["pand.href"];
+      const hrefs=Array.isArray(rel)
+        ? rel
+        : (rel ? [rel] : []);
+
+      const hoortBijPand=hrefs.some(h=>
+        String(h).includes(String(p.identificatie))
+      );
+
+      if(!hoortBijPand)
         continue;
-
-      const data=await res.json();
-
-      const v=data.properties || {};
 
       if(
         !v.openbare_ruimte_naam ||
         !v.huisnummer ||
         !v.woonplaats_naam
-      ){
+      )
         continue;
-      }
 
       results.push({
         straat:v.openbare_ruimte_naam,
@@ -304,17 +374,10 @@ async function getBAGAddresses(p){
         postcode:v.postcode || "",
         woonplaats:v.woonplaats_naam
       });
-
-    }catch(e){
-
-      console.error(
-        "BAG verblijfsobject fout:",
-        href,
-        e
-      );
-
     }
 
+  }catch(e){
+    console.error("BAG VO zoekfout:",e);
   }
 
   return results;
@@ -520,7 +583,7 @@ async function loadRCEForPand(o){
   const p=o.f.properties || {};
 
   const addresses=
-    await getBAGAddresses(p);
+    await getBAGAddresses(p,o);
 
   if(!addresses.length){
     setStatus("RCE-diagnose: BAG-pand heeft geen bruikbaar verblijfsobject-adres");
