@@ -1,0 +1,75 @@
+name: One-time RCE diagnose patch
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: "!contains(github.event.head_commit.message, 'Isoleer BAG-RCE diagnose van RCE minuutplanservice')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch app.js
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app.js')
+          s=p.read_text(encoding='utf-8')
+          old='''const minuutLayer=L.tileLayer.wms(
+  "https://services.rce.geovoorziening.nl/misc/wms",
+  {
+    layers:"Minuutplanbegrenzingen",
+    format:"image/png",
+    transparent:true,
+    version:"1.3.0",
+    opacity:0.5
+  }
+).addTo(map);
+
+minuutLayer.addTo(map);'''
+          new='''const minuutLayer=L.tileLayer.wms(
+  "https://services.rce.geovoorziening.nl/misc/wms",
+  {
+    layers:"Minuutplanbegrenzingen",
+    format:"image/png",
+    transparent:true,
+    version:"1.3.0",
+    opacity:0.5
+  }
+);
+
+// Diagnosemodus: RCE minuutplan-WMS/WFS tijdelijk niet automatisch laden.
+// De BAG -> verblijfsobject -> adres -> RCE-diagnose blijft volledig actief.
+const RCE_DIAGNOSE_ZONDER_MINUUTPLAN=true;'''
+          if old not in s:
+              raise SystemExit('WMS-blok niet gevonden')
+          s=s.replace(old,new,1)
+          old='''async function loadHistForLocation(lat,lng){
+
+  try{'''
+          new='''async function loadHistForLocation(lat,lng){
+
+  if(RCE_DIAGNOSE_ZONDER_MINUUTPLAN)
+    return;
+
+  try{'''
+          if old not in s:
+              raise SystemExit('loadHistForLocation niet gevonden')
+          s=s.replace(old,new,1)
+          old='''    setStatus(`${list.length} BAG binnen ${radius}m`);'''
+          new='''    if(!RCE_DIAGNOSE_ZONDER_MINUUTPLAN)
+      setStatus(`${list.length} BAG binnen ${radius}m`);'''
+          if old not in s:
+              raise SystemExit('BAG eindstatus niet gevonden')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit app.js and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-rce-diagnose.yml
+          git add app.js
+          git commit -m "Isoleer BAG-RCE diagnose van RCE minuutplanservice"
+          git push
