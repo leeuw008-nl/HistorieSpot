@@ -1,0 +1,22 @@
+name: Restore working app.js
+
+on:
+  push:
+    paths:
+      - RESTORE_APP_TRIGGER.txt
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore app.js from known working commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout 94d50725c8bd46ef73b3ff1dd2bff0f3a0750afc -- app.js
+          git add app.js
+          git commit -m "Restore working map click and 1832 functionality" || exit 0
+          git push
