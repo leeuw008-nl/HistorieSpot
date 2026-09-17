@@ -265,6 +265,7 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 
 async function getBAGAddresses(p,o){
   const results=[];
+
   if(p && Array.isArray(p.verblijfsobject)){
     const hrefs=p.verblijfsobject.map(v=>v && (v.href || v)).filter(Boolean);
     for(const href of hrefs){
@@ -272,14 +273,25 @@ async function getBAGAddresses(p,o){
         const res=await fetch(href);
         if(!res.ok) continue;
         const data=await res.json();
-        const v=data && Array.isArray(data.features) && data.features.length ? (data.features[0].properties || {}) : (data.properties || {});
+        const v=data && Array.isArray(data.features) && data.features.length
+          ? (data.features[0].properties || {})
+          : (data.properties || {});
         if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
-        results.push({straat:v.openbare_ruimte_naam,huisnummer:v.huisnummer,huisletter:v.huisletter || '',toevoeging:v.toevoeging || '',postcode:v.postcode || '',woonplaats:v.woonplaats_naam});
+        results.push({
+          straat:v.openbare_ruimte_naam,
+          huisnummer:v.huisnummer,
+          huisletter:v.huisletter || '',
+          toevoeging:v.toevoeging || '',
+          postcode:v.postcode || '',
+          woonplaats:v.woonplaats_naam
+        });
       }catch(e){ console.error('BAG verblijfsobject fout:',href,e); }
     }
   }
+
   if(results.length) return results;
   if(!p || !p.identificatie || !o || !o.c) return [];
+
   try{
     const b=box(o.c.lat,o.c.lng,50);
     const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=100&f=json`;
@@ -287,26 +299,34 @@ async function getBAGAddresses(p,o){
     if(!res.ok) return [];
     const data=await res.json();
     const features=Array.isArray(data.features) ? data.features : [];
+
     for(const f of features){
       const v=f.properties || {};
       const rel=v.pand;
       const hrefs=[];
-      if(Array.isArray(rel)) rel.forEach(r=>{if(typeof r==='string') hrefs.push(r); else if(r && r.href) hrefs.push(r.href);});
+      if(Array.isArray(rel)) rel.forEach(r=>{
+        if(typeof r==='string') hrefs.push(r);
+        else if(r && r.href) hrefs.push(r.href);
+      });
       else if(typeof rel==='string') hrefs.push(rel);
       else if(rel && rel.href) hrefs.push(rel.href);
+
       if(!hrefs.some(h=>String(h).includes(String(p.identificatie)))) continue;
       if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
-      results.push({straat:v.openbare_ruimte_naam,huisnummer:v.huisnummer,huisletter:v.huisletter || '',toevoeging:v.toevoeging || '',postcode:v.postcode || '',woonplaats:v.woonplaats_naam});
+
+      results.push({
+        straat:v.openbare_ruimte_naam,
+        huisnummer:v.huisnummer,
+        huisletter:v.huisletter || '',
+        toevoeging:v.toevoeging || '',
+        postcode:v.postcode || '',
+        woonplaats:v.woonplaats_naam
+      });
     }
   }catch(e){ console.error('BAG VO zoekfout:',e); }
+
   return results;
 }
-
-
-/* =========================================================
-   RCE FUNCTIE 2
-   Zoek officieel Rijksmonument op BAG-adres.
-   ========================================================= */
 
 async function findRCEByAddress(address){
 
@@ -502,15 +522,13 @@ async function loadRCEForPand(o){
   const p=o.f.properties || {};
 
   const addresses=
-    await getBAGAddresses(p,o);
+    await getBAGAddresses(p);
 
   if(!addresses.length){
     return;
   }
 
   for(const address of addresses){
-
-    window.rceDiagnosisShown=true;
 
     const monuments=
       await findRCEByAddress(address);
@@ -550,7 +568,6 @@ async function loadRCEForPand(o){
    ========================================================= */
 
 async function loadBAG(lat,lng,radius){
-
   window.rceDiagnosisShown=false;
 
   bagLayer.clearLayers();
@@ -723,8 +740,9 @@ async function loadBAG(lat,lng,radius){
     });
 
 
-    if(!window.rceDiagnosisShown)
-      setStatus(`${list.length} BAG binnen ${radius}m`);
+    setStatus(
+      `${list.length} BAG binnen ${radius}m`
+    );
 
   }catch(e){
 
