@@ -355,7 +355,7 @@ async function findRCEByAddress(address){
 
     const url=
       "https://api.linkeddata.cultureelerfgoed.nl/" +
-      "rest-api-rijksmonumenten/run?" +
+      "queries/rce/rest-api-rijksmonumenten/run?" +
       params.toString();
 
     const res=await fetch(url);
