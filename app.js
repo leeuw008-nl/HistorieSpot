@@ -211,9 +211,7 @@ const minuutLayer=L.tileLayer.wms(
     version:"1.3.0",
     opacity:0.5
   }
-).addTo(map);
-
-minuutLayer.addTo(map);
+);
 
 toggleMin&&toggleMin.addEventListener(
   "change",
@@ -544,6 +542,7 @@ async function loadRCEForPand(o){
     const adresDiagnose=
       `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}, ${address.postcode || "postcode onbekend"}, ${address.woonplaats}`;
 
+    window.rceDiagnosisShown=true;
     setStatus(
       `RCE-diagnose: BAG verblijfsobject → ${adresDiagnose} → ${monuments.length} RCE-resultaat/resultaten`
     );
@@ -740,9 +739,9 @@ async function loadBAG(lat,lng,radius){
     });
 
 
-    setStatus(
-      `${list.length} BAG binnen ${radius}m`
-    );
+    /* RCE-diagnose mag door deze eindmelding niet worden overschreven. */
+    if(!window.rceDiagnosisShown)
+      setStatus(`${list.length} BAG binnen ${radius}m`);
 
   }catch(e){
 
@@ -884,6 +883,9 @@ radiusSel&&radiusSel.addEventListener(
 
 
 async function loadHistForLocation(lat,lng){
+
+  /* Tijdelijk uitgeschakeld tijdens BAG-RCE diagnose: RCE WFS/WMS time-out. */
+  return;
 
   try{
 
