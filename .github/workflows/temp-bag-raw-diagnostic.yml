@@ -1,0 +1,51 @@
+name: Temporary BAG raw response diagnostic
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-bag-raw:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add BAG raw response diagnostic
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = """        }else if(isVO){
+          const v=data && Array.isArray(data.features) && data.features.length ? data.features[0].properties || {} : (data.properties || {});
+          const adres=[v.openbare_ruimte_naam,v.huisnummer,v.huisletter||'',v.toevoeging||''].join(' ').replace(/\\s+/g,' ').trim();
+          showDebug('BAG verblijfsobject HTTP '+response.status+' → '+(adres || 'adresvelden ontbreken')+(v.postcode?' → '+v.postcode:'')+(v.woonplaats_naam?' '+v.woonplaats_naam:''));
+"""
+          new = """        }else if(isVO){
+          const v=data && Array.isArray(data.features) && data.features.length ? data.features[0].properties || {} : (data.properties || {});
+          const adres=[v.openbare_ruimte_naam,v.huisnummer,v.huisletter||'',v.toevoeging||''].join(' ').replace(/\\s+/g,' ').trim();
+          showDebug('BAG verblijfsobject HTTP '+response.status+' → '+(adres || 'adresvelden ontbreken')+(v.postcode?' → '+v.postcode:'')+(v.woonplaats_naam?' '+v.woonplaats_naam:''));
+          showDebug('BAG RAW → '+JSON.stringify(data));
+"""
+          if s.count(old) != 1:
+              raise SystemExit(f'Expected exactly 1 BAG diagnostic block, found {s.count(old)}')
+          s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit change
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Add temporary BAG raw response diagnostic'
+          git push
+
+# trigger
