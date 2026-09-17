@@ -1,0 +1,38 @@
+name: Patch RCE URL encoding
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-rce-url.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace only RCE URL construction
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+          old = '''    const url=\n      "https://api.linkeddata.cultureelerfgoed.nl/" +\n      "queries/rce/rest-api-rijksmonumenten/run?" +\n      params.toString();'''
+          new = '''    const url=\n      "https://api.linkeddata.cultureelerfgoed.nl/" +\n      "queries/rce/rest-api-rijksmonumenten/run?" +\n      "page=1&pageSize=10&straat=" +\n      encodeURIComponent(straat);'''
+          if old not in s:
+              raise SystemExit('Expected RCE URL block not found; no change made.')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Fix RCE street URL encoding'
+          git push
