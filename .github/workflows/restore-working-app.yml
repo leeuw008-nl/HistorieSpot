@@ -12,11 +12,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Restore app.js from known working commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout a60892a6f0eff6cd39553986e93902ee465341d3 -- app.js
           git add app.js
-          git commit -m "Restore working app.js from known good commit" || exit 0
+          git commit -m "Restore working app.js from known good commit"
           git push
