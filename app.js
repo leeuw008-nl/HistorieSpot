@@ -354,27 +354,17 @@ async function getBAGAddresses(p,o){
 }
 
 async function findRCEByAddress(address){
-
   try{
-
     const params=new URLSearchParams();
-
     params.set("page","1");
     params.set("pageSize","10");
-
-    /*
-      De RCE API ondersteunt postcode en volledigAdres.
-      We gebruiken beide wanneer postcode beschikbaar is.
-    */
 
     const volledigAdres=
       `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}`;
 
     params.set("volledigAdres",volledigAdres);
-
     if(address.postcode)
       params.set("postcode",address.postcode);
-
     if(address.woonplaats)
       params.set("woonplaatsnaam",address.woonplaats);
 
@@ -384,23 +374,43 @@ async function findRCEByAddress(address){
       params.toString();
 
     const res=await fetch(url);
+    const contentType=res.headers.get("content-type") || "(geen content-type)";
+    const raw=await res.text();
+
+    const diagnose=
+      `RCE HTTP ${res.status} | type: ${contentType} | lengte: ${raw.length} | RAW: ${raw.slice(0,500)}`;
+
+    console.log(diagnose);
+    if(window.rceFlowDebug)
+      window.rceFlowDebug(diagnose);
+    setStatus(diagnose);
 
     if(!res.ok)
       return [];
 
-    const data=await res.json();
+    if(!raw.trim())
+      return [];
 
-    return Array.isArray(data)
-      ? data
-      : [];
-
+    try{
+      const data=JSON.parse(raw);
+      return Array.isArray(data)
+        ? data
+        : [];
+    }catch(parseError){
+      console.error("RCE JSON parse fout:",parseError,"RAW:",raw);
+      if(window.rceFlowDebug)
+        window.rceFlowDebug(
+          "RCE JSON parse fout: " +
+          parseError.message +
+          " | RAW: " +
+          raw.slice(0,500)
+        );
+      return [];
+    }
   }catch(e){
-
-    console.error(
-      "RCE Rijksmonumenten fout:",
-      e
-    );
-
+    console.error("RCE Rijksmonumenten fout:",e);
+    if(window.rceFlowDebug)
+      window.rceFlowDebug("RCE fetch fout: "+e.message);
     return [];
   }
 }
