@@ -1,0 +1,20 @@
+name: Restore known-good app.js
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-known-good-app.yml'
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore app.js from known working commit
+        run: |
+          git checkout a60892a6f0eff6cd39553986e93902ee465341d3 -- app.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          git commit -m 'Restore app.js from known working commit' || exit 0
+          git push
