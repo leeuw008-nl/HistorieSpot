@@ -559,9 +559,9 @@ async function findRCEByAddress(address){
         String(huisnummer).trim();
 
       const postcodeMatch=
-        !postcode ||
+        !rcePostcode ||
         (
-          rcePostcode &&
+          postcode &&
           String(rcePostcode)
             .replace(/\s+/g,"")
             .toUpperCase() === postcode
