@@ -311,6 +311,13 @@ async function getBAGAddresses(p,o){
       else if(typeof rel==='string') hrefs.push(rel);
       else if(rel && rel.href) hrefs.push(rel.href);
 
+      if(v["pand.href"]){
+        if(Array.isArray(v["pand.href"]))
+          v["pand.href"].forEach(h=>hrefs.push(h));
+        else
+          hrefs.push(v["pand.href"]);
+      }
+
       if(!hrefs.some(h=>String(h).includes(String(p.identificatie)))) continue;
       if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
 
@@ -357,8 +364,6 @@ async function findRCEByAddress(address){
       "https://api.linkeddata.cultureelerfgoed.nl/" +
       "queries/rce/rest-api-rijksmonumenten/run?" +
       params.toString();
-
-    setStatus("RCE-aanroep: " + url);
 
     const res=await fetch(url);
 
@@ -525,12 +530,6 @@ async function loadRCEForPand(o){
 
   const addresses=
     await getBAGAddresses(p,o);
-  if(window.rceFlowDebug) window.rceFlowDebug(
-    "FLOW → BAG-adressen terug: " + addresses.length
-  );
-  if(window.rceFlowDebug) window.rceFlowDebug(
-    "FLOW → BAG-adressen terug: " + addresses.length
-  );
 
   if(!addresses.length){
     return;
@@ -538,14 +537,6 @@ async function loadRCEForPand(o){
 
   for(const address of addresses){
 
-    if(window.rceFlowDebug) window.rceFlowDebug(
-      "FLOW → findRCEByAddress aanroep voor " +
-      address.straat + " " + address.huisnummer
-    );
-    if(window.rceFlowDebug) window.rceFlowDebug(
-      "FLOW → findRCEByAddress aanroep voor " +
-      address.straat + " " + address.huisnummer
-    );
     const monuments=
       await findRCEByAddress(address);
 
@@ -751,7 +742,6 @@ async function loadBAG(lat,lng,radius){
         Rijksmonument.
       */
 
-      if(window.rceFlowDebug) window.rceFlowDebug("FLOW → loadRCEForPand aanroep");
       loadRCEForPand(o);
 
     });
