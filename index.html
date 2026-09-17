@@ -52,7 +52,7 @@
 
   <main class="main-fullscreen">
     <div id="map"></div>
-    <button id="locateBtn" class="locate-fab" aria-label="Bepaal mijn positie"><svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06C3.52 6.83 6.83 3.52 11 3.06V1h2v2.06C17.17 3.52 20.48 6.83 20.94 11H23v2h-2.06c-.46 4.17-3.77 7.48-7.94 7.94V23h-2v-2.06C6.83 20.48 3.52 17.17 3.06 13H1v-2h2.06z"/></svg></button>
+    <button id="locateBtn" class="locate-fab" aria-label="Bepaal mijn positie"><svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06C3.52 6.83 6.83 3.52 11 3.06V1h2v2.06C17.17 3.52 20.48 6.83 20.94 11H23v2h-2.06c-.46 4.17-3.77 7.48-7.94 7.94V23h-2v-2.06C6.83 20.48 3.52 17.17 3.52 20.48 17.17 20.48 20.48 17.17 20.94 13H23v-2h-2.06c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06C3.52 6.83 6.83 3.52 11 3.06V1h2v2.06C17.17 3.52 20.48 6.83 20.94 11H23v2h-2.06z"/></svg></button>
     <div id="opacityBar" class="map-bottom-bar">
       <input id="historischeOpacity" type="range" min="0" max="100" value="55">
       <span id="historischeOpacityValue" class="value">55%</span>
@@ -62,82 +62,8 @@
     <div id="status" class="status-toast">Druk op het kompas-icoontje om je positie te bepalen.</div>
   </main>
 
-  <!-- TIJDELIJKE RCE-DIAGNOSE -->
-  <script>
-  (function(){
-    const originalFetch=window.fetch;
-    const events=[];
-    function showDebug(text){
-      let box=document.getElementById('rceDebug');
-      if(!box){
-        box=document.createElement('div');
-        box.id='rceDebug';
-        box.style.cssText='position:fixed;left:8px;right:8px;bottom:70px;z-index:9999;background:rgba(255,255,255,.96);border:2px solid #7b1e1e;border-radius:6px;padding:8px;font:12px/1.35 Arial,sans-serif;max-height:180px;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.25)';
-        document.body.appendChild(box);
-      }
-      events.push(text);
-      box.innerHTML='<b>RCE-diagnose</b><br>'+events.slice(-10).map(s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;')).join('<br>');
-    }
-    window.rceFlowDebug=showDebug;
-    showDebug('INDEX-DIAGNOSE versie 20260917-5');
-    window.fetch=async function(input,init){
-      const url=String(input && input.url ? input.url : input || '');
-      const isRCE=url.includes('api.linkeddata.cultureelerfgoed.nl/queries/rce/rest-api-rijksmonumenten/run');
-      const isVO=url.includes('/verblijfsobject/');
-      const isVOCollection=url.includes('/collections/verblijfsobject/items');
-      const response=await originalFetch.apply(this,arguments);
-      if(!isRCE && !isVO && !isVOCollection) return response;
-      try{
-        const raw=await response.clone().text();
-        if(isRCE){
-          showDebug('RCE HTTP '+response.status+' → '+raw.length+' bytes');
-          showDebug('RCE RAW → '+raw.substring(0,300));
-        }else if(isVO){
-          const v=data && Array.isArray(data.features) && data.features.length ? data.features[0].properties || {} : (data.properties || {});
-          const adres=[v.openbare_ruimte_naam,v.huisnummer,v.huisletter||'',v.toevoeging||''].join(' ').replace(/\s+/g,' ').trim();
-          showDebug('BAG verblijfsobject HTTP '+response.status+' → '+(adres || 'adresvelden ontbreken')+(v.postcode?' → '+v.postcode:'')+(v.woonplaats_naam?' '+v.woonplaats_naam:''));
-          showDebug('BAG RAW → '+JSON.stringify(data));
-        }else if(isVOCollection){
-          const n=Array.isArray(data.features)?data.features.length:0;
-          showDebug('BAG verblijfsobject-zoekactie HTTP '+response.status+' → '+n+' objecten in zoekgebied');
-        }
-      }catch(e){
-        showDebug((isRCE?'RCE':'BAG verblijfsobject')+' response kon niet als JSON worden gelezen');
-      }
-      return response;
-    };
-  })();
-  </script>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="app.js?v=20260917-6"></script>
-
-  <!-- TIJDELIJKE RCE FLOW-DIAGNOSE: controleert alleen of de bestaande functie globaal beschikbaar is. -->
-  <script>
-  (function(){
-    const show=window.rceFlowDebug;
-    if(typeof window.loadRCEForPand==='function'){
-      show && show('FLOW → loadRCEForPand beschikbaar');
-    }else{
-      show && show('FLOW → loadRCEForPand NIET beschikbaar');
-    }
-  })();
-  </script>
-
-  <!-- TIJDELIJKE RCE FLOW-DIAGNOSE: alleen observatie van bestaande setStatus()-meldingen. -->
-  <script>
-  (function(){
-    const start=Date.now();
-    const oldStatus=window.setStatus;
-    if(typeof oldStatus==='function'){
-      window.setStatus=function(t){
-        try{ if(window.rceFlowDebug && /RCE|BAG verblijfsobject|adres/i.test(String(t))) window.rceFlowDebug('FLOW '+(Date.now()-start)+'ms → '+String(t)); }catch(e){}
-        return oldStatus.apply(this,arguments);
-      };
-    }
-    window.rceFlowDebug && window.rceFlowDebug('FLOW → diagnose geladen');
-  })();
-  </script>
 
   <!-- HisGIS 1832: alleen aanvullende status, geen tweede kaart-popup -->
   <script>
