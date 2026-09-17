@@ -1,0 +1,59 @@
+name: One-time BAG pand.href fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch app.js
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+          old = '''      if(Array.isArray(rel)) rel.forEach(r=>{
+        if(typeof r==='string') hrefs.push(r);
+        else if(r && r.href) hrefs.push(r.href);
+      });
+      else if(typeof rel==='string') hrefs.push(rel);
+      else if(rel && rel.href) hrefs.push(rel.href);
+'''
+          new = '''      if(Array.isArray(rel)) rel.forEach(r=>{
+        if(typeof r==='string') hrefs.push(r);
+        else if(r && r.href) hrefs.push(r.href);
+      });
+      else if(typeof rel==='string') hrefs.push(rel);
+      else if(rel && rel.href) hrefs.push(rel.href);
+
+      if(v["pand.href"]){
+        if(Array.isArray(v["pand.href"]))
+          v["pand.href"].forEach(h=>hrefs.push(h));
+        else
+          hrefs.push(v["pand.href"]);
+      }
+'''
+          if s.count(old) != 1:
+              raise SystemExit(f'Expected exactly 1 target block, found {s.count(old)}')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Commit fix and remove workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js
+          git rm .github/workflows/fix-bag-pandhref.yml
+          git commit -m 'Fix BAG pand.href parsing for RCE lookup'
+          git push
