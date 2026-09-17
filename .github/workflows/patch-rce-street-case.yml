@@ -1,4 +1,4 @@
-name: Patch RCE street case
+name: Patch RCE address diagnostics
 
 on:
   push:
@@ -14,41 +14,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Patch app.js
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
-          p = Path("app.js")
-          s = p.read_text(encoding="utf-8")
-          old = '''    const straat=String(address.straat || "").trim();'''
-          new = '''    const straat=String(address.straat || "").trim();
-    const rceStraat=
-      straat ? straat.charAt(0).toUpperCase()+straat.slice(1) : "";'''
-          if old not in s:
-              raise SystemExit("Expected street declaration not found")
-          if "encodeURIComponent(rceStraat)" in s:
-              raise SystemExit("Patch already applied")
-          s = s.replace(old, new, 1)
-          old_url = '''      "page=1&pageSize=10&straat=" +
-      encodeURIComponent(straat);'''
-          new_url = '''      "page=1&pageSize=10&straat=" +
-      encodeURIComponent(rceStraat);'''
-          if old_url not in s:
-              raise SystemExit("Expected RCE URL block not found")
-          s = s.replace(old_url, new_url, 1)
-          p.write_text(s, encoding="utf-8")
-      - name: Commit patch
+          p=Path("app.js")
+          s=p.read_text(encoding="utf-8")
+          old='''      const adresMatch=\n        straatMatch &&\n        huisnummerMatch &&\n        postcodeMatch;'''
+          new='''      const adresMatch=\n        straatMatch &&\n        huisnummerMatch &&\n        postcodeMatch;\n\n      /* TIJDELIJKE DIAGNOSE: RCE adresvergelijking */\n      if(window.rceFlowDebug)\n        window.rceFlowDebug(\n          `ADRES-CHECK | BAG: ${straat} ${huisnummer} ${postcode || "geen postcode"} | RCE: ${rceStraat} ${rceHuisnummer} ${rcePostcode || "geen postcode"} | straat:${straatMatch ? "JA" : "NEE"} huisnummer:${huisnummerMatch ? "JA" : "NEE"} postcode:${postcodeMatch ? "JA" : "NEE"}`\n        );'''
+          if "/* TIJDELIJKE DIAGNOSE: RCE adresvergelijking */" in s:
+              print("Diagnostic already applied")
+          else:
+              if old not in s:
+                  raise SystemExit("Expected adresMatch block not found")
+              s=s.replace(old,new,1)
+              p.write_text(s,encoding="utf-8")
+          PY
+      - name: Commit patch and remove workflow
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.js
-          git diff --cached --exit-code && exit 0 || true
-          git commit -m "Normalize RCE street query capitalization"
-          git push
-      - name: Remove temporary workflow
-        if: success()
-        run: |
           git rm .github/workflows/patch-rce-street-case.yml
-          git commit -m "Remove temporary RCE patch workflow"
+          git commit -m "Add RCE address comparison diagnostics"
           git push
-
-# trigger patch run
