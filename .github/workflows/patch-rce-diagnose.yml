@@ -18,7 +18,6 @@ jobs:
           p = Path('app.js')
           s = p.read_text(encoding='utf-8')
           old = s
-          s = s.replace('const minuutLayer=L.tileLayer.wms(\n  "https://services.rce.geovoorziening.nl/misc/wms",', 'const minuutLayer=L.tileLayer.wms(\n  "https://services.rce.geovoorziening.nl/misc/wms",')
           s = s.replace('  }\n).addTo(map);\n\nminuutLayer.addTo(map);', '  }\n);')
           s = s.replace('async function loadHistForLocation(lat,lng){\n\n  try{', 'async function loadHistForLocation(lat,lng){\n\n  /* Tijdelijk uitgeschakeld tijdens BAG-RCE diagnose: RCE WFS/WMS time-out. */\n  return;\n\n  try{')
           s = s.replace('    setStatus(\n      `${list.length} BAG binnen ${radius}m`\n    );', '    /* RCE-diagnose mag door deze eindmelding niet worden overschreven. */\n    if(!window.rceDiagnosisShown)\n      setStatus(`${list.length} BAG binnen ${radius}m`);')
