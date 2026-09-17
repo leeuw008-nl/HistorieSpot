@@ -522,7 +522,7 @@ async function loadRCEForPand(o){
   const p=o.f.properties || {};
 
   const addresses=
-    await getBAGAddresses(p);
+    await getBAGAddresses(p,o);
 
   if(!addresses.length){
     return;
