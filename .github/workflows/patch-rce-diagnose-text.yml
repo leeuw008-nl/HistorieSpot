@@ -1,0 +1,33 @@
+name: Patch RCE diagnostic text
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-rce-diagnose-text.yml'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index.html
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '''      try{\n        const data=await response.clone().json();\n        if(isRCE){\n          const count=Array.isArray(data) ? data.length : (Array.isArray(data.data) ? data.data.length : 'geen array');\n          let nr='';\n          const first=Array.isArray(data) ? data[0] : (Array.isArray(data.data) ? data.data[0] : null);\n          if(first) nr=first.rijksmonumentnummer || first.cultuurhistorischObjectnummer || '';\n          showDebug('RCE HTTP '+response.status+' → '+count+' resultaat/resultaten'+(nr?' → monument '+nr:''));\n        }else if(isVO){'''
+          new = '''      try{\n        const raw=await response.clone().text();\n        if(isRCE){\n          showDebug('RCE HTTP '+response.status+' → '+raw.length+' bytes');\n          showDebug('RCE RAW → '+raw.substring(0,300));\n        }else if(isVO){'''
+          if old not in s:
+              raise SystemExit('Expected RCE diagnostic block not found; no changes made.')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'Read RCE diagnostic response as text'
+          git push
