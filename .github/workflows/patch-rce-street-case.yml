@@ -50,3 +50,5 @@ jobs:
           git rm .github/workflows/patch-rce-street-case.yml
           git commit -m "Remove temporary RCE patch workflow"
           git push
+
+# trigger patch run
