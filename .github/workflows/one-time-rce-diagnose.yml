@@ -1,16 +1,17 @@
 name: One-time RCE diagnose patch
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 permissions:
   contents: write
 jobs:
   patch:
-    if: "!contains(github.event.head_commit.message, 'Isoleer BAG-RCE diagnose van RCE minuutplanservice')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Patch app.js
+        shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -65,11 +66,11 @@ const RCE_DIAGNOSE_ZONDER_MINUUTPLAN=true;'''
           s=s.replace(old,new,1)
           p.write_text(s,encoding='utf-8')
           PY
-      - name: Commit app.js and remove temporary workflow
+      - name: Commit patched app.js
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/one-time-rce-diagnose.yml
           git add app.js
+          git diff --cached --quiet && exit 0
           git commit -m "Isoleer BAG-RCE diagnose van RCE minuutplanservice"
           git push
