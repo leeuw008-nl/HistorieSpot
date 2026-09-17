@@ -107,9 +107,10 @@ jobs:
           s = s[:start] + new_func + s[end:]
           s = re.sub(r'await getBAGAddresses\(p\)\s*;', 'await getBAGAddresses(p,o);', s)
 
-          s = s.replace(
-              '"https://api.linkeddata.cultureelerfgoed.nl/" +\n    "rest-api-rijksmonumenten/run?"',
-              '"https://api.linkeddata.cultureelerfgoed.nl/" +\n    "queries/rce/rest-api-rijksmonumenten/run?"'
+          s = re.sub(
+              r'("https://api\.linkeddata\.cultureelerfgoed\.nl/"\s*\+\s*"?)(?:queries/)?(?:rest-api-rijksmonumenten/run\?)',
+              r'\1queries/rce/rest-api-rijksmonumenten/run?',
+              s
           )
 
           s = re.sub(
