@@ -290,7 +290,7 @@ async function getBAGAddresses(p,o){
   }
 
   if(results.length) return results;
-  if(!p || !o || !o.c) return [];
+  if(!p || !p.identificatie || !o || !o.c) return [];
 
   try{
     const b=box(o.c.lat,o.c.lng,50);
@@ -299,10 +299,6 @@ async function getBAGAddresses(p,o){
     if(!res.ok) return [];
     const data=await res.json();
     const features=Array.isArray(data.features) ? data.features : [];
-
-    const clickedPandIds=[];
-    if(o && o.f && o.f.id) clickedPandIds.push(String(o.f.id));
-    if(p && p.identificatie) clickedPandIds.push(String(p.identificatie));
 
     for(const f of features){
       const v=f.properties || {};
@@ -322,11 +318,7 @@ async function getBAGAddresses(p,o){
           hrefs.push(v["pand.href"]);
       }
 
-      const matchesClickedPand=clickedPandIds.length>0 && hrefs.some(h=>{
-        const hs=String(h);
-        return clickedPandIds.some(id=>hs.endsWith('/'+id) || hs.includes('/'+id));
-      });
-      if(!matchesClickedPand) continue;
+      if(!hrefs.some(h=>String(h).includes(String(p.identificatie)))) continue;
       if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
 
       results.push({
