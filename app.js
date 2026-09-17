@@ -278,7 +278,9 @@ async function getBAGAddresses(p,o){
           : (data.properties || {});
         if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
         results.push({
-          straat:v.openbare_ruimte_naam,
+  verblijfsobjectId:
+    String(v.identificatie || href.split('/').pop() || ''),
+  straat:v.openbare_ruimte_naam,
           huisnummer:v.huisnummer,
           huisletter:v.huisletter || '',
           toevoeging:v.toevoeging || '',
@@ -340,7 +342,9 @@ async function getBAGAddresses(p,o){
       if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
 
       results.push({
-        straat:v.openbare_ruimte_naam,
+  verblijfsobjectId:
+    String(v.identificatie || f.id || ''),
+  straat:v.openbare_ruimte_naam,
         huisnummer:v.huisnummer,
         huisletter:v.huisletter || '',
         toevoeging:v.toevoeging || '',
@@ -367,6 +371,11 @@ async function findRCEByAddress(address){
     const postcode=String(address.postcode || "")
       .replace(/\s+/g,"")
       .toUpperCase();
+
+    const verblijfsobjectId=
+      String(address.verblijfsobjectId || "")
+        .trim()
+        .replace(/^.*\/verblijfsobject\//,"");
 
     const volledigAdres=
       `${straat} ${huisnummer}${huisletter}${toevoeging}`.trim();
@@ -403,15 +412,13 @@ async function findRCEByAddress(address){
       return [];
 
     /*
-     * De RCE API levert hier N-Triples, geen JSON.
-     * Daarom eerst de RDF-triples uitlezen.
+     * RCE levert N-Triples.
+     * De triples worden hieronder eerst verzameld.
      */
 
     const triples=[];
 
-    const lines=raw.split(/\r?\n/);
-
-    for(const line of lines){
+    for(const line of raw.split(/\r?\n/)){
 
       const m=line.match(
         /^<([^>]+)>\s+<([^>]+)>\s+(?:"([^"]*)"|<([^>]+)>)(?:\^\^<[^>]+>)?\s*\.$/
@@ -423,8 +430,14 @@ async function findRCEByAddress(address){
       triples.push({
         subject:m[1],
         predicate:m[2],
-        literal:m[3] !== undefined ? m[3] : null,
-        uri:m[4] !== undefined ? m[4] : null
+        literal:
+          m[3] !== undefined
+            ? m[3]
+            : null,
+        uri:
+          m[4] !== undefined
+            ? m[4]
+            : null
       });
     }
 
@@ -434,27 +447,29 @@ async function findRCEByAddress(address){
 
     const subjects=new Map();
 
-    function addTriple(t){
+    for(const t of triples){
+
       if(!subjects.has(t.subject))
         subjects.set(t.subject,[]);
 
       subjects.get(t.subject).push(t);
     }
 
-    for(const t of triples)
-      addTriple(t);
-
     function getLiteral(subject,predicate){
+
       const list=subjects.get(subject) || [];
 
       const t=list.find(x =>
         x.predicate.endsWith("#"+predicate)
       );
 
-      return t ? (t.literal !== null ? t.literal : t.uri) : "";
+      return t
+        ? (t.literal !== null ? t.literal : t.uri)
+        : "";
     }
 
     function getUri(subject,predicate){
+
       const list=subjects.get(subject) || [];
 
       const t=list.find(x =>
@@ -465,6 +480,7 @@ async function findRCEByAddress(address){
     }
 
     function normalize(value){
+
       return String(value || "")
         .toLowerCase()
         .replace(/\s+/g," ")
@@ -472,67 +488,99 @@ async function findRCEByAddress(address){
     }
 
     /*
-     * Rijksmonumenten zoeken.
+     * Zoek alle Rijksmonumenten in de response.
      */
 
     const results=[];
 
     for(const [monumentSubject,monumentTriples] of subjects){
 
-      const isRijksmonument=monumentTriples.some(t =>
-        t.predicate.endsWith("#type") &&
-        t.uri &&
-        t.uri.endsWith("#Rijksmonument")
-      );
+      const isRijksmonument=
+        monumentTriples.some(t =>
+          t.predicate.endsWith("#type") &&
+          t.uri &&
+          t.uri.endsWith("#Rijksmonument")
+        );
 
       if(!isRijksmonument)
         continue;
 
       /*
        * Rijksmonument
-       *   -> heeftBasisregistratieRelatie
-       *      -> heeftBAGRelatie
+       *   ↓
+       * heeftBasisregistratieRelatie
+       *   ↓
+       * heeftBAGRelatie
        */
 
-      const basisSubject=getUri(
-        monumentSubject,
-        "heeftBasisregistratieRelatie"
-      );
+      const basisSubject=
+        getUri(
+          monumentSubject,
+          "heeftBasisregistratieRelatie"
+        );
 
       if(!basisSubject)
         continue;
 
-      const bagSubject=getUri(
-        basisSubject,
-        "heeftBAGRelatie"
-      );
+      const bagSubject=
+        getUri(
+          basisSubject,
+          "heeftBAGRelatie"
+        );
 
       if(!bagSubject)
         continue;
 
-      const rceStraat=getLiteral(
-        bagSubject,
-        "openbareRuimte"
-      );
+      const rceStraat=
+        getLiteral(
+          bagSubject,
+          "openbareRuimte"
+        );
 
-      const rceHuisnummer=getLiteral(
-        bagSubject,
-        "huisnummer"
-      );
+      const rceHuisnummer=
+        getLiteral(
+          bagSubject,
+          "huisnummer"
+        );
 
-      const rcePostcode=getLiteral(
-        bagSubject,
-        "postcode"
-      );
+      const rcePostcode=
+        getLiteral(
+          bagSubject,
+          "postcode"
+        );
 
       /*
-       * Vergelijk straat + huisnummer + postcode.
-       * Huisletter/toevoeging wordt niet geëist omdat deze
-       * niet in deze RCE-BAGRelatie aanwezig hoeft te zijn.
+       * Dit is de sterkste koppeling:
+       *
+       * BAG verblijfsobject
+       *          =
+       * RCE heeftVerblijfsobject
+       */
+
+      const rceVerblijfsobject=
+        getUri(
+          bagSubject,
+          "heeftVerblijfsobject"
+        );
+
+      const rceVerblijfsobjectId=
+        String(rceVerblijfsobject || "")
+          .replace(/^.*\/verblijfsobject\//,"")
+          .trim();
+
+      const bagIdMatch=
+        verblijfsobjectId &&
+        rceVerblijfsobjectId &&
+        verblijfsobjectId === rceVerblijfsobjectId;
+
+      /*
+       * Fallback voor RCE-relaties waarin het
+       * verblijfsobject niet aanwezig is.
        */
 
       const straatMatch=
-        normalize(rceStraat) === normalize(straat);
+        normalize(rceStraat) ===
+        normalize(straat);
 
       const huisnummerMatch=
         String(rceHuisnummer).trim() ===
@@ -540,29 +588,41 @@ async function findRCEByAddress(address){
 
       const postcodeMatch=
         !postcode ||
-        String(rcePostcode)
-          .replace(/\s+/g,"")
-          .toUpperCase() === postcode;
+        (
+          rcePostcode &&
+          String(rcePostcode)
+            .replace(/\s+/g,"")
+            .toUpperCase() === postcode
+        );
 
-      if(!straatMatch || !huisnummerMatch || !postcodeMatch)
-        continue;
+      const adresMatch=
+        straatMatch &&
+        huisnummerMatch &&
+        postcodeMatch;
 
       /*
-       * Zelfde datastructuur teruggeven als showRCE()
-       * al verwacht.
+       * Een exacte BAG-ID-match heeft voorrang.
+       * Als die niet beschikbaar is, gebruiken we
+       * de adresmatch als fallback.
        */
 
-      const rijksmonumentnummer=getLiteral(
-        monumentSubject,
-        "rijksmonumentnummer"
-      );
+      if(!bagIdMatch && !adresMatch)
+        continue;
 
-      const cultuurhistorischObjectnummer=getLiteral(
-        monumentSubject,
-        "cultuurhistorischObjectnummer"
-      );
+      const rijksmonumentnummer=
+        getLiteral(
+          monumentSubject,
+          "rijksmonumentnummer"
+        );
+
+      const cultuurhistorischObjectnummer=
+        getLiteral(
+          monumentSubject,
+          "cultuurhistorischObjectnummer"
+        );
 
       results.push({
+
         rijksmonumentnummer:
           rijksmonumentnummer ||
           cultuurhistorischObjectnummer,
@@ -573,9 +633,11 @@ async function findRCEByAddress(address){
           huisnummer:rceHuisnummer,
           openbareRuimte:rceStraat,
           postcode:rcePostcode,
+
           heeftVerblijfsobject:
-            getUri(bagSubject,"heeftVerblijfsobject")
+            rceVerblijfsobject
         }
+
       });
     }
 
@@ -588,16 +650,21 @@ async function findRCEByAddress(address){
 
   }catch(e){
 
-    console.error("RCE Rijksmonumenten fout:",e);
+    console.error(
+      "RCE Rijksmonumenten fout:",
+      e
+    );
 
     if(window.rceFlowDebug)
       window.rceFlowDebug(
-        "RCE fetch/parse fout: "+e.message
+        "RCE fetch/parse fout: " +
+        e.message
       );
 
     return [];
   }
 }
+
 /* =========================================================
    RCE FUNCTIE 3
    Toon gevonden Rijksmonumenten als aparte marker.
