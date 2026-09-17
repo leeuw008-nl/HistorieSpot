@@ -388,6 +388,9 @@ async function findRCEByAddress(address){
       "queries/rce/rest-api-rijksmonumenten/run?" +
       params.toString();
 
+    if(window.rceFlowDebug)
+      window.rceFlowDebug(`RCE URL: ${url}`);
+
     const res=await fetch(url);
     const contentType=res.headers.get("content-type") || "";
     const raw=await res.text();
