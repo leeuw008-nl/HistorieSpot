@@ -101,7 +101,7 @@ jobs:
           s = s[:start] + new_func + s[end:]
 
           # Pass the object context needed by the fallback BAG lookup.
-          s = s.replace('const addresses = await getBAGAddresses(p);', 'const addresses = await getBAGAddresses(p,o);')
+          s = re.sub(r'await getBAGAddresses\(p\)\s*;', 'await getBAGAddresses(p,o);', s)
 
           # Do not let an intermediate empty BAG result overwrite the useful RCE diagnosis.
           s = re.sub(
