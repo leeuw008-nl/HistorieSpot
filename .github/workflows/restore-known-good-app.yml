@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Restore app.js from known working commit
         run: |
           git checkout a60892a6f0eff6cd39553986e93902ee465341d3 -- app.js
