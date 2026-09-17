@@ -79,6 +79,13 @@ jobs:
                 else if(typeof rel==='string') hrefs.push(rel);
                 else if(rel && rel.href) hrefs.push(rel.href);
 
+                if(v["pand.href"]){
+                  if(Array.isArray(v["pand.href"]))
+                    v["pand.href"].forEach(h=>hrefs.push(h));
+                  else
+                    hrefs.push(v["pand.href"]);
+                }
+
                 if(!hrefs.some(h=>String(h).includes(String(p.identificatie)))) continue;
                 if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
 
@@ -100,7 +107,6 @@ jobs:
           s = s[:start] + new_func + s[end:]
           s = re.sub(r'await getBAGAddresses\(p\)\s*;', 'await getBAGAddresses(p,o);', s)
 
-          # The known-good app builds the RCE URL from two adjacent JS strings.
           s = s.replace(
               '"https://api.linkeddata.cultureelerfgoed.nl/" +\n    "rest-api-rijksmonumenten/run?"',
               '"https://api.linkeddata.cultureelerfgoed.nl/" +\n    "queries/rce/rest-api-rijksmonumenten/run?"'
@@ -131,12 +137,13 @@ jobs:
               'async function findRCEByAddress',
               'function showRCE',
               'getBAGAddresses(p,o)',
-              'queries/rce/rest-api-rijksmonumenten/run?'
+              'queries/rce/rest-api-rijksmonumenten/run?',
+              'v["pand.href"]'
           ]
           for x in required:
               if x not in s:
                   raise SystemExit(f'Missing expected code: {x}')
           PY
           git add app.js
-          git commit -m "Restore RCE and fix BAG address matching"
+          git commit -m "Restore RCE and fix BAG pand.href matching"
           git push
