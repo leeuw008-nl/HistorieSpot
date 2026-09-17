@@ -572,6 +572,12 @@ async function findRCEByAddress(address){
         huisnummerMatch &&
         postcodeMatch;
 
+      /* TIJDELIJKE DIAGNOSE: RCE adresvergelijking */
+      if(window.rceFlowDebug)
+        window.rceFlowDebug(
+          `ADRES-CHECK | BAG: ${straat} ${huisnummer} ${postcode || "geen postcode"} | RCE: ${rceStraat} ${rceHuisnummer} ${rcePostcode || "geen postcode"} | straat:${straatMatch ? "JA" : "NEE"} huisnummer:${huisnummerMatch ? "JA" : "NEE"} postcode:${postcodeMatch ? "JA" : "NEE"}`
+        );
+
       if(!bagIdMatch && !adresMatch)
         continue;
 
