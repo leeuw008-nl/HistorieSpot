@@ -525,6 +525,9 @@ async function loadRCEForPand(o){
 
   const addresses=
     await getBAGAddresses(p,o);
+  if(window.rceFlowDebug) window.rceFlowDebug(
+    "FLOW → BAG-adressen terug: " + addresses.length
+  );
 
   if(!addresses.length){
     return;
@@ -532,6 +535,10 @@ async function loadRCEForPand(o){
 
   for(const address of addresses){
 
+    if(window.rceFlowDebug) window.rceFlowDebug(
+      "FLOW → findRCEByAddress aanroep voor " +
+      address.straat + " " + address.huisnummer
+    );
     const monuments=
       await findRCEByAddress(address);
 
