@@ -88,13 +88,10 @@
       const response=await originalFetch.apply(this,arguments);
       if(!isRCE && !isVO && !isVOCollection) return response;
       try{
-        const data=await response.clone().json();
+        const raw=await response.clone().text();
         if(isRCE){
-          const count=Array.isArray(data) ? data.length : (Array.isArray(data.data) ? data.data.length : 'geen array');
-          let nr='';
-          const first=Array.isArray(data) ? data[0] : (Array.isArray(data.data) ? data.data[0] : null);
-          if(first) nr=first.rijksmonumentnummer || first.cultuurhistorischObjectnummer || '';
-          showDebug('RCE HTTP '+response.status+' → '+count+' resultaat/resultaten'+(nr?' → monument '+nr:''));
+          showDebug('RCE HTTP '+response.status+' → '+raw.length+' bytes');
+          showDebug('RCE RAW → '+raw.substring(0,300));
         }else if(isVO){
           const v=data && Array.isArray(data.features) && data.features.length ? data.features[0].properties || {} : (data.properties || {});
           const adres=[v.openbare_ruimte_naam,v.huisnummer,v.huisletter||'',v.toevoeging||''].join(' ').replace(/\s+/g,' ').trim();
