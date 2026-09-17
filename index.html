@@ -15,12 +15,12 @@
   <header class="app-header">
     <button id="menuBtn" class="icon-btn" aria-label="Menu"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg></button>
     <div class="header-title"><h1>HistorieSpot</h1></div>
-    <button id="infoBtn" class="icon-btn" aria-label="Info"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M11 7h2v2h-2V7m0 4h2v6h-2v-6m1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></button>
+    <button id="infoBtn" class="icon-btn" aria-label="Info"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M11 7h2v2h-2V7m0 4h2v6h-2v-6m1-9C6.48 2 2 6.48 2 12s4.48 10 10 10S22 17.52 22 12 17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></button>
   </header>
 
   <div id="menuOverlay" class="overlay hidden"></div>
   <nav id="sideMenu" class="side-menu">
-    <div class="side-menu-header"><strong>Menu</strong><button id="closeMenuBtn" class="icon-btn small" aria-label="Sluiten"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l1.41 1.41L7.83 11H20v2H7.83l5.59 5.59L12 20l-8-8 8-8 1.41 1.41L7.83 11H20z"/></svg></button></div>
+    <div class="side-menu-header"><strong>Menu</strong><button id="closeMenuBtn" class="icon-btn small" aria-label="Sluiten"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l5.59 5.59L12 20l-8-8 8-8 1.41 1.41L7.83 13H20v-2z"/></svg></button></div>
     <div class="side-menu-content">
       <div class="menu-section"><h3>Zoeken</h3><label for="radius">Zoekradius</label><select id="radius"><option value="25">25 meter</option><option value="50" selected>50 meter</option><option value="100">100 meter</option><option value="250">250 meter</option><option value="500">500 meter</option></select><p class="menu-hint">Gebouwen binnen deze radius tonen hun bouwjaar direct op de kaart.</p></div>
       <div style="margin-top:12px">
@@ -62,37 +62,32 @@
     <div id="status" class="status-toast">Druk op het kompas-icoontje om je positie te bepalen.</div>
   </main>
 
-  <!-- TIJDELIJKE RCE-DIAGNOSE: blijft zichtbaar zodat latere statusmeldingen hem niet overschrijven. -->
+  <!-- TIJDELIJKE RCE-DIAGNOSE -->
   <script>
   (function(){
     const originalFetch=window.fetch;
     const events=[];
-
     function showDebug(text){
       let box=document.getElementById('rceDebug');
       if(!box){
         box=document.createElement('div');
         box.id='rceDebug';
-        box.style.cssText='position:fixed;left:8px;right:8px;bottom:70px;z-index:9999;background:rgba(255,255,255,.96);border:2px solid #7b1e1e;border-radius:6px;padding:8px;font:12px/1.35 Arial,sans-serif;max-height:145px;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+        box.style.cssText='position:fixed;left:8px;right:8px;bottom:70px;z-index:9999;background:rgba(255,255,255,.96);border:2px solid #7b1e1e;border-radius:6px;padding:8px;font:12px/1.35 Arial,sans-serif;max-height:180px;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,.25)';
         document.body.appendChild(box);
       }
       events.push(text);
-      box.innerHTML='<b>RCE-diagnose</b><br>'+events.slice(-6).map(s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;')).join('<br>');
+      box.innerHTML='<b>RCE-diagnose</b><br>'+events.slice(-10).map(s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;')).join('<br>');
     }
-
+    window.rceFlowDebug=showDebug;
     window.fetch=async function(input,init){
       const url=String(input && input.url ? input.url : input || '');
       const isRCE=url.includes('api.linkeddata.cultureelerfgoed.nl/queries/rce/rest-api-rijksmonumenten/run');
       const isVO=url.includes('/verblijfsobject/');
       const isVOCollection=url.includes('/collections/verblijfsobject/items');
-
       const response=await originalFetch.apply(this,arguments);
-
       if(!isRCE && !isVO && !isVOCollection) return response;
-
       try{
         const data=await response.clone().json();
-
         if(isRCE){
           const count=Array.isArray(data) ? data.length : (Array.isArray(data.data) ? data.data.length : 'geen array');
           let nr='';
@@ -110,14 +105,29 @@
       }catch(e){
         showDebug((isRCE?'RCE':'BAG verblijfsobject')+' response kon niet als JSON worden gelezen');
       }
-
       return response;
     };
   })();
   </script>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=20260917-3"></script>
+  <script src="app.js?v=20260917-4"></script>
+
+  <!-- TIJDELIJKE RCE FLOW-DIAGNOSE: alleen observatie van bestaande setStatus()-meldingen. -->
+  <script>
+  (function(){
+    const start=Date.now();
+    const oldStatus=window.setStatus;
+    const originalTextSetter=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'textContent').set;
+    if(typeof oldStatus==='function'){
+      window.setStatus=function(t){
+        try{ if(window.rceFlowDebug && /RCE|BAG verblijfsobject|adres/i.test(String(t))) window.rceFlowDebug('FLOW '+(Date.now()-start)+'ms → '+String(t)); }catch(e){}
+        return oldStatus.apply(this,arguments);
+      };
+    }
+    window.rceFlowDebug && window.rceFlowDebug('FLOW → diagnose geladen');
+  })();
+  </script>
 
   <!-- HisGIS 1832: alleen aanvullende status, geen tweede kaart-popup -->
   <script>
@@ -125,18 +135,14 @@
     const t=setInterval(()=>{
       if(!window.map) return;
       clearInterval(t);
-
       const toggle=document.getElementById('toggleHisGIS');
       if(!toggle) return;
-
       const updateHisGISStatus=()=>{
         if(toggle.checked){
           const current=(document.getElementById('status')||{}).textContent||'';
-          if(!current || current.startsWith('Klik op kaart met HisGIS'))
-            return;
+          if(!current || current.startsWith('Klik op kaart met HisGIS')) return;
         }
       };
-
       toggle.addEventListener('change',updateHisGISStatus);
     },500);
   })();
