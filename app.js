@@ -370,17 +370,10 @@ async function findRCEByAddress(address){
     const huisnummer=String(address.huisnummer || "").trim();
     const huisletter=String(address.huisletter || "").trim();
     const toevoeging=String(address.toevoeging || "").trim();
-    const postcode=String(address.postcode || "")
-      .replace(/\s+/g,"")
-      .toUpperCase();
-
     const verblijfsobjectId=
       String(address.verblijfsobjectId || "")
         .trim()
         .replace(/^.*\/verblijfsobject\//,"");
-
-    const volledigAdres=
-      `${straat} ${huisnummer}${huisletter}${toevoeging}`.trim();
 
     if(straat)
       params.set("straat",straat);
@@ -391,23 +384,7 @@ async function findRCEByAddress(address){
       "page=1&pageSize=10&straat=" +
       encodeURIComponent(rceStraat);
 
-    if(window.rceFlowDebug)
-      window.rceFlowDebug(`RCE URL: ${url}`);
-
     const res=await fetch(url);
-    const contentType=res.headers.get("content-type") || "";
-    const raw=await res.text();
-
-    const diagnose=
-      `RCE HTTP ${res.status} | type: ${contentType} | lengte: ${raw.length}`;
-
-    console.log(diagnose);
-
-    if(window.rceFlowDebug)
-      window.rceFlowDebug(diagnose);
-
-    setStatus(`RCE URL: ${url} | ${diagnose}`);
-
     if(!res.ok || !raw.trim())
       return [];
 
@@ -544,12 +521,6 @@ async function findRCEByAddress(address){
         rceVerblijfsobjectId &&
         verblijfsobjectId === rceVerblijfsobjectId;
 
-      /* TIJDELIJKE DIAGNOSE: BAG-ID -> RCE-ID */
-      if(window.rceFlowDebug)
-        window.rceFlowDebug(
-          `BAG-ID: ${verblijfsobjectId || "ontbreekt"} | RCE-ID: ${rceVerblijfsobjectId || "ontbreekt"} | BAG-ID MATCH: ${bagIdMatch ? "JA" : "NEE"}`
-        );
-
       const straatMatch=
         normalize(rceStraat) ===
         normalize(straat);
@@ -558,19 +529,9 @@ async function findRCEByAddress(address){
         String(rceHuisnummer).trim() ===
         String(huisnummer).trim();
 
-      const postcodeMatch=
-        !postcode ||
-        (
-          rcePostcode &&
-          String(rcePostcode)
-            .replace(/\s+/g,"")
-            .toUpperCase() === postcode
-        );
-
       const adresMatch=
         straatMatch &&
-        huisnummerMatch &&
-        postcodeMatch;
+        huisnummerMatch;
 
       if(!bagIdMatch && !adresMatch)
         continue;
@@ -607,11 +568,6 @@ async function findRCEByAddress(address){
       });
     }
 
-    if(window.rceFlowDebug)
-      window.rceFlowDebug(
-        `RCE match: ${results.length} monument(en)`
-      );
-
     return results;
 
   }catch(e){
@@ -620,12 +576,6 @@ async function findRCEByAddress(address){
       "RCE Rijksmonumenten fout:",
       e
     );
-
-    if(window.rceFlowDebug)
-      window.rceFlowDebug(
-        "RCE fetch/parse fout: " +
-        e.message
-      );
 
     return [];
   }
