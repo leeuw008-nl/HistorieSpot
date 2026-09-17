@@ -1,9 +1,0 @@
-name: Test RCE diagnose patch
-on: push
-permissions:
-  contents: write
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo hello
