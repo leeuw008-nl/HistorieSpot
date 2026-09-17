@@ -265,61 +265,39 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 
 async function getBAGAddresses(p){
 
-  if(!p || !Array.isArray(p.verblijfsobject))
-    return [];
-
-  const hrefs=p.verblijfsobject
-    .map(v=>v && v.href)
-    .filter(Boolean);
-
-  if(!hrefs.length)
-    return [];
-
   const results=[];
 
-  for(const href of hrefs){
+  if(p && Array.isArray(p.verblijfsobject)){
+    const hrefs=p.verblijfsobject
+      .map(v=>v && (v.href || v))
+      .filter(Boolean);
 
-    try{
-
-      const res=await fetch(href);
-
-      if(!res.ok)
-        continue;
-
-      const data=await res.json();
-
-      const v=data.properties || {};
-
-      if(
-        !v.openbare_ruimte_naam ||
-        !v.huisnummer ||
-        !v.woonplaats_naam
-      ){
-        continue;
+    for(const href of hrefs){
+      try{
+        const res=await fetch(href);
+        if(!res.ok) continue;
+        const data=await res.json();
+        const v=data && Array.isArray(data.features) && data.features.length
+          ? (data.features[0].properties || {})
+          : (data.properties || {});
+        if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
+        results.push({
+          straat:v.openbare_ruimte_naam,
+          huisnummer:v.huisnummer,
+          huisletter:v.huisletter || '',
+          toevoeging:v.toevoeging || '',
+          postcode:v.postcode || '',
+          woonplaats:v.woonplaats_naam
+        });
+      }catch(e){
+        console.error('BAG verblijfsobject fout:',href,e);
       }
-
-      results.push({
-        straat:v.openbare_ruimte_naam,
-        huisnummer:v.huisnummer,
-        huisletter:v.huisletter || "",
-        toevoeging:v.toevoeging || "",
-        postcode:v.postcode || "",
-        woonplaats:v.woonplaats_naam
-      });
-
-    }catch(e){
-
-      console.error(
-        "BAG verblijfsobject fout:",
-        href,
-        e
-      );
-
     }
-
   }
 
-  return results;
+  if(results.length) return results;
+
+  return [];
 }
 
 
@@ -570,6 +548,8 @@ async function loadRCEForPand(o){
 
 async function loadBAG(lat,lng,radius){
 
+  window.rceDiagnosisShown=false;
+
   bagLayer.clearLayers();
   bagLabel.clearLayers();
 
@@ -740,9 +720,8 @@ async function loadBAG(lat,lng,radius){
     });
 
 
-    setStatus(
-      `${list.length} BAG binnen ${radius}m`
-    );
+    if(!window.rceDiagnosisShown)
+      setStatus(`${list.length} BAG binnen ${radius}m`);
 
   }catch(e){
 
