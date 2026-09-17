@@ -14,11 +14,130 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore app.js from known working commit
+      - name: Restore known-good app.js and patch BAG/RCE
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout a60892a6f0eff6cd39553986e93902ee465341d3 -- app.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('app.js')
+          s = p.read_text(encoding='utf-8')
+
+          # Replace the old BAG-address resolver with the robust current BAG OGC schema handling.
+          start = s.find('async function getBAGAddresses(')
+          end = s.find('async function findRCEByAddress', start)
+          if start < 0 or end < 0:
+              raise SystemExit('BAG/RCE function markers not found')
+
+          new_func = r'''async function getBAGAddresses(p,o){
+            const results=[];
+
+            if(p && Array.isArray(p.verblijfsobject)){
+              const hrefs=p.verblijfsobject.map(v=>v && (v.href || v)).filter(Boolean);
+              for(const href of hrefs){
+                try{
+                  const res=await fetch(href);
+                  if(!res.ok) continue;
+                  const data=await res.json();
+                  const v=data && Array.isArray(data.features) && data.features.length
+                    ? (data.features[0].properties || {})
+                    : (data.properties || {});
+                  if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
+                  results.push({
+                    straat:v.openbare_ruimte_naam,
+                    huisnummer:v.huisnummer,
+                    huisletter:v.huisletter || '',
+                    toevoeging:v.toevoeging || '',
+                    postcode:v.postcode || '',
+                    woonplaats:v.woonplaats_naam
+                  });
+                }catch(e){ console.error('BAG verblijfsobject fout:',href,e); }
+              }
+            }
+
+            if(results.length) return results;
+            if(!p || !p.identificatie || !o || !o.c) return [];
+
+            try{
+              const b=box(o.c.lat,o.c.lng,50);
+              const url=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=100&f=json`;
+              const res=await fetch(url);
+              if(!res.ok) return [];
+              const data=await res.json();
+              const features=Array.isArray(data.features) ? data.features : [];
+
+              for(const f of features){
+                const v=f.properties || {};
+                const rel=v.pand;
+                const hrefs=[];
+                if(Array.isArray(rel)) rel.forEach(r=>{
+                  if(typeof r==='string') hrefs.push(r);
+                  else if(r && r.href) hrefs.push(r.href);
+                });
+                else if(typeof rel==='string') hrefs.push(rel);
+                else if(rel && rel.href) hrefs.push(rel.href);
+
+                if(!hrefs.some(h=>String(h).includes(String(p.identificatie)))) continue;
+                if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
+
+                results.push({
+                  straat:v.openbare_ruimte_naam,
+                  huisnummer:v.huisnummer,
+                  huisletter:v.huisletter || '',
+                  toevoeging:v.toevoeging || '',
+                  postcode:v.postcode || '',
+                  woonplaats:v.woonplaats_naam
+                });
+              }
+            }catch(e){ console.error('BAG VO zoekfout:',e); }
+
+            return results;
+          }
+
+          '''
+          s = s[:start] + new_func + s[end:]
+
+          # Pass the object context needed by the fallback BAG lookup.
+          s = s.replace('const addresses = await getBAGAddresses(p);', 'const addresses = await getBAGAddresses(p,o);')
+
+          # Do not let an intermediate empty BAG result overwrite the useful RCE diagnosis.
+          s = re.sub(
+              r'\s*setStatus\([^;\n]*BAG-pand heeft geen bruikbaar verblijfsobject-adres[^;\n]*\);',
+              '',
+              s
+          )
+
+          # Reset the diagnosis flag at each BAG load if that function exists.
+          marker = 'async function loadBAG('
+          pos = s.find(marker)
+          if pos >= 0:
+              brace = s.find('{', pos)
+              if brace >= 0 and 'window.rceDiagnosisShown=false;' not in s[brace:brace+250]:
+                  s = s[:brace+1] + '\n  window.rceDiagnosisShown=false;' + s[brace+1:]
+
+          # Guard a final generic BAG status so it cannot overwrite an RCE result.
+          s = s.replace(
+              'setStatus(`BAG: ${panden.length} pand(en) gevonden`);',
+              'if(!window.rceDiagnosisShown) setStatus(`BAG: ${panden.length} pand(en) gevonden`);'
+          )
+
+          p.write_text(s, encoding='utf-8')
+
+          # Sanity checks: the restored app must contain the RCE pipeline and the patched BAG resolver.
+          required = [
+              'const rceLayer=',
+              'async function getBAGAddresses(p,o)',
+              'async function findRCEByAddress',
+              'async function showRCE',
+              'getBAGAddresses(p,o)'
+          ]
+          for x in required:
+              if x not in s:
+                  raise SystemExit(f'Missing expected code: {x}')
+          PY
           git add app.js
-          git commit -m "Restore working app.js from known good commit"
+          git commit -m "Restore RCE and fix BAG address matching"
           git push
