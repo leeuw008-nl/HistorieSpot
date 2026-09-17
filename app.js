@@ -385,7 +385,11 @@ async function findRCEByAddress(address){
       encodeURIComponent(rceStraat);
 
     const res=await fetch(url);
-    if(!res.ok || !raw.trim())
+    if(!res.ok)
+      return [];
+
+    const raw=await res.text();
+    if(!raw.trim())
       return [];
 
     const triples=[];
