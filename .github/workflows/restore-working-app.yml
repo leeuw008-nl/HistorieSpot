@@ -103,6 +103,12 @@ jobs:
           # Pass the object context needed by the fallback BAG lookup.
           s = re.sub(r'await getBAGAddresses\(p\)\s*;', 'await getBAGAddresses(p,o);', s)
 
+          # Use the documented RCE HVDL Rijksmonumenten API path.
+          s = s.replace(
+              'https://api.linkeddata.cultureelerfgoed.nl/rest-api-rijksmonumenten/run?',
+              'https://api.linkeddata.cultureelerfgoed.nl/queries/rce/rest-api-rijksmonumenten/run?'
+          )
+
           # Do not let an intermediate empty BAG result overwrite the useful RCE diagnosis.
           s = re.sub(
               r'\s*setStatus\([^;\n]*BAG-pand heeft geen bruikbaar verblijfsobject-adres[^;\n]*\);',
@@ -132,7 +138,8 @@ jobs:
               'async function getBAGAddresses(p,o)',
               'async function findRCEByAddress',
               'function showRCE',
-              'getBAGAddresses(p,o)'
+              'getBAGAddresses(p,o)',
+              'queries/rce/rest-api-rijksmonumenten/run?'
           ]
           for x in required:
               if x not in s:
