@@ -12,11 +12,59 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore app.js from known working commit
+      - name: Restore app.js and patch BAG RCE only
         run: |
           git checkout a60892a6f0eff6cd39553986e93902ee465341d3 -- app.js
+          node <<'NODE'
+          const fs=require('fs');
+          const p='app.js';
+          let s=fs.readFileSync(p,'utf8');
+          const start=s.indexOf('async function getBAGAddresses(p){');
+          const end=s.indexOf('\n\n\n/* =========================================================\n   RCE FUNCTIE 2',start);
+          if(start<0||end<0) throw new Error('getBAGAddresses block not found');
+          const fn=`async function getBAGAddresses(p){
+
+            const results=[];
+
+            if(p && Array.isArray(p.verblijfsobject)){
+              const hrefs=p.verblijfsobject
+                .map(v=>v && (v.href || v))
+                .filter(Boolean);
+
+              for(const href of hrefs){
+                try{
+                  const res=await fetch(href);
+                  if(!res.ok) continue;
+                  const data=await res.json();
+                  const v=data && Array.isArray(data.features) && data.features.length
+                    ? (data.features[0].properties || {})
+                    : (data.properties || {});
+                  if(!v.openbare_ruimte_naam || !v.huisnummer || !v.woonplaats_naam) continue;
+                  results.push({
+                    straat:v.openbare_ruimte_naam,
+                    huisnummer:v.huisnummer,
+                    huisletter:v.huisletter || '',
+                    toevoeging:v.toevoeging || '',
+                    postcode:v.postcode || '',
+                    woonplaats:v.woonplaats_naam
+                  });
+                }catch(e){
+                  console.error('BAG verblijfsobject fout:',href,e);
+                }
+              }
+            }
+
+            if(results.length) return results;
+
+            return [];
+          }`;
+          s=s.slice(0,start)+fn+s.slice(end);
+          s=s.replace('async function loadBAG(lat,lng,radius){\n\n','async function loadBAG(lat,lng,radius){\n\n  window.rceDiagnosisShown=false;\n\n');
+          s=s.replace('    setStatus(\n      `${list.length} BAG binnen ${radius}m`\n    );','    if(!window.rceDiagnosisShown)\n      setStatus(`${list.length} BAG binnen ${radius}m`);');
+          fs.writeFileSync(p,s);
+          NODE
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app.js
-          git commit -m 'Restore app.js from known working commit' || exit 0
+          git commit -m 'Restore app.js and fix BAG RCE address matching'
           git push
