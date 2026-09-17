@@ -131,7 +131,7 @@ jobs:
               'const rceLayer=',
               'async function getBAGAddresses(p,o)',
               'async function findRCEByAddress',
-              'async function showRCE',
+              'function showRCE',
               'getBAGAddresses(p,o)'
           ]
           for x in required:
