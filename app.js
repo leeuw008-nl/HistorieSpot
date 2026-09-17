@@ -380,14 +380,8 @@ async function findRCEByAddress(address){
     const volledigAdres=
       `${straat} ${huisnummer}${huisletter}${toevoeging}`.trim();
 
-    if(volledigAdres)
-      params.set("volledigAdres",volledigAdres);
-
     if(straat)
       params.set("straat",straat);
-
-    if(postcode)
-      params.set("postcode",postcode);
 
     const url=
       "https://api.linkeddata.cultureelerfgoed.nl/" +
