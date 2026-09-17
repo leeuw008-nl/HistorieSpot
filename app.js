@@ -737,6 +737,7 @@ async function loadBAG(lat,lng,radius){
         Rijksmonument.
       */
 
+      if(window.rceFlowDebug) window.rceFlowDebug("FLOW → loadRCEForPand aanroep");
       loadRCEForPand(o);
 
     });
