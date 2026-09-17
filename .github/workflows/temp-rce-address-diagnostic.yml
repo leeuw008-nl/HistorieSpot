@@ -42,3 +42,5 @@ jobs:
           git add app.js
           git commit -m 'Add temporary RCE address diagnostics'
           git push
+
+# trigger
