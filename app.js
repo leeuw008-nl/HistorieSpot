@@ -386,7 +386,8 @@ async function findRCEByAddress(address){
     const url=
       "https://api.linkeddata.cultureelerfgoed.nl/" +
       "queries/rce/rest-api-rijksmonumenten/run?" +
-      params.toString();
+      "page=1&pageSize=10&straat=" +
+      encodeURIComponent(straat);
 
     if(window.rceFlowDebug)
       window.rceFlowDebug(`RCE URL: ${url}`);
