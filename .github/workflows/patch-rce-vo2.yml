@@ -1,0 +1,44 @@
+name: Fix RCE VO relation
+on:
+  push:
+    branches: [main]
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[skip rce vo2]') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch app.js
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app.js')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('const rel=v["pand.href"];','const rel=v.pand;')
+          s=s.replace('''  bagLayer.clearLayers();
+  bagLabel.clearLayers();''','''  window.rceDiagnosisShown=false;
+
+  bagLayer.clearLayers();
+  bagLabel.clearLayers();''',1)
+          s=s.replace('''    const hrefs=Array.isArray(rel)
+      ? rel
+      : (rel ? [rel] : []);''','''    const hrefs=Array.isArray(rel)
+      ? rel.map(x=>typeof x === "string" ? x : (x && (x.href || x.uri || x.id))).filter(Boolean)
+      : (rel ? [rel] : []);''')
+          s=s.replace('''    const hoortBijPand=hrefs.some(h=>
+      String(h).includes(String(p.identificatie))
+    );''','''    const hoortBijPand=hrefs.some(h=>
+      String(h).includes(String(p.identificatie))
+    );''')
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix BAG pand relatie en RCE diagnose reset [skip rce vo2]"
+          git push
