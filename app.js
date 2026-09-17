@@ -365,6 +365,8 @@ async function findRCEByAddress(address){
     params.set("pageSize","10");
 
     const straat=String(address.straat || "").trim();
+    const rceStraat=
+      straat ? straat.charAt(0).toUpperCase()+straat.slice(1) : "";
     const huisnummer=String(address.huisnummer || "").trim();
     const huisletter=String(address.huisletter || "").trim();
     const toevoeging=String(address.toevoeging || "").trim();
@@ -387,7 +389,7 @@ async function findRCEByAddress(address){
       "https://api.linkeddata.cultureelerfgoed.nl/" +
       "queries/rce/rest-api-rijksmonumenten/run?" +
       "page=1&pageSize=10&straat=" +
-      encodeURIComponent(straat);
+      encodeURIComponent(rceStraat);
 
     if(window.rceFlowDebug)
       window.rceFlowDebug(`RCE URL: ${url}`);
