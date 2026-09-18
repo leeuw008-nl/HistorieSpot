@@ -949,7 +949,8 @@ async function loadBAG(lat,lng,radius){
 
       bagLabel.addLayer(lab);
 
-      loadRCEForPand(o);
+      // TIJDELIJK UIT tijdens WFS-test:
+      // loadRCEForPand(o);
 
     });
 
@@ -1059,7 +1060,7 @@ map.on("click",async e=>{
 yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 window.addEventListener("load",()=>{
-  setTimeout(testOverijsselMonumentenWFS,1800);
+  setTimeout(testOverijsselMonumentenWFS,2500);
   if(toggleKadasterColors)toggleKadasterColors.checked=true;
   setTimeout(()=>{
     if(navigator.geolocation){
