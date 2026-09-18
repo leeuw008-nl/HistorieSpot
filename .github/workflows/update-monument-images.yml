@@ -1,0 +1,182 @@
+name: Update gemeentelijke monumentafbeeldingen
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 1 * *"
+  push:
+    paths:
+      - ".github/workflows/update-monument-images.yml"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Haal officiële publicatie op en bouw afbeeldingsindex
+        shell: python
+        run: |
+          from pathlib import Path
+          from html.parser import HTMLParser
+          from urllib.parse import urljoin
+          import json
+          import re
+          import urllib.request
+          from datetime import datetime, timezone
+
+          SOURCE = "https://zoek.officielebekendmakingen.nl/gmb-2026-30438.html"
+          OUT = Path("data/gemeente-monumenten-afbeeldingen.json")
+
+          req = urllib.request.Request(SOURCE, headers={"User-Agent": "HistorieSpot/1.0"})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              html = r.read().decode("utf-8")
+
+          class Parser(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.blocks = []
+                  self.current = None
+                  self.heading = None
+                  self.row = None
+                  self.cell = None
+
+              def handle_starttag(self, tag, attrs):
+                  a = dict(attrs)
+                  tag = tag.lower()
+
+                  if tag in ("h1","h2","h3","h4","h5","h6"):
+                      self.heading = []
+
+                  if tag == "tr":
+                      self.row = []
+                  elif tag in ("th","td") and self.row is not None:
+                      self.cell = []
+                  elif tag == "img" and self.current is not None:
+                      src = a.get("src") or a.get("data-src") or a.get("data-lazy-src")
+                      if src:
+                          self.current["images"].append({
+                              "url": urljoin(SOURCE, src),
+                              "label": a.get("alt") or a.get("title") or Path(src.split("?")[0]).name
+                          })
+
+                  if tag == "a" and self.current is not None:
+                      href = a.get("href","")
+                      if re.search(r"\.(?:jpe?g|png|webp)(?:[?#].*)?$", href, re.I):
+                          self.current["images"].append({
+                              "url": urljoin(SOURCE, href),
+                              "label": Path(href.split("?")[0]).name
+                          })
+
+              def handle_endtag(self, tag):
+                  tag = tag.lower()
+
+                  if tag in ("h1","h2","h3","h4","h5","h6") and self.heading is not None:
+                      text = re.sub(r"\s+", " ", "".join(self.heading)).strip()
+                      m = re.search(r"\bGM[- ](\d+)\b", text, re.I)
+                      if m:
+                          if self.current is not None:
+                              self.blocks.append(self.current)
+                          self.current = {
+                              "gm": f"GM-{int(m.group(1)):02d}",
+                              "heading": text,
+                              "rows": [],
+                              "images": []
+                          }
+                      self.heading = None
+
+                  if tag in ("th","td") and self.cell is not None:
+                      value = re.sub(r"\s+", " ", "".join(self.cell)).strip()
+                      self.row.append(value)
+                      self.cell = None
+
+                  if tag == "tr" and self.row is not None:
+                      if self.current is not None and self.row:
+                          self.current["rows"].append(self.row)
+                      self.row = None
+
+              def handle_data(self, data):
+                  if self.heading is not None:
+                      self.heading.append(data)
+                  if self.cell is not None:
+                      self.cell.append(data)
+
+          parser = Parser()
+          parser.feed(html)
+          if parser.current is not None:
+              parser.blocks.append(parser.current)
+
+          def norm(s):
+              s = str(s or "").lower().replace("’","'").replace("–","-").replace("—","-")
+              return re.sub(r"\s+", " ", s).strip()
+
+          records = []
+          for b in parser.blocks:
+              address = ""
+              for row in b["rows"]:
+                  if len(row) >= 2 and norm(row[0]) == "adres":
+                      address = row[1]
+                      break
+
+              images = []
+              seen = set()
+              for img in b["images"]:
+                  u = img["url"]
+                  if not re.search(r"\.(?:jpe?g|png|webp)(?:[?#].*)?$", u, re.I):
+                      continue
+                  if u in seen:
+                      continue
+                  seen.add(u)
+                  images.append(img)
+
+              if not images:
+                  continue
+
+              street = ""
+              house = ""
+              if address:
+                  m = re.match(r"^(.*?)[, ]+([0-9]+(?:[-/][0-9A-Za-z]+)?(?:[A-Za-z])?)\s*(?:,|$)", address, re.I)
+                  if m:
+                      street = m.group(1).strip()
+                      house = m.group(2).strip()
+                  else:
+                      street = address.split(",")[0].strip()
+
+              records.append({
+                  "gm": b["gm"],
+                  "heading": b["heading"],
+                  "address": address,
+                  "street": street,
+                  "house": house,
+                  "images": images
+              })
+
+          if not records:
+              raise SystemExit("Geen gemeentelijke monumenten met afbeeldingen gevonden; publicatieparser gestopt.")
+
+          OUT.parent.mkdir(parents=True, exist_ok=True)
+          OUT.write_text(json.dumps({
+              "source": SOURCE,
+              "publication": "Gemeenteblad 2026, 30438",
+              "generated": datetime.now(timezone.utc).isoformat(),
+              "monuments": records
+          }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+          print(f"{len(records)} monumenten met afbeeldingen gevonden.")
+          for r in records:
+              print(r["gm"], r["address"], len(r["images"]))
+
+      - name: Commit gegenereerde index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/gemeente-monumenten-afbeeldingen.json
+          if git diff --cached --quiet; then
+            echo "Geen wijzigingen."
+            exit 0
+          fi
+          git commit -m "Update gemeentelijke monumentafbeeldingen"
+          git push
