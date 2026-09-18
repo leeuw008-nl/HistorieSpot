@@ -258,6 +258,49 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 );
 
 
+
+/* =========================================================
+   TIJDELIJKE OVERIJSSEL MONUMENTEN WFS-TEST
+   ========================================================= */
+async function testOverijsselMonumentenWFS(){
+  const rd=wgs84ToRD(52.516,6.420);
+  const minX=rd.x-500, minY=rd.y-500, maxX=rd.x+500, maxY=rd.y+500;
+  const layers=[
+    {name:"B73_Rijksmonumenten",label:"Rijksmonumenten"},
+    {name:"B73_Gemeentelijke_Monumenten",label:"Gemeentelijke monumenten"}
+  ];
+
+  setStatus("Overijssel WFS-test wordt uitgevoerd...");
+  const results=[];
+
+  for(const layer of layers){
+    try{
+      const params=new URLSearchParams({
+        service:"WFS",version:"2.0.0",request:"GetFeature",
+        typeNames:`B73_Cultuur:${layer.name}`,
+        srsName:"EPSG:28992",
+        bbox:`${minX},${minY},${maxX},${maxY},EPSG:28992`,
+        outputFormat:"application/json",count:"100"
+      });
+      const res=await fetch(`https://services.geodataoverijssel.nl/geoserver/B73_Cultuur/wfs?${params}`);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data=await res.json();
+      const features=Array.isArray(data.features)?data.features:[];
+      const first=features[0]||null;
+      const props=first&&first.properties?first.properties:{};
+      const geometry=first&&first.geometry?first.geometry:null;
+      const keys=Object.keys(props);
+      const sample=keys.slice(0,8).map(k=>`${k}=${props[k]}`).join(" | ");
+      results.push(`${layer.label}: ${features.length} features; velden: ${keys.slice(0,8).join(", ")}${sample?`; eerste: ${sample}`:""}; geometrie: ${geometry?geometry.type:"geen"}`);
+    }catch(e){
+      results.push(`${layer.label}: FOUT ${e.message}`);
+    }
+  }
+
+  setStatus(`WFS-test Ommen: ${results.join(" || ")}`);
+  console.log("Overijssel WFS-test",{bbox:[minX,minY,maxX,maxY],results});
+}
+
 /* =========================================================
    RCE FUNCTIE 1
    Haalt het verblijfsobject op dat bij een BAG-pand hoort.
@@ -1016,6 +1059,7 @@ map.on("click",async e=>{
 yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 window.addEventListener("load",()=>{
+  setTimeout(testOverijsselMonumentenWFS,1800);
   if(toggleKadasterColors)toggleKadasterColors.checked=true;
   setTimeout(()=>{
     if(navigator.geolocation){
