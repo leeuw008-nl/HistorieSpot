@@ -369,150 +369,106 @@ async function loadGemeenteMonumentImages(address){
 }
 
 
-function escapeCommonsRegex(s){
-  return String(s||"").replace(/[.*+?^()|[\\]\\]/g,"\\$&");
-}
-
-async function commonsApi(params){
-  const api="https://commons.wikimedia.org/w/api.php";
-  const p=new URLSearchParams({
-    action:"query",
-    format:"json",
-    origin:"*",
-    ...params
+async function wikidataApi(query){
+  const url="https://query.wikidata.org/sparql?query="+encodeURIComponent(query)+"&format=json";
+  const res=await fetch(url,{
+    headers:{
+      "Accept":"application/sparql-results+json"
+    }
   });
-
-  const res=await fetch(api+"?"+p.toString());
-  if(!res.ok) throw new Error("Commons HTTP "+res.status);
+  if(!res.ok) throw new Error("Wikidata HTTP "+res.status);
   return res.json();
 }
 
-function commonsAddressMatch(wikitext,address){
-  const text=String(wikitext||"");
+function wikidataAddressMatch(value,address){
   const wantedStreet=normalizeMonumentText(address?.straat);
   const wantedNumber=normalizeMonumentText(address?.huisnummer);
   const wantedCity=normalizeMonumentText(address?.plaats);
 
   if(!wantedStreet||!wantedNumber) return false;
 
-  // Alleen een expliciet Building address-blok telt als exacte adresmatch.
-  const m=text.match(/\{\{\s*Building address\b([\s\S]*?)\}\}/i);
-  if(!m) return false;
+  const text=normalizeMonumentText(value);
+  const streetNumber=normalizeMonumentText(wantedStreet+" "+wantedNumber);
 
-  const block=m[1];
+  if(!text.includes(streetNumber)) return false;
+  if(wantedCity&&!text.includes(wantedCity)) return false;
 
-  function parameter(name){
-    const escaped=name.replace(/[.*+?^()|[\\]\\\\]/g,"\\\\$&");
-    const re=new RegExp(
-      "\\|\\\\s*"+escaped+"\\\\s*=\\\\s*([^\\\\n|}]+)",
-      "i"
-    );
-    const hit=block.match(re);
-    return hit ? normalizeMonumentText(hit[1]) : "";
-  }
-
-  const street=parameter("Street name");
-  const number=parameter("House number");
-  const city=parameter("City");
-
-  return street===wantedStreet &&
-         number===wantedNumber &&
-         (!wantedCity || city===wantedCity);
+  return true;
 }
 
-async function getCommonsFileDetails(title,address){
-  try{
-    const data=await commonsApi({
-      prop:"imageinfo|revisions",
-      titles:title,
-      iiprop:"url",
-      iiurlwidth:"700",
-      rvprop:"content",
-      rvslots:"main"
-    });
-
-    const pages=Object.values(data?.query?.pages||{});
-    const p=pages[0];
-    if(!p||p.missing!==undefined) return null;
-
-    const image=p?.imageinfo?.[0];
-    const wikitext=
-      p?.revisions?.[0]?.slots?.main?.["*"] ||
-      p?.revisions?.[0]?.["*"] ||
-      "";
-
-    // GEEN adresbewijs = GEEN afbeelding.
-    if(!commonsAddressMatch(wikitext,address)) return null;
-
-    const url=image?.thumburl||image?.url||"";
-    if(!url) return null;
-
-    return{
-      url,
-      full:image?.url||"",
-      label:String(title||"").replace(/^File:/,"")
-    };
-  }catch(e){
-    return null;
-  }
-}
-
-async function searchCommonsMonumentImages(address){
+async function searchWikidataMonumentImages(address){
   const straat=String(address?.straat||"").trim();
   const huisnummer=String(address?.huisnummer||"").trim();
   const plaats=String(address?.plaats||"").trim();
 
-  if(!straat||!huisnummer||!plaats) return [];
+  if(!straat||!huisnummer) return [];
 
   try{
-    // De zoekopdracht levert alleen kandidaten. De daaropvolgende
-    // Building-address-validatie bepaalt of een foto werkelijk bij
-    // dit pand hoort.
-    const queries=[
-      'insource:"Building address" insource:"'+straat+'" insource:"'+huisnummer+'"',
-      '"'+straat+" "+huisnummer+'" "'+plaats+'"'
-    ];
+    const streetEsc=straat.replace(/"/g,'\\\"');
+    const numberEsc=huisnummer.replace(/"/g,'\\\"');
+    const cityEsc=plaats.replace(/"/g,'\\\"');
 
-    const titles=[];
+    const cityFilter=plaats
+      ? ' && CONTAINS(LCASE(STR(?address)), LCASE("'+cityEsc+'"))'
+      : '';
+
+    const query=
+      'SELECT DISTINCT ?item ?itemLabel ?address ?image WHERE {'+
+      '{'+
+      ' ?item wdt:P6375 ?address ; wdt:P18 ?image .'+
+      ' FILTER(CONTAINS(LCASE(STR(?address)), LCASE("'+streetEsc+'")) &&'+
+      ' CONTAINS(LCASE(STR(?address)), LCASE("'+numberEsc+'"))'+
+      cityFilter+')'+
+      '} UNION {'+
+      ' ?item p:P669 ?streetStatement ; wdt:P18 ?image .'+
+      ' ?streetStatement ps:P669 ?street ; pq:P670 ?houseNumber .'+
+      ' ?street rdfs:label ?streetLabel .'+
+      ' FILTER(LANG(?streetLabel)="nl")'+
+      ' FILTER(LCASE(STR(?streetLabel))=LCASE("'+streetEsc+'"))'+
+      ' FILTER(LCASE(STR(?houseNumber))=LCASE("'+numberEsc+'"))'+
+      ' BIND("" AS ?address)'+
+      '}'+
+      ' SERVICE wikibase:label { bd:serviceParam wikibase:language "nl,en". }'+
+      '} LIMIT 20';
+
+    const data=await wikidataApi(query);
+    const rows=data?.results?.bindings||[];
+    const results=[];
     const seen=new Set();
 
-    for(const q of queries){
-      const data=await commonsApi({
-        generator:"search",
-        gsrsearch:q,
-        gsrnamespace:"6",
-        gsrlimit:"50"
+    for(const row of rows){
+      const image=row?.image?.value||"";
+      const addressValue=row?.address?.value||"";
+
+      if(addressValue && !wikidataAddressMatch(addressValue,address))
+        continue;
+
+      if(!image||seen.has(image)) continue;
+      seen.add(image);
+
+      results.push({
+        url:image,
+        full:image,
+        label:row?.itemLabel?.value||"Wikidata monument",
+        wikidata:row?.item?.value||""
       });
 
-      Object.values(data?.query?.pages||{}).forEach(p=>{
-        const title=p?.title||"";
-        if(title&&!seen.has(title)){
-          seen.add(title);
-          titles.push(title);
-        }
-      });
-    }
-
-    const results=[];
-    for(const title of titles){
-      const item=await getCommonsFileDetails(title,address);
-      if(item?.url) results.push(item);
       if(results.length>=12) break;
     }
 
     return results;
   }catch(e){
+    console.warn("Wikidata monumentafbeeldingen:",e);
     return [];
   }
 }
 
-async function loadCommonsMonumentImages(address){
-  return searchCommonsMonumentImages(address);
-}
-
 async function loadLandelijkeMonumentImages(address){
-  const images=await loadCommonsMonumentImages(address);
-  if(images.length) return {source:"Wikimedia Commons",images};
+  const images=await searchWikidataMonumentImages(address);
+  if(images.length) return {source:"Wikidata / Wikimedia Commons",images};
+
+  // Geen verifieerbare landelijke afbeelding gevonden:
+  // de bestaande officiële gemeentelijke bron blijft de fallback.
   return {source:"",images:[]};
 }
 
