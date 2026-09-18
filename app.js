@@ -369,42 +369,105 @@ async function loadGemeenteMonumentImages(address){
 }
 
 
-async function loadCommonsMonumentImages(address){
-  const straat=String(address?.straat||"").trim();
-  const huisnummer=String(address?.huisnummer||"").trim();
-  const plaats=String(address?.plaats||"").trim();
+function escapeCommonsRegex(s){
+  return String(s||"").replace(/[.*+?^()|[\\]\\]/g,"\\$&");
+}
 
-  if(!straat||!huisnummer||!plaats) return [];
-
+async function commonsApi(params){
   const api="https://commons.wikimedia.org/w/api.php";
-  const params=new URLSearchParams({
+  const p=new URLSearchParams({
     action:"query",
     format:"json",
     origin:"*",
-    generator:"categorymembers",
-    gcmtype:"file",
-    gcmlimit:"30",
-    prop:"imageinfo",
-    iiprop:"url",
-    iiurlwidth:"600",
-    gcmprop:"title",
-    gcmtitle:"Category:"+straat+" "+huisnummer+", "+plaats
+    ...params
   });
 
+  const res=await fetch(api+"?"+p.toString());
+  if(!res.ok) throw new Error("Commons HTTP "+res.status);
+  return res.json();
+}
+
+function commonsAddressMatch(wikitext,address){
+  const text=String(wikitext||"");
+  const straat=normalizeMonumentText(address?.straat);
+  const huisnummer=normalizeMonumentText(address?.huisnummer);
+  const plaats=normalizeMonumentText(address?.plaats);
+
+  if(!straat||!huisnummer) return false;
+
+  const streetPattern=escapeCommonsRegex(straat);
+  const housePattern=escapeCommonsRegex(huisnummer);
+
+  const templateMatch=text.match(/\\{\\{\\s*Building address[\\s\\S]*?\\}\\}/i);
+
+  if(templateMatch){
+    const block=normalizeMonumentText(templateMatch[0]);
+    const numberRegex=new RegExp("(^|\\\\D)"+housePattern+"($|\\\\D)","i");
+
+    if(
+      block.includes(straat) &&
+      numberRegex.test(block) &&
+      (!plaats || block.includes(plaats))
+    ){
+      return true;
+    }
+
+    return false;
+  }
+
+  const n=normalizeMonumentText(text);
+  if(!n.includes(straat)) return false;
+
+  const addressRegex=new RegExp(
+    streetPattern+"\\s+"+
+    housePattern+
+    "(?:\\s*[a-z])?(?:\\s*,\\s*|\\s+)"+
+    (plaats ? escapeCommonsRegex(plaats) : ""),
+    "i"
+  );
+
+  if(addressRegex.test(n))
+    return true;
+
+  return new RegExp(
+    streetPattern+"\\s+"+
+    housePattern+
+    "(?:\\s*[a-z])?(?:\\s|,|$)",
+    "i"
+  ).test(n);
+}
+
+async function getCommonsFileDetails(title,address){
   try{
-    const res=await fetch(api+"?"+params);
-    if(!res.ok) return [];
-    const data=await res.json();
+    const data=await commonsApi({
+      prop:"imageinfo|revisions",
+      titles:title,
+      iiprop:"url",
+      iiurlwidth:"700",
+      rvprop:"content",
+      rvslots:"main"
+    });
+
     const pages=Object.values(data?.query?.pages||{});
-    return pages
-      .map(p=>({
-        url:p?.imageinfo?.[0]?.thumburl||p?.imageinfo?.[0]?.url||"",
-        full:p?.imageinfo?.[0]?.url||"",
-        label:p?.title ? p.title.replace(/^File:/,"") : ""
-      }))
-      .filter(x=>x.url);
+    const p=pages[0];
+    if(!p||p.missing!==undefined) return null;
+
+    const image=p?.imageinfo?.[0];
+    const wikitext=
+      p?.revisions?.[0]?.slots?.main?.["*"] ||
+      p?.revisions?.[0]?.["*"] ||
+      "";
+
+    if(!commonsAddressMatch(wikitext,address))
+      return null;
+
+    return{
+      url:image?.thumburl||image?.url||"",
+      full:image?.url||"",
+      label:String(title||"").replace(/^File:/,"")
+    };
   }catch(e){
-    return [];
+    return null;
   }
 }
 
@@ -415,61 +478,54 @@ async function searchCommonsMonumentImages(address){
 
   if(!straat||!huisnummer||!plaats) return [];
 
-  const api="https://commons.wikimedia.org/w/api.php";
-  const query='"'+straat+" "+huisnummer+'" "'+plaats+'"';
-
-  const params=new URLSearchParams({
-    action:"query",
-    format:"json",
-    origin:"*",
-    generator:"search",
-    gsrsearch:query,
-    gsrnamespace:"6",
-    gsrlimit:"30",
-    prop:"imageinfo",
-    iiprop:"url",
-    iiurlwidth:"600"
-  });
-
   try{
-    const res=await fetch(api+"?"+params);
-    if(!res.ok) return [];
-    const data=await res.json();
-    const pages=Object.values(data?.query?.pages||{});
-    const streetNorm=normalizeMonumentText(straat);
-    const houseNorm=normalizeMonumentText(huisnummer);
-    const placeNorm=normalizeMonumentText(plaats);
+    const queries=[
+      'insource:"'+straat+" "+huisnummer+'" "'+plaats+'"',
+      'insource:"'+straat+" "+huisnummer+'"'
+    ];
 
-    const scored=pages.map(p=>{
-      const titleNorm=normalizeMonumentText(p?.title||"");
-      let score=0;
-      if(titleNorm.includes(streetNorm))score+=6;
-      if(titleNorm.includes(houseNorm))score+=5;
-      if(titleNorm.includes(placeNorm))score+=3;
-      return{
-        score,
-        url:p?.imageinfo?.[0]?.thumburl||p?.imageinfo?.[0]?.url||"",
-        full:p?.imageinfo?.[0]?.url||"",
-        label:p?.title ? p.title.replace(/^File:/,"") : ""
-      };
-    });
+    const titles=[];
+    const seen=new Set();
 
-    return scored
-      .filter(x=>x.url&&x.score>=11)
-      .sort((a,b)=>b.score-a.score)
-      .slice(0,12);
+    for(const q of queries){
+      const data=await commonsApi({
+        generator:"search",
+        gsrsearch:q,
+        gsrnamespace:"6",
+        gsrlimit:"50"
+      });
+
+      Object.values(data?.query?.pages||{}).forEach(p=>{
+        const title=p?.title||"";
+        if(title&&!seen.has(title)){
+          seen.add(title);
+          titles.push(title);
+        }
+      });
+
+      if(titles.length>=50) break;
+    }
+
+    const results=[];
+    for(const title of titles.slice(0,50)){
+      const item=await getCommonsFileDetails(title,address);
+      if(item?.url) results.push(item);
+      if(results.length>=12) break;
+    }
+
+    return results;
   }catch(e){
     return [];
   }
 }
 
+async function loadCommonsMonumentImages(address){
+  return searchCommonsMonumentImages(address);
+}
+
 async function loadLandelijkeMonumentImages(address){
-  const direct=await loadCommonsMonumentImages(address);
-  if(direct.length) return {source:"Wikimedia Commons",images:direct};
-
-  const search=await searchCommonsMonumentImages(address);
-  if(search.length) return {source:"Wikimedia Commons",images:search};
-
+  const images=await loadCommonsMonumentImages(address);
+  if(images.length) return {source:"Wikimedia Commons",images};
   return {source:"",images:[]};
 }
 
