@@ -543,6 +543,7 @@ async function loadOverijsselMonumentenVoorPand(o){
             monumentMarker.setPopupContent(popup+gallery);
           }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
         }
+      }
     }catch(e){console.error("Overijssel monument WFS fout:",e);}
   }
 }
