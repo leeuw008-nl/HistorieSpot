@@ -348,7 +348,15 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         function absoluteUrl(v){
           const s=String(v||"").trim();
-          return /^https?:\\/\\//i.test(s) ? s : "";
+          if(/^https?:\\/\\//i.test(s)) return s;
+
+          // BACH/beeldbank-URL: de WFS levert soms alleen de querystring.
+          // Gebruik dan automatisch de BACH-afbeeldingsserver.
+          if(/^image_servlet=BachImageServlet/i.test(s)){
+            return "https://www.bach-databank.nl/" + s;
+          }
+
+          return "";
         }
 
         function fieldRow(key){
