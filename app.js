@@ -328,10 +328,10 @@ function normalizeMonumentText(value){
   return String(value||"")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\\u0300-\\u036f]/g,"")
+    .replace(/[\u0300-\u036f]/g,"")
     .replace(/[’']/g,"'")
     .replace(/[^a-z0-9]+/g," ")
-    .replace(/\\s+/g," ")
+    .replace(/\s+/g," ")
     .trim();
 }
 
@@ -344,9 +344,8 @@ async function loadGemeenteMonumentImages(address){
 
   const doc=await getGemeenteMonumentHtml();
   const wantedStreet=normalizeMonumentText(straat);
+  const wantedNumber=normalizeMonumentText(huisnummer);
 
-  // We zoeken eerst de GM-kop waarin straat + huisnummer voorkomen.
-  // Daarna verzamelen we alle afbeeldingen tot de volgende GM-kop.
   const headings=Array.from(
     doc.querySelectorAll("h1,h2,h3,h4,h5,h6")
   );
@@ -355,12 +354,80 @@ async function loadGemeenteMonumentImages(address){
 
   for(const heading of headings){
     const text=normalizeMonumentText(heading.textContent);
+
     if(!text.includes(wantedStreet))
       continue;
 
-    if(huisnummer){
-      const numberPattern=new RegExp(
-        `(^|\\\\s)${huisnummer.replace(/[-/\\\\^$*+?.()|[\\]{}]/g,"\\\\async function loadOverijsselMonumentenVoorPand(o){")}(?=\\\\s|$)`
+    if(
+      wantedNumber &&
+      !text.split(" ").includes(wantedNumber)
+    )
+      continue;
+
+    if(/\bgm-\d+/i.test(heading.textContent||"")){
+      startHeading=heading;
+      break;
+    }
+  }
+
+  if(!startHeading)
+    return [];
+
+  const wantedImages=[];
+  let started=false;
+
+  const nodes=Array.from(
+    doc.querySelectorAll("h1,h2,h3,h4,h5,h6,img")
+  );
+
+  for(const node of nodes){
+    if(node===startHeading){
+      started=true;
+      continue;
+    }
+
+    if(!started)
+      continue;
+
+    if(/^H[1-6]$/.test(node.tagName)){
+      if(/\bgm-\d+/i.test(node.textContent||""))
+        break;
+      continue;
+    }
+
+    if(node.tagName!=="IMG")
+      continue;
+
+    const label=
+      node.getAttribute("alt") ||
+      node.getAttribute("title") ||
+      "";
+
+    const src=
+      node.getAttribute("src") ||
+      node.getAttribute("data-src") ||
+      "";
+
+    if(!src)
+      continue;
+
+    if(!/\.jpe?g$/i.test(String(label).trim()))
+      continue;
+
+    const url=new URL(src,GEMEENTE_MONUMENT_HTML_URL).href;
+
+    if(!wantedImages.some(x=>x.url===url)){
+      wantedImages.push({
+        url,
+        label:String(label).trim()
+      });
+    }
+  }
+
+  return wantedImages;
+}
+
+async function loadOverijsselMonumentenVoorPand(o){")}(?=\\\\s|$)`
       );
       if(!numberPattern.test(text))
         continue;
