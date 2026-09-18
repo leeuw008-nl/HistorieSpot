@@ -348,7 +348,7 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         function absoluteUrl(v){
           const s=String(v||"").trim();
-          return /^https?:\\/\\//i.test(s) ? s : "";
+          return s.startsWith("http://") || s.startsWith("https://") ? s : "";
         }
 
         function fieldRow(key){
