@@ -260,7 +260,7 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 
 
 /* =========================================================
-   TIJDELIJKE OVERIJSSEL MONUMENTEN WFS-TEST
+   TIJDELIJKE OVERIJSSEL MONUMENTEN WFS-DETAILTEST
    ========================================================= */
 async function testOverijsselMonumentenWFS(){
   const rd=wgs84ToRD(52.516,6.420);
@@ -270,7 +270,7 @@ async function testOverijsselMonumentenWFS(){
     {name:"B73_Gemeentelijke_Monumenten",label:"Gemeentelijke monumenten"}
   ];
 
-  setStatus("Overijssel WFS-test wordt uitgevoerd...");
+  setStatus("Overijssel WFS-detailtest...");
   const results=[];
 
   for(const layer of layers){
@@ -286,21 +286,25 @@ async function testOverijsselMonumentenWFS(){
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
       const data=await res.json();
       const features=Array.isArray(data.features)?data.features:[];
-      const first=features[0]||null;
-      const props=first&&first.properties?first.properties:{};
-      const geometry=first&&first.geometry?first.geometry:null;
-      const keys=Object.keys(props);
-      const sample=keys.slice(0,8).map(k=>`${k}=${props[k]}`).join(" | ");
-      results.push(`${layer.label}: ${features.length} features; velden: ${keys.slice(0,8).join(", ")}${sample?`; eerste: ${sample}`:""}; geometrie: ${geometry?geometry.type:"geen"}`);
+
+      const rows=features.map((f,i)=>{
+        const p=f.properties||{};
+        const g=f.geometry||{};
+        const xy=g&&g.type==="Point"&&Array.isArray(g.coordinates)
+          ? `${Number(g.coordinates[0]).toFixed(2)},${Number(g.coordinates[1]).toFixed(2)}`
+          : "geen punt";
+        return `#${i+1} ${p.MONUMENTENNUMMER||"geen nr"} | ${p.STRAATNAAM||""} ${p.HUISNUMMERS||""} | ${p.PLAATSNAAM||""} | MIP=${p.MIP_NR||""} | RD=${xy}`;
+      });
+
+      results.push(`${layer.label}: ${rows.join(" || ")}`);
     }catch(e){
       results.push(`${layer.label}: FOUT ${e.message}`);
     }
   }
 
-  setStatus(`WFS-test Ommen: ${results.join(" || ")}`);
-  console.log("Overijssel WFS-test",{bbox:[minX,minY,maxX,maxY],results});
+  setStatus(`WFS-detail Ommen: ${results.join(" || ")}`);
+  console.log("Overijssel WFS-detailtest",results);
 }
-
 /* =========================================================
    RCE FUNCTIE 1
    Haalt het verblijfsobject op dat bij een BAG-pand hoort.
