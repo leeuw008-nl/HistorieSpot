@@ -307,36 +307,106 @@ async function loadOverijsselMonumentenVoorPand(o){
         const monumentType=layer.label;
         const nummer=number||"Onbekend";
 
-        let popup=`
-          <div style="min-width:290px;max-width:340px;font-size:14px;line-height:1.45">
-            <div style="font-size:17px;font-weight:700;margin-bottom:8px">
+        // Toon alle inhoudelijk bruikbare monumentgegevens die de WFS werkelijk levert.
+        // De locatie, ruimtelijke koppeling en zoekradius blijven ongewijzigd.
+        const labelMap={
+          MONUMENTENNUMMER:"Monumentnummer",
+          NAAM:"Naam",
+          BENAMING:"Benaming",
+          OMSCHRIJVING:"Omschrijving",
+          BOUWJAAR:"Bouwjaar",
+          BOUWPERIODE:"Bouwperiode",
+          FUNCTIE:"Functie",
+          OORSPRONKELIJKE_FUNCTIE:"Oorspronkelijke functie",
+          STRAATNAAM:"Straat",
+          HUISNUMMERS:"Huisnummer",
+          PLAATSNAAM:"Plaats",
+          MIP_NR:"MIP-nummer",
+          IND_WAARDERING:"Waardering",
+          TYPE:"Type",
+          CATEGORIE:"Categorie",
+          STATUS:"Status"
+        };
+
+        const hiddenKeys=new Set([
+          "OBJECTID","geometry","SHAPE","SHAPE_LENGTH","SHAPE_AREA",
+          "MONUMENTENNUMMER","STRAATNAAM","HUISNUMMERS","PLAATSNAAM",
+          "MIP_NR","IND_WAARDERING"
+        ]);
+
+        const preferredKeys=[
+          "NAAM","BENAMING","OMSCHRIJVING","BOUWJAAR","BOUWPERIODE",
+          "FUNCTIE","OORSPRONKELIJKE_FUNCTIE","TYPE","CATEGORIE","STATUS"
+        ];
+
+        function displayValue(v){
+          if(v===null||v===undefined||v==="")return "";
+          if(Array.isArray(v))return v.join(", ");
+          if(typeof v==="object")return JSON.stringify(v);
+          return String(v);
+        }
+
+        function fieldRow(key){
+          const value=displayValue(p[key]);
+          if(!value)return "";
+          const label=labelMap[key]||key.replaceAll("_"," ");
+          return `
+            <div style="margin-top:7px">
+              <b>${esc(label)}</b><br>
+              <span>${esc(value)}</span>
+            </div>`;
+        }
+
+        let detailRows="";
+        const used=new Set();
+
+        preferredKeys.forEach(key=>{
+          if(Object.prototype.hasOwnProperty.call(p,key)){
+            const row=fieldRow(key);
+            if(row){
+              detailRows+=row;
+              used.add(key);
+            }
+          }
+        });
+
+        // Neem ook overige niet-technische WFS-attributen mee.
+        Object.keys(p).forEach(key=>{
+          if(used.has(key)||hiddenKeys.has(key)||key.startsWith("_"))return;
+          const value=displayValue(p[key]);
+          if(!value)return;
+          detailRows+=fieldRow(key);
+        });
+
+        const popup=`
+          <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
+            <div style="font-size:18px;font-weight:700;margin-bottom:9px">
               🏛 ${esc(monumentType)}
             </div>
 
-            <div style="background:#f3f5f7;border-radius:7px;padding:8px 10px;margin-bottom:9px">
+            <div style="background:#f3f5f7;border-left:4px solid ${layer.name==="B73_Rijksmonumenten"?"#7b1e1e":"#1d5d8f"};border-radius:6px;padding:9px 10px;margin-bottom:10px">
               <div style="font-size:12px;color:#666">Monumentnummer</div>
-              <div style="font-size:16px;font-weight:700">${esc(nummer)}</div>
+              <div style="font-size:17px;font-weight:700">${esc(nummer)}</div>
             </div>
 
-            ${address ? `
-              <div style="margin-bottom:7px">
-                <b>Adres</b><br>${esc(address)}
-                ${p.PLAATSNAAM ? ", "+esc(p.PLAATSNAAM) : ""}
-              </div>` : ""}
+            <div style="margin-bottom:9px">
+              <b>Adres</b><br>
+              ${address ? esc(address) : "Onbekend"}
+              ${p.PLAATSNAAM ? ", "+esc(p.PLAATSNAAM) : ""}
+            </div>
 
-            ${p.MIP_NR ? `
-              <div><b>MIP-nummer</b><br>${esc(p.MIP_NR)}</div>` : ""}
+            ${detailRows
+              ? `<div style="border-top:1px solid #ddd;padding-top:2px">${detailRows}</div>`
+              : ""}
 
-            ${p.IND_WAARDERING ? `
-              <div style="margin-top:7px"><b>Waardering</b><br>${esc(p.IND_WAARDERING)}</div>` : ""}
+            <hr style="margin:11px 0 8px">
 
-            <hr style="margin:10px 0 8px">
-
-            <div style="font-size:12px;color:#666">
+            <div style="font-size:11px;color:#666">
               Bron: Provincie Overijssel · B73 Cultuur
             </div>
           </div>
         `;
+
         const isRM=layer.name==="B73_Rijksmonumenten";
         const icon=L.divIcon({
           className:"",
