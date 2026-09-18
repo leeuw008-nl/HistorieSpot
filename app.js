@@ -262,7 +262,7 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 /* =========================================================
    TIJDELIJKE OVERIJSSEL MONUMENTEN WFS-DETAILTEST
    ========================================================= */
-async function testOverijsselMonumentenWFS(){
+async function testOverijsselMonumentenWFSDebug(){
   const rd=wgs84ToRD(52.516,6.420);
   const minX=rd.x-500, minY=rd.y-500, maxX=rd.x+500, maxY=rd.y+500;
   const layers=[
@@ -1065,7 +1065,7 @@ map.on("click",async e=>{
 yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 window.addEventListener("load",()=>{
-  setTimeout(testOverijsselMonumentenWFS,2500);
+  setTimeout(testOverijsselMonumentenWFSDebug,2500);
   if(toggleKadasterColors)toggleKadasterColors.checked=true;
   setTimeout(()=>{
     if(navigator.geolocation){
