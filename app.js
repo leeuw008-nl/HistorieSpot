@@ -369,31 +369,86 @@ async function loadGemeenteMonumentImages(address){
 }
 
 
-async function wikidataApi(query){
-  const url="https://query.wikidata.org/sparql?query="+encodeURIComponent(query)+"&format=json";
-  const res=await fetch(url,{
-    headers:{
-      "Accept":"application/sparql-results+json"
-    }
-  });
-  if(!res.ok) throw new Error("Wikidata HTTP "+res.status);
+async function commonsApi(params){
+  const url="https://commons.wikimedia.org/w/api.php?"+new URLSearchParams({
+    origin:"*",
+    format:"json",
+    ...params
+  }).toString();
+
+  const res=await fetch(url);
+  if(!res.ok) throw new Error("Commons HTTP "+res.status);
   return res.json();
 }
 
-function wikidataAddressMatch(value,address){
-  const wantedStreet=normalizeMonumentText(address?.straat);
-  const wantedNumber=normalizeMonumentText(address?.huisnummer);
-  const wantedCity=normalizeMonumentText(address?.plaats);
+function commonsCategoryName(address){
+  const straat=String(address?.straat||"").trim();
+  const huisnummer=String(address?.huisnummer||"").trim();
+  const plaats=String(address?.plaats||"").trim();
 
-  if(!wantedStreet||!wantedNumber) return false;
+  if(!straat||!huisnummer||!plaats) return "";
 
-  const text=normalizeMonumentText(value);
-  const streetNumber=normalizeMonumentText(wantedStreet+" "+wantedNumber);
+  return "Category:"+straat+" "+huisnummer+", "+plaats;
+}
 
-  if(!text.includes(streetNumber)) return false;
-  if(wantedCity&&!text.includes(wantedCity)) return false;
+async function searchCommonsAddressCategory(address){
+  const category=commonsCategoryName(address);
+  if(!category) return [];
 
-  return true;
+  try{
+    // Een adrescategorie is veel betrouwbaarder dan een algemene Commons-zoekopdracht:
+    // de categorie zelf is de expliciete koppeling tussen adres en afbeeldingen.
+    const data=await commonsApi({
+      action:"query",
+      list:"categorymembers",
+      cmtitle:category,
+      cmtype:"file",
+      cmlimit:"50"
+    });
+
+    const members=data?.query?.categorymembers||[];
+    if(!members.length) return [];
+
+    const titles=members
+      .map(x=>x?.title)
+      .filter(Boolean);
+
+    const results=[];
+    const seen=new Set();
+
+    // Vraag de directe afbeeldings-URL's van de gevonden bestanden op.
+    for(let i=0;i<titles.length;i+=50){
+      const batch=titles.slice(i,i+50);
+
+      const info=await commonsApi({
+        action:"query",
+        prop:"imageinfo",
+        iiprop:"url",
+        iiurlwidth:"900",
+        titles:batch.join("|")
+      });
+
+      const pages=info?.query?.pages||{};
+
+      Object.values(pages).forEach(page=>{
+        const image=page?.imageinfo?.[0];
+        const url=image?.thumburl||image?.url||"";
+        if(!url||seen.has(url)) return;
+
+        seen.add(url);
+        results.push({
+          url,
+          full:image?.url||url,
+          label:page?.title||"Wikimedia Commons"
+        });
+      });
+    }
+
+    return results.slice(0,12);
+  }catch(e){
+    console.warn("Commons adrescategorie:",e);
+    return [];
+  }
 }
 
 async function searchWikidataMonumentImages(address){
@@ -431,18 +486,19 @@ async function searchWikidataMonumentImages(address){
       ' SERVICE wikibase:label { bd:serviceParam wikibase:language "nl,en". }'+
       '} LIMIT 20';
 
-    const data=await wikidataApi(query);
+    const data=await (async()=>{
+      const url="https://query.wikidata.org/sparql?query="+encodeURIComponent(query)+"&format=json";
+      const res=await fetch(url,{headers:{"Accept":"application/sparql-results+json"}});
+      if(!res.ok) throw new Error("Wikidata HTTP "+res.status);
+      return res.json();
+    })();
+
     const rows=data?.results?.bindings||[];
     const results=[];
     const seen=new Set();
 
     for(const row of rows){
       const image=row?.image?.value||"";
-      const addressValue=row?.address?.value||"";
-
-      if(addressValue && !wikidataAddressMatch(addressValue,address))
-        continue;
-
       if(!image||seen.has(image)) continue;
       seen.add(image);
 
@@ -464,10 +520,26 @@ async function searchWikidataMonumentImages(address){
 }
 
 async function loadLandelijkeMonumentImages(address){
-  const images=await searchWikidataMonumentImages(address);
-  if(images.length) return {source:"Wikidata / Wikimedia Commons",images};
+  // 1. Eerst de exacte Commons-adrescategorie.
+  // Dit voorkomt de willekeurige resultaten die de algemene Commons-search gaf.
+  const categoryImages=await searchCommonsAddressCategory(address);
+  if(categoryImages.length){
+    return {
+      source:"Wikimedia Commons adrescategorie",
+      images:categoryImages
+    };
+  }
 
-  // Geen verifieerbare landelijke afbeelding gevonden:
+  // 2. Daarna Wikidata/P18 als tweede landelijke route.
+  const wikidataImages=await searchWikidataMonumentImages(address);
+  if(wikidataImages.length){
+    return {
+      source:"Wikidata / Wikimedia Commons",
+      images:wikidataImages
+    };
+  }
+
+  // 3. Geen landelijke afbeelding gevonden:
   // de bestaande officiële gemeentelijke bron blijft de fallback.
   return {source:"",images:[]};
 }
