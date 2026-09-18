@@ -389,52 +389,39 @@ async function commonsApi(params){
 
 function commonsAddressMatch(wikitext,address){
   const text=String(wikitext||"");
-  const straat=normalizeMonumentText(address?.straat);
-  const huisnummer=normalizeMonumentText(address?.huisnummer);
-  const plaats=normalizeMonumentText(address?.plaats);
+  const wantedStreet=normalizeMonumentText(address?.straat);
+  const wantedNumber=normalizeMonumentText(address?.huisnummer);
+  const wantedCity=normalizeMonumentText(address?.plaats);
 
-  if(!straat||!huisnummer) return false;
+  if(!wantedStreet||!wantedNumber) return false;
 
-  const streetPattern=escapeCommonsRegex(straat);
-  const housePattern=escapeCommonsRegex(huisnummer);
+  // Alleen een expliciet {{Building address}}-blok is voldoende bewijs.
+  // Categorienaam, bestandsnaam of vrije beschrijving mogen GEEN adresmatch
+  // veroorzaken: die kunnen naar een ander pand verwijzen.
+  const m=text.match(/\\{\\{\\s*Building address\\b([\\s\\S]*?)\\}\\}/i);
+  if(!m) return false;
 
-  const templateMatch=text.match(/\\{\\{\\s*Building address[\\s\\S]*?\\}\\}/i);
+  const block=m[1];
 
-  if(templateMatch){
-    const block=normalizeMonumentText(templateMatch[0]);
-    const numberRegex=new RegExp("(^|\\\\D)"+housePattern+"($|\\\\D)","i");
-
-    if(
-      block.includes(straat) &&
-      numberRegex.test(block) &&
-      (!plaats || block.includes(plaats))
-    ){
-      return true;
-    }
-
-    return false;
+  function parameter(name){
+    const re=new RegExp(
+      "\\\\|\\\\s*"+name.replace(/[.*+?^()|[\\]\\]/g,"\\\\$&")+
+      "\\\\s*=\\\\s*([^\\n|}]+)",
+      "i"
+    );
+    const hit=block.match(re);
+    return hit ? normalizeMonumentText(hit[1]) : "";
   }
 
-  const n=normalizeMonumentText(text);
-  if(!n.includes(straat)) return false;
+  const street=parameter("Street name");
+  const number=parameter("House number");
+  const city=parameter("City");
 
-  const addressRegex=new RegExp(
-    streetPattern+"\\s+"+
-    housePattern+
-    "(?:\\s*[a-z])?(?:\\s*,\\s*|\\s+)"+
-    (plaats ? escapeCommonsRegex(plaats) : ""),
-    "i"
-  );
+  if(street!==wantedStreet) return false;
+  if(number!==wantedNumber) return false;
+  if(wantedCity && city!==wantedCity) return false;
 
-  if(addressRegex.test(n))
-    return true;
-
-  return new RegExp(
-    streetPattern+"\\s+"+
-    housePattern+
-    "(?:\\s*[a-z])?(?:\\s|,|$)",
-    "i"
-  ).test(n);
+  return true;
 }
 
 async function getCommonsFileDetails(title,address){
