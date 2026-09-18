@@ -724,7 +724,10 @@ async function loadOverijsselMonumentenVoorPand(o){
         const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
         monumentLayer.addLayer(monumentMarker);
 
-        // Gemeentelijke monumenten: officiële afbeeldingen eerst tonen.
+        // Gemeentelijke monumenten: eerst uitsluitend de bewezen officiële
+        // afbeeldingen uit Gemeenteblad 2026, 30438 tonen.
+        // De landelijke Commons/Wikidata-route staat tijdelijk buiten deze
+        // popup-flow zodat de officiële route deterministisch blijft.
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
           const imageAddress={
             straat:p.STRAATNAAM||"",
@@ -732,18 +735,31 @@ async function loadOverijsselMonumentenVoorPand(o){
             plaats:p.PLAATSNAAM||""
           };
 
-          loadGemeenteMonumentImages(imageAddress).then(fallbackImages=>{
-            if(!fallbackImages.length) return;
-            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+fallbackImages.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
-          }).catch(()=>{});
-
-          loadLandelijkeMonumentImages(imageAddress).then(result=>{
-            const images=result.images||[];
+          loadGemeenteMonumentImages(imageAddress).then(images=>{
             if(!images.length) return;
-            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.full||img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Wikimedia Commons</div></div>";
-            monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
-          }).catch(()=>{});
+
+            const gallery=
+              "<div style=\\\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\\\">"+
+              "<b>Preview</b>"+
+              "<div style=\\\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\\\">"+
+              images.map(img=>
+                "<a href=\\\""+esc(img.url)+"\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">"+
+                "<img src=\\\""+esc(img.url)+"\\\" alt=\\\""+esc(img.label)+"\\\" loading=\\\"lazy\\\" "+
+                "onerror=\\\"this.parentElement.style.display='none'\\\" "+
+                "style=\\\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\\\">"+
+                "</a>"
+              ).join("")+
+              "</div>"+
+              "<div style=\\\"font-size:10px;color:#666;margin-top:5px\\\">Bron: Gemeenteblad 2026, 30438</div>"+
+              "</div>";
+
+            monumentMarker.setPopupContent(
+              popup.replace("<!--GEMEENTE_PREVIEW-->",gallery)
+            );
+          }).catch(e=>{
+            console.warn("Gemeentelijke monumentafbeeldingen:",e);
+          });
+        }
         }
 
       }
