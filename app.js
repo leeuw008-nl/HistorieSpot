@@ -724,7 +724,7 @@ async function loadOverijsselMonumentenVoorPand(o){
         const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
         monumentLayer.addLayer(monumentMarker);
 
-        // Gemeentelijke monumenten: afbeeldingen uit de officiële HTML.
+        // Gemeentelijke monumenten: officiële afbeeldingen eerst tonen.
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
           const imageAddress={
             straat:p.STRAATNAAM||"",
@@ -732,32 +732,20 @@ async function loadOverijsselMonumentenVoorPand(o){
             plaats:p.PLAATSNAAM||""
           };
 
-          // Officiële gemeentelijke bron meteen tonen.
-          // De landelijke bron loopt parallel en mag later alleen vervangen
-          // als daar daadwerkelijk een afbeelding voor wordt gevonden.
           loadGemeenteMonumentImages(imageAddress).then(fallbackImages=>{
             if(!fallbackImages.length) return;
-            const gallery="<div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd"><b>Preview</b><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px">"+fallbackImages.map(img=>"<a href=""+esc(img.url)+"" target="_blank" rel="noopener"><img src=""+esc(img.url)+"" alt=""+esc(img.label)+"" loading="lazy" onerror="this.parentElement.style.display='none'" style="display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5"></a>").join("")+"</div><div style="font-size:10px;color:#666;margin-top:5px">Bron: Gemeenteblad 2026, 30438</div></div>";
+            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+fallbackImages.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
             monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
           }).catch(()=>{});
 
-          // Landelijke Commons/Wikidata-route. Als die niets oplevert,
-          // blijft de officiële gemeentelijke Preview zichtbaar.
           loadLandelijkeMonumentImages(imageAddress).then(result=>{
             const images=result.images||[];
             if(!images.length) return;
-            const gallery="<div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd"><b>Preview</b><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px">"+images.map(img=>"<a href=""+esc(img.full||img.url)+"" target="_blank" rel="noopener"><img src=""+esc(img.url)+"" alt=""+esc(img.label)+"" loading="lazy" onerror="this.parentElement.style.display='none'" style="display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5"></a>").join("")+"</div><div style="font-size:10px;color:#666;margin-top:5px">Bron: Wikimedia Commons</div></div>";
+            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.full||img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Wikimedia Commons</div></div>";
             monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
           }).catch(()=>{});
         }
 
-            return loadGemeenteMonumentImages(imageAddress).then(fallbackImages=>{
-              if(!fallbackImages.length) return;
-              const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+fallbackImages.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-              monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
-            });
-          }).catch(()=>{});
-        }
       }
     }catch(e){console.error("Overijssel monument WFS fout:",e);}
   }
@@ -1498,60 +1486,3 @@ radiusSel&&radiusSel.addEventListener(
     }
   }
 );
-
-async function loadHistForLocation(lat,lng){
-  try{
-    if(!map.hasLayer(minuutLayer)) minuutLayer.addTo(map);
-    const rd=wgs84ToRD(lat,lng);
-    const b=[rd.x-50,rd.y-50,rd.x+50,rd.y+50].join(",");
-    const url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-    const res=await fetch(url); const data=await res.json(); if(!data.features||!data.features.length) return;
-    let code=data.features[0].properties.CODE; const orig=code; code=corr(code);
-    if(window.histLayer) map.removeLayer(window.histLayer);
-    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
-  }catch(e){console.error("hist 1832 load fail",e);}
-}
-
-let selectedMarker=null;
-map.on("click",async e=>{
-  const lat=e.latlng.lat, lng=e.latlng.lng, r=Number(radiusSel.value);
-  if(selectedMarker) map.removeLayer(selectedMarker);
-  selectedMarker=L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
-  setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
-  loadBAG(lat,lng,r);
-  loadHistForLocation(lat,lng);
-  try{
-    if(map.hasLayer(minuutLayer)){
-      const rd=wgs84ToRD(lat,lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-      const res=await fetch(url),data=await res.json();if(data.features&&data.features.length){
-        let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
-        if(window.histLayer)map.removeLayer(window.histLayer);
-        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
-        const p=data.features[0].properties;
-        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><small>Geklikte positie wordt nu gebruikt voor BAG</small></div>`).openOn(map);
-      }
-    }
-  }catch(err){console.error(err);}
-});
-
-yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
-toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
-window.addEventListener("load",()=>{
-  // Monumenten worden ruimtelijk geladen per BAG-pand.
-  if(toggleKadasterColors)toggleKadasterColors.checked=true;
-  setTimeout(()=>{
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(p=>{
-        const lat=p.coords.latitude,lng=p.coords.longitude,r=Number(radiusSel.value);
-        map.setView([lat,lng],18);
-        curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
-        accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);loadHistForLocation(lat,lng);
-      },()=>{
-        loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
-      },{enableHighAccuracy:true,timeout:8000});
-    }else{
-      loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
-    }
-  },600);
-});
