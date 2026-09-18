@@ -304,13 +304,39 @@ async function loadOverijsselMonumentenVoorPand(o){
         monumentSeen.add(key);
         const ll=rdToWgs84(mx,my);
         const address=[p.STRAATNAAM,p.HUISNUMMERS].filter(Boolean).join(" ");
-        let popup="<div style=\"min-width:250px\"><b>🏛 "+esc(layer.label)+"</b><br>";
-        popup+="Monumentnummer: <b>"+esc(number||"Onbekend")+"</b><br>";
-        if(address)popup+="Adres: <b>"+esc(address)+"</b><br>";
-        if(p.PLAATSNAAM)popup+=esc(p.PLAATSNAAM);
-        if(p.MIP_NR)popup+="<br>MIP: "+esc(p.MIP_NR);
-        if(p.IND_WAARDERING)popup+="<br>Waardering: "+esc(p.IND_WAARDERING);
-        popup+="<hr style=\"margin:8px 0\"><small>Bron: Provincie Overijssel · B73 Cultuur</small></div>";
+        const monumentType=layer.label;
+        const nummer=number||"Onbekend";
+
+        let popup=`
+          <div style="min-width:290px;max-width:340px;font-size:14px;line-height:1.45">
+            <div style="font-size:17px;font-weight:700;margin-bottom:8px">
+              🏛 ${esc(monumentType)}
+            </div>
+
+            <div style="background:#f3f5f7;border-radius:7px;padding:8px 10px;margin-bottom:9px">
+              <div style="font-size:12px;color:#666">Monumentnummer</div>
+              <div style="font-size:16px;font-weight:700">${esc(nummer)}</div>
+            </div>
+
+            ${address ? `
+              <div style="margin-bottom:7px">
+                <b>Adres</b><br>${esc(address)}
+                ${p.PLAATSNAAM ? ", "+esc(p.PLAATSNAAM) : ""}
+              </div>` : ""}
+
+            ${p.MIP_NR ? `
+              <div><b>MIP-nummer</b><br>${esc(p.MIP_NR)}</div>` : ""}
+
+            ${p.IND_WAARDERING ? `
+              <div style="margin-top:7px"><b>Waardering</b><br>${esc(p.IND_WAARDERING)}</div>` : ""}
+
+            <hr style="margin:10px 0 8px">
+
+            <div style="font-size:12px;color:#666">
+              Bron: Provincie Overijssel · B73 Cultuur
+            </div>
+          </div>
+        `;
         const isRM=layer.name==="B73_Rijksmonumenten";
         const icon=L.divIcon({
           className:"",
@@ -703,46 +729,63 @@ function showRCE(rce,address,lat,lng){
     bag.volledigAdres ||
     `${address.straat} ${address.huisnummer}`;
 
+  const registerUrl=
+    "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+
+    encodeURIComponent(number);
+
   const popup=`
-    <div style="min-width:280px">
-      <b>🏛 Rijksmonument</b><br>
-      Rijksmonumentnummer:
-      <b>${esc(number)}</b>
+    <div style="min-width:300px;max-width:360px;font-size:14px;line-height:1.45">
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px">
+        🏛 Rijksmonument
+      </div>
 
-      <hr style="margin:8px 0">
+      <div style="background:#f7eeee;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px">
+        <div style="font-size:12px;color:#666">Rijksmonumentnummer</div>
+        <div style="font-size:17px;font-weight:700">${esc(number)}</div>
+      </div>
 
-      <b>${esc(adres)}</b><br>
-      ${address.postcode
-        ? esc(address.postcode)+"<br>"
-        : ""}
-      ${esc(address.woonplaats)}
+      <div style="margin-bottom:8px">
+        <b>Adres</b><br>
+        ${esc(adres)}
+        ${address.postcode ? ", "+esc(address.postcode) : ""}
+        ${address.woonplaats ? "<br>"+esc(address.woonplaats) : ""}
+      </div>
 
       ${
         inschrijving
-          ? `<br><br>Inschrijving Monumentenregister:
-             ${esc(inschrijving)}`
+          ? `<div style="margin-top:8px">
+               <b>Inschrijving register</b><br>${esc(inschrijving)}
+             </div>`
           : ""
       }
 
       ${
         functie
-          ? `<br><br>Oorspronkelijke functie:
-             ${esc(functie)}`
+          ? `<div style="margin-top:8px">
+               <b>Oorspronkelijke functie</b><br>${esc(functie)}
+             </div>`
           : ""
       }
 
       ${
         omschrijving
-          ? `<hr style="margin:8px 0">
-             <small>${esc(omschrijving)}</small>`
+          ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd">
+               <b>Omschrijving</b><br>
+               <span style="font-size:13px">${esc(omschrijving)}</span>
+             </div>`
           : ""
       }
 
-      <hr style="margin:8px 0">
+      <div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
+        <a href="${registerUrl}" target="_blank" rel="noopener"
+           style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
+          Rijksmonumentenregister
+        </a>
+      </div>
 
-      <small>
+      <div style="font-size:11px;color:#666;margin-top:8px">
         Bron: Rijksdienst voor het Cultureel Erfgoed
-      </small>
+      </div>
     </div>
   `;
 
