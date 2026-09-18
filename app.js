@@ -444,14 +444,19 @@ async function loadOverijsselMonumentenVoorPand(o){
           if(!value)return "";
           const label=labelMap[key]||key.replaceAll("_"," ");
           const url=absoluteUrl(value);
-          const isPreview=/^preview$/i.test(key)||/preview/i.test(label);
+          const isPreview=/^preview$/i.test(key)||/preview/i.test(label)||/preview/i.test(value);
 
+          // Het Overijssel-WFS veld "Preview" bevat een afbeelding/afbeeldings-URL.
+          // Toon die direct als afbeelding in plaats van de technische URL-tekst.
           if(isPreview && url){
             return `
-              <div style="margin-top:9px">
-                <b>${esc(label)}</b><br>
-                <a href="${esc(url)}" target="_blank" rel="noopener" style="display:block;margin-top:5px;text-decoration:none">
-                  <img src="${esc(url)}" alt="Preview" style="display:block;width:100%;max-width:340px;max-height:220px;object-fit:contain;border:1px solid #ccc;border-radius:5px;background:#f5f5f5">
+              <div style="margin-top:9px;padding-top:2px">
+                <b>Preview</b>
+                <a href="${esc(url)}" target="_blank" rel="noopener" style="display:block;margin-top:6px;text-decoration:none">
+                  <img src="${esc(url)}"
+                       alt="Monument preview"
+                       loading="lazy"
+                       style="display:block;width:100%;max-width:340px;max-height:240px;object-fit:contain;border:1px solid #ccc;border-radius:6px;background:#f5f5f5">
                 </a>
               </div>`;
           }
