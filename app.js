@@ -954,9 +954,10 @@ async function loadBAG(lat,lng,radius){
 
     });
 
-    setStatus(
-      `${list.length} BAG binnen ${radius}m`
-    );
+    // TIJDELIJK UIT tijdens WFS-test:
+    // setStatus(
+    //   `${list.length} BAG binnen ${radius}m`
+    // );
 
   }catch(e){
 
