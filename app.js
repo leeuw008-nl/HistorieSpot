@@ -274,42 +274,94 @@ function rdToWgs84(x,y){
   return{lat,lon};
 }
 
-const GEMEENTE_MONUMENT_HTML_URL="https://zoek.officielebekendmakingen.nl/gmb-2026-30438.html";
-let gemeenteMonumentHtmlPromise=null;
-async function getGemeenteMonumentHtml(){
-  if(gemeenteMonumentHtmlPromise) return gemeenteMonumentHtmlPromise;
-  gemeenteMonumentHtmlPromise=fetch(GEMEENTE_MONUMENT_HTML_URL,{cache:"force-cache"}).then(r=>{if(!r.ok) throw new Error("Monument HTML HTTP "+r.status); return r.text();}).then(t=>new DOMParser().parseFromString(t,"text/html")).catch(e=>{gemeenteMonumentHtmlPromise=null; throw e;});
-  return gemeenteMonumentHtmlPromise;
+const GEMEENTE_MONUMENT_IMAGES_URL="data/gemeente-monumenten-afbeeldingen.json";
+let gemeenteMonumentImagesPromise=null;
+
+async function getGemeenteMonumentImages(){
+  if(gemeenteMonumentImagesPromise) return gemeenteMonumentImagesPromise;
+
+  gemeenteMonumentImagesPromise=fetch(GEMEENTE_MONUMENT_IMAGES_URL,{cache:"no-cache"})
+    .then(r=>{
+      if(!r.ok) throw new Error("Monumentafbeeldingen-index HTTP "+r.status);
+      return r.json();
+    })
+    .catch(e=>{
+      gemeenteMonumentImagesPromise=null;
+      throw e;
+    });
+
+  return gemeenteMonumentImagesPromise;
 }
+
 function normalizeMonumentText(value){
-  return String(value||"").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^a-z0-9]+/g," ").replace(/\\s+/g," ").trim();
+  return String(value||"")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/[’']/g,"'")
+    .replace(/[^a-z0-9]+/g," ")
+    .replace(/\s+/g," ")
+    .trim();
 }
+
+function monumentHouseMatch(wanted,known){
+  const a=normalizeMonumentText(wanted);
+  const b=normalizeMonumentText(known);
+
+  if(!a||!b) return false;
+  if(a===b) return true;
+
+  const na=a.replace(/\s+/g,"").replace(/t\/m/g,"-");
+  const nb=b.replace(/\s+/g,"").replace(/t\/m/g,"-");
+  if(na===nb) return true;
+
+  const ad=(a.match(/\d+/g)||[]).join(",");
+  const bd=(b.match(/\d+/g)||[]).join(",");
+  return !!ad && ad===bd;
+}
+
 async function loadGemeenteMonumentImages(address){
   const straat=normalizeMonumentText(address?.straat);
   const huisnummer=normalizeMonumentText(address?.huisnummer);
+
   if(!straat) return [];
-  const doc=await getGemeenteMonumentHtml();
-  const nodes=Array.from(doc.querySelectorAll("h1,h2,h3,h4,h5,h6,a,img"));
-  let active=false;
+
+  const data=await getGemeenteMonumentImages();
+  const monuments=Array.isArray(data?.monuments)?data.monuments:[];
+
+  const matches=monuments.filter(m=>{
+    const ms=normalizeMonumentText(m.street||"");
+    if(!ms) return false;
+
+    const streetMatch=
+      ms===straat ||
+      ms.includes(straat) ||
+      straat.includes(ms);
+
+    if(!streetMatch) return false;
+
+    if(!huisnummer) return true;
+    return monumentHouseMatch(huisnummer,m.house||"") ||
+           normalizeMonumentText(m.address).includes(huisnummer);
+  });
+
   const result=[];
-  for(const node of nodes){
-    const raw=((node.textContent||"")+" "+(node.getAttribute("alt")||"")+" "+(node.getAttribute("title")||"")).replace(/\\s+/g," ").trim();
-    const text=normalizeMonumentText(raw);
-    if(/\\bgm\\s*[- ]\\s*\\d+\\b/i.test(raw)){
-      if(text.includes(straat) && (!huisnummer || text.split(" ").includes(huisnummer))) active=true;
-      else if(active) break;
-    }
-    if(!active) continue;
-    let src=node.getAttribute("src")||node.getAttribute("data-src")||"";
-    if(node.tagName==="A") src=src||node.getAttribute("href")||"";
-    if(!src){const img=node.querySelector?.("img"); if(img) src=img.getAttribute("src")||"";}
-    if(!src) continue;
-    const url=new URL(src,GEMEENTE_MONUMENT_HTML_URL).href;
-    if(!/\\.jpe?g(?:[?#].*)?$/i.test(url)) continue;
-    if(!result.some(x=>x.url===url)) result.push({url,label:raw});
-  }
+  const seen=new Set();
+
+  matches.forEach(m=>{
+    (m.images||[]).forEach(img=>{
+      if(!img?.url||seen.has(img.url)) return;
+      seen.add(img.url);
+      result.push({
+        url:img.url,
+        label:img.label||""
+      });
+    });
+  });
+
   return result;
 }
+
 async function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
