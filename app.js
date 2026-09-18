@@ -346,14 +346,45 @@ async function loadOverijsselMonumentenVoorPand(o){
           return String(v);
         }
 
+        function absoluteUrl(v){
+          const s=String(v||"").trim();
+          return /^https?:\\/\\//i.test(s) ? s : "";
+        }
+
         function fieldRow(key){
           const value=displayValue(p[key]);
           if(!value)return "";
           const label=labelMap[key]||key.replaceAll("_"," ");
+          const url=absoluteUrl(value);
+          const isPreview=/^preview$/i.test(key)||/preview/i.test(label);
+
+          if(isPreview && url){
+            return `
+              <div style="margin-top:9px">
+                <b>${esc(label)}</b><br>
+                <a href="${esc(url)}" target="_blank" rel="noopener" style="display:block;margin-top:5px;text-decoration:none">
+                  <img src="${esc(url)}" alt="Preview" style="display:block;width:100%;max-width:340px;max-height:220px;object-fit:contain;border:1px solid #ccc;border-radius:5px;background:#f5f5f5">
+                </a>
+              </div>`;
+          }
+
+          if(url){
+            return `
+              <div style="margin-top:7px">
+                <b>${esc(label)}</b><br>
+                <a href="${esc(url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:3px;padding:5px 8px;background:#1d5d8f;color:white;text-decoration:none;border-radius:4px">
+                  ${esc(label)} openen
+                </a>
+              </div>`;
+          }
+
+          // Lange technische preview-/URL-achtige waarden niet meer over de popup laten doorlopen.
+          const compactValue=value.length>180 ? value.slice(0,177)+"…" : value;
+
           return `
-            <div style="margin-top:7px">
+            <div style="margin-top:7px;overflow-wrap:anywhere">
               <b>${esc(label)}</b><br>
-              <span>${esc(value)}</span>
+              <span>${esc(compactValue)}</span>
             </div>`;
         }
 
