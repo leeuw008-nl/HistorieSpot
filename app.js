@@ -274,6 +274,166 @@ function rdToWgs84(x,y){
   return{lat,lon};
 }
 
+const GEMEENTE_MONUMENT_HTML_URL=
+  "https://zoek.officielebekendmakingen.nl/gmb-2026-30438.html";
+
+const GEMEENTE_MONUMENT_PROXY=
+  "https://api.allorigins.win/raw?url=";
+
+let gemeenteMonumentHtmlPromise=null;
+
+/* =========================================================
+   Gemeentelijke monumenten - officiële afbeeldingen
+   Haalt de <img>-koppelingen rechtstreeks uit de officiële
+   HTML-publicatie. Geen PDF-verwerking en geen lokale kopieën.
+   ========================================================= */
+async function getGemeenteMonumentHtml(){
+  if(gemeenteMonumentHtmlPromise)
+    return gemeenteMonumentHtmlPromise;
+
+  gemeenteMonumentHtmlPromise=(async()=>{
+    try{
+      let res=await fetch(GEMEENTE_MONUMENT_HTML_URL,{cache:"force-cache"});
+      if(res.ok){
+        const text=await res.text();
+        if(text.includes("Bijlage IV Gemeentelijke monumenten"))
+          return new DOMParser().parseFromString(text,"text/html");
+      }
+    }catch(e){
+      console.warn("Officiële monument-HTML direct ophalen mislukt:",e);
+    }
+
+    // Fallback voor browsers die directe CORS-toegang blokkeren.
+    const proxyUrl=
+      GEMEENTE_MONUMENT_PROXY+
+      encodeURIComponent(GEMEENTE_MONUMENT_HTML_URL);
+
+    const res=await fetch(proxyUrl);
+    if(!res.ok)
+      throw new Error(`Monument HTML HTTP ${res.status}`);
+
+    const text=await res.text();
+    return new DOMParser().parseFromString(text,"text/html");
+  })();
+
+  try{
+    return await gemeenteMonumentHtmlPromise;
+  }catch(e){
+    gemeenteMonumentHtmlPromise=null;
+    throw e;
+  }
+}
+
+function normalizeMonumentText(value){
+  return String(value||"")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g,"")
+    .replace(/[’']/g,"'")
+    .replace(/[^a-z0-9]+/g," ")
+    .replace(/\\s+/g," ")
+    .trim();
+}
+
+async function loadGemeenteMonumentImages(address){
+  const straat=String(address?.straat||"").trim();
+  const huisnummer=String(address?.huisnummer||"").trim();
+
+  if(!straat)
+    return [];
+
+  const doc=await getGemeenteMonumentHtml();
+  const wantedStreet=normalizeMonumentText(straat);
+
+  // We zoeken eerst de GM-kop waarin straat + huisnummer voorkomen.
+  // Daarna verzamelen we alle afbeeldingen tot de volgende GM-kop.
+  const headings=Array.from(
+    doc.querySelectorAll("h1,h2,h3,h4,h5,h6")
+  );
+
+  let startHeading=null;
+
+  for(const heading of headings){
+    const text=normalizeMonumentText(heading.textContent);
+    if(!text.includes(wantedStreet))
+      continue;
+
+    if(huisnummer){
+      const numberPattern=new RegExp(
+        `(^|\\\\s)${huisnummer.replace(/[-/\\\\^$*+?.()|[\\]{}]/g,"\\\\async function loadOverijsselMonumentenVoorPand(o){")}(?=\\\\s|$)`
+      );
+      if(!numberPattern.test(text))
+        continue;
+    }
+
+    if(/\\bgm-\\d+/i.test(text)){
+      startHeading=heading;
+      break;
+    }
+  }
+
+  if(!startHeading)
+    return [];
+
+  const wantedImages=[];
+  let started=false;
+
+  // DOM-volgorde van koppen en afbeeldingen behouden.
+  const nodes=Array.from(
+    doc.querySelectorAll("h1,h2,h3,h4,h5,h6,img")
+  );
+
+  for(const node of nodes){
+    if(node===startHeading){
+      started=true;
+      continue;
+    }
+
+    if(!started)
+      continue;
+
+    if(/^H[1-6]$/.test(node.tagName)){
+      const headingText=node.textContent||"";
+      if(/\\bgm-\\d+/i.test(headingText))
+        break;
+      continue;
+    }
+
+    if(node.tagName!=="IMG")
+      continue;
+
+    const label=
+      node.getAttribute("alt") ||
+      node.getAttribute("title") ||
+      "";
+
+    const src=
+      node.getAttribute("src") ||
+      node.getAttribute("data-src") ||
+      "";
+
+    if(!src)
+      continue;
+
+    // Alleen afbeeldingen uit de monumentsectie gebruiken.
+    // Navigatie-/logo-afbeeldingen worden hiermee uitgesloten.
+    const imageLabel=String(label).trim();
+    if(!/\\.jpe?g$/i.test(imageLabel))
+      continue;
+
+    const url=new URL(src,GEMEENTE_MONUMENT_HTML_URL).href;
+
+    if(!wantedImages.some(x=>x.url===url)){
+      wantedImages.push({
+        url,
+        label:imageLabel
+      });
+    }
+  }
+
+  return wantedImages;
+}
+
 async function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
@@ -444,7 +604,39 @@ async function loadOverijsselMonumentenVoorPand(o){
           html:"<div style=\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">"+(isRM?"RM":"GM")+"</div>",
           iconSize:[30,30],iconAnchor:[15,15]
         });
-        monumentLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
+        const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
+        monumentLayer.addLayer(monumentMarker);
+
+        // Gemeentelijke monumenten: afbeeldingen automatisch uit de
+        // officiële HTML-publicatie van Gemeenteblad 2026, 30438 halen.
+        if(layer.name==="B73_Gemeentelijke_Monumenten"){
+          loadGemeenteMonumentImages({
+            straat:p.STRAATNAAM || "",
+            huisnummer:p.HUISNUMMERS || ""
+          }).then(images=>{
+            if(!images.length) return;
+
+            const gallery=`
+              <div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
+                <b>Afbeeldingen</b>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px">
+                  ${images.map(img=>`
+                    <a href="${esc(img.url)}" target="_blank" rel="noopener" style="display:block">
+                      <img src="${esc(img.url)}"
+                           alt="${esc(img.label)}"
+                           loading="lazy"
+                           style="display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5">
+                    </a>
+                  `).join("")}
+                </div>
+                <div style="font-size:10px;color:#666;margin-top:5px">
+                  Bron: Gemeenteblad 2026, 30438 · Officiële bekendmakingen
+                </div>
+              </div>`;
+
+            monumentMarker.bindPopup(popup + gallery);
+          }).catch(e=>console.error("Gemeentelijke monumentafbeeldingen fout:",e));
+        }
       }
     }catch(e){console.error("Overijssel monument WFS fout:",e);}
   }
