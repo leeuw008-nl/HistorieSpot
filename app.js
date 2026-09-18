@@ -395,18 +395,16 @@ function commonsAddressMatch(wikitext,address){
 
   if(!wantedStreet||!wantedNumber) return false;
 
-  // Alleen een expliciet {{Building address}}-blok is voldoende bewijs.
-  // Categorienaam, bestandsnaam of vrije beschrijving mogen GEEN adresmatch
-  // veroorzaken: die kunnen naar een ander pand verwijzen.
-  const m=text.match(/\\{\\{\\s*Building address\\b([\\s\\S]*?)\\}\\}/i);
+  // Alleen een expliciet Building address-blok telt als exacte adresmatch.
+  const m=text.match(/\{\{\s*Building address\b([\s\S]*?)\}\}/i);
   if(!m) return false;
 
   const block=m[1];
 
   function parameter(name){
+    const escaped=name.replace(/[.*+?^()|[\\]\\\\]/g,"\\\\$&");
     const re=new RegExp(
-      "\\\\|\\\\s*"+name.replace(/[.*+?^()|[\\]\\]/g,"\\\\$&")+
-      "\\\\s*=\\\\s*([^\\n|}]+)",
+      "\\|\\\\s*"+escaped+"\\\\s*=\\\\s*([^\\\\n|}]+)",
       "i"
     );
     const hit=block.match(re);
@@ -417,11 +415,9 @@ function commonsAddressMatch(wikitext,address){
   const number=parameter("House number");
   const city=parameter("City");
 
-  if(street!==wantedStreet) return false;
-  if(number!==wantedNumber) return false;
-  if(wantedCity && city!==wantedCity) return false;
-
-  return true;
+  return street===wantedStreet &&
+         number===wantedNumber &&
+         (!wantedCity || city===wantedCity);
 }
 
 async function getCommonsFileDetails(title,address){
@@ -445,11 +441,14 @@ async function getCommonsFileDetails(title,address){
       p?.revisions?.[0]?.["*"] ||
       "";
 
-    if(!commonsAddressMatch(wikitext,address))
-      return null;
+    // GEEN adresbewijs = GEEN afbeelding.
+    if(!commonsAddressMatch(wikitext,address)) return null;
+
+    const url=image?.thumburl||image?.url||"";
+    if(!url) return null;
 
     return{
-      url:image?.thumburl||image?.url||"",
+      url,
       full:image?.url||"",
       label:String(title||"").replace(/^File:/,"")
     };
@@ -466,9 +465,12 @@ async function searchCommonsMonumentImages(address){
   if(!straat||!huisnummer||!plaats) return [];
 
   try{
+    // De zoekopdracht levert alleen kandidaten. De daaropvolgende
+    // Building-address-validatie bepaalt of een foto werkelijk bij
+    // dit pand hoort.
     const queries=[
-      'insource:"'+straat+" "+huisnummer+'" "'+plaats+'"',
-      'insource:"'+straat+" "+huisnummer+'"'
+      'insource:"Building address" insource:"'+straat+'" insource:"'+huisnummer+'"',
+      '"'+straat+" "+huisnummer+'" "'+plaats+'"'
     ];
 
     const titles=[];
@@ -489,12 +491,10 @@ async function searchCommonsMonumentImages(address){
           titles.push(title);
         }
       });
-
-      if(titles.length>=50) break;
     }
 
     const results=[];
-    for(const title of titles.slice(0,50)){
+    for(const title of titles){
       const item=await getCommonsFileDetails(title,address);
       if(item?.url) results.push(item);
       if(results.length>=12) break;
