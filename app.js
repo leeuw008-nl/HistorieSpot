@@ -368,6 +368,111 @@ async function loadGemeenteMonumentImages(address){
   return result;
 }
 
+
+async function loadCommonsMonumentImages(address){
+  const straat=String(address?.straat||"").trim();
+  const huisnummer=String(address?.huisnummer||"").trim();
+  const plaats=String(address?.plaats||"").trim();
+
+  if(!straat||!huisnummer||!plaats) return [];
+
+  const api="https://commons.wikimedia.org/w/api.php";
+  const params=new URLSearchParams({
+    action:"query",
+    format:"json",
+    origin:"*",
+    generator:"categorymembers",
+    gcmtype:"file",
+    gcmlimit:"30",
+    prop:"imageinfo",
+    iiprop:"url",
+    iiurlwidth:"600",
+    gcmprop:"title",
+    gcmtitle:"Category:"+straat+" "+huisnummer+", "+plaats
+  });
+
+  try{
+    const res=await fetch(api+"?"+params);
+    if(!res.ok) return [];
+    const data=await res.json();
+    const pages=Object.values(data?.query?.pages||{});
+    return pages
+      .map(p=>({
+        url:p?.imageinfo?.[0]?.thumburl||p?.imageinfo?.[0]?.url||"",
+        full:p?.imageinfo?.[0]?.url||"",
+        label:p?.title ? p.title.replace(/^File:/,"") : ""
+      }))
+      .filter(x=>x.url);
+  }catch(e){
+    return [];
+  }
+}
+
+async function searchCommonsMonumentImages(address){
+  const straat=String(address?.straat||"").trim();
+  const huisnummer=String(address?.huisnummer||"").trim();
+  const plaats=String(address?.plaats||"").trim();
+
+  if(!straat||!huisnummer||!plaats) return [];
+
+  const api="https://commons.wikimedia.org/w/api.php";
+  const query='"'+straat+" "+huisnummer+'" "'+plaats+'"';
+
+  const params=new URLSearchParams({
+    action:"query",
+    format:"json",
+    origin:"*",
+    generator:"search",
+    gsrsearch:query,
+    gsrnamespace:"6",
+    gsrlimit:"30",
+    prop:"imageinfo",
+    iiprop:"url",
+    iiurlwidth:"600"
+  });
+
+  try{
+    const res=await fetch(api+"?"+params);
+    if(!res.ok) return [];
+    const data=await res.json();
+    const pages=Object.values(data?.query?.pages||{});
+    const streetNorm=normalizeMonumentText(straat);
+    const houseNorm=normalizeMonumentText(huisnummer);
+    const placeNorm=normalizeMonumentText(plaats);
+
+    const scored=pages.map(p=>{
+      const titleNorm=normalizeMonumentText(p?.title||"");
+      let score=0;
+      if(titleNorm.includes(streetNorm))score+=6;
+      if(titleNorm.includes(houseNorm))score+=5;
+      if(titleNorm.includes(placeNorm))score+=3;
+      return{
+        score,
+        url:p?.imageinfo?.[0]?.thumburl||p?.imageinfo?.[0]?.url||"",
+        full:p?.imageinfo?.[0]?.url||"",
+        label:p?.title ? p.title.replace(/^File:/,"") : ""
+      };
+    });
+
+    return scored
+      .filter(x=>x.url&&x.score>=11)
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,12);
+  }catch(e){
+    return [];
+  }
+}
+
+async function loadLandelijkeMonumentImages(address){
+  const direct=await loadCommonsMonumentImages(address);
+  if(direct.length) return {source:"Wikimedia Commons",images:direct};
+
+  const search=await searchCommonsMonumentImages(address);
+  if(search.length) return {source:"Wikimedia Commons",images:search};
+
+  return {source:"",images:[]};
+}
+
 async function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
@@ -550,11 +655,27 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         // Gemeentelijke monumenten: afbeeldingen uit de officiële HTML.
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          loadGemeenteMonumentImages({straat:p.STRAATNAAM||"",huisnummer:p.HUISNUMMERS||""}).then(images=>{
-            if(!images.length) return;
-            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
-          }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
+          const imageAddress={
+            straat:p.STRAATNAAM||"",
+            huisnummer:p.HUISNUMMERS||"",
+            plaats:p.PLAATSNAAM||""
+          };
+
+          loadLandelijkeMonumentImages(imageAddress).then(result=>{
+            const images=result.images||[];
+
+            if(images.length){
+              const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.full||img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Wikimedia Commons</div></div>";
+              monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
+              return;
+            }
+
+            return loadGemeenteMonumentImages(imageAddress).then(fallbackImages=>{
+              if(!fallbackImages.length) return;
+              const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+fallbackImages.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
+              monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
+            });
+          }).catch(()=>{});
         }
       }
     }catch(e){console.error("Overijssel monument WFS fout:",e);}
