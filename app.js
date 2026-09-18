@@ -260,50 +260,67 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 
 
 /* =========================================================
-   TIJDELIJKE OVERIJSSEL MONUMENTEN WFS-DETAILTEST
+   OVERIJSSEL MONUMENTEN - RUIMTELIJKE KOPPELING
+   BAG-pand -> monumentpunt binnen 50 meter
    ========================================================= */
-async function testOverijsselMonumentenWFSDebug(){
-  const rd=wgs84ToRD(52.516,6.420);
-  const minX=rd.x-500, minY=rd.y-500, maxX=rd.x+500, maxY=rd.y+500;
+const monumentLayer=L.layerGroup().addTo(map);
+const monumentSeen=new Set();
+
+function rdToWgs84(x,y){
+  const dx=(x-155000)/100000;
+  const dy=(y-463000)/100000;
+  const lat=52.15517440+(3235.65389*dy-32.58297*dx*dx-0.2475*dy*dy-0.84978*dx*dx*dy-0.0655*dy*dy*dy-0.01709*dx*dx*dy*dy-0.00738*dx+0.0053*dx*dx*dx*dx-0.00039*dx*dx*dy*dy*dy+0.00033*dx*dx*dx*dx*dy-0.00012*dx*dy)/3600;
+  const lon=5.38720621+(5260.52916*dx+105.94684*dx*dy+2.45656*dx*dy*dy-0.81885*dx*dx*dx+0.05594*dx*dy*dy*dy-0.05607*dx*dx*dx*dy+0.01199*dy-0.00256*dx*dx*dy+0.00128*dx*dx*dx*dx+0.00022*dy*dy-0.00022*dx*dx*dy*dy+0.00026*dx*dx*dx*dx*dx*dx)/3600;
+  return{lat,lon};
+}
+
+async function loadOverijsselMonumentenVoorPand(o){
+  if(!o||!o.c||!o.f)return;
+  const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
   const layers=[
-    {name:"B73_Rijksmonumenten",label:"Rijksmonumenten"},
-    {name:"B73_Gemeentelijke_Monumenten",label:"Gemeentelijke monumenten"}
+    {name:"B73_Rijksmonumenten",label:"Rijksmonument"},
+    {name:"B73_Gemeentelijke_Monumenten",label:"Gemeentelijk monument"}
   ];
-
-  setStatus("Overijssel WFS-detailtest...");
-  const results=[];
-
   for(const layer of layers){
     try{
       const params=new URLSearchParams({
         service:"WFS",version:"2.0.0",request:"GetFeature",
-        typeNames:`B73_Cultuur:${layer.name}`,
-        srsName:"EPSG:28992",
-        bbox:`${minX},${minY},${maxX},${maxY},EPSG:28992`,
-        outputFormat:"application/json",count:"100"
+        typeNames:`B73_Cultuur:${layer.name}`,srsName:"EPSG:28992",
+        bbox:`${rd.x-r},${rd.y-r},${rd.x+r},${rd.y+r},EPSG:28992`,
+        outputFormat:"application/json",count:"20"
       });
       const res=await fetch(`https://services.geodataoverijssel.nl/geoserver/B73_Cultuur/wfs?${params}`);
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      if(!res.ok)continue;
       const data=await res.json();
       const features=Array.isArray(data.features)?data.features:[];
-
-      const rows=features.map((f,i)=>{
-        const p=f.properties||{};
-        const g=f.geometry||{};
-        const xy=g&&g.type==="Point"&&Array.isArray(g.coordinates)
-          ? `${Number(g.coordinates[0]).toFixed(2)},${Number(g.coordinates[1]).toFixed(2)}`
-          : "geen punt";
-        return `#${i+1} ${p.MONUMENTENNUMMER||"geen nr"} | ${p.STRAATNAAM||""} ${p.HUISNUMMERS||""} | ${p.PLAATSNAAM||""} | MIP=${p.MIP_NR||""} | RD=${xy}`;
-      });
-
-      results.push(`${layer.label}: ${rows.join(" || ")}`);
-    }catch(e){
-      results.push(`${layer.label}: FOUT ${e.message}`);
-    }
+      for(const f of features){
+        const p=f.properties||{},g=f.geometry||{};
+        if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)continue;
+        const mx=Number(g.coordinates[0]),my=Number(g.coordinates[1]),d=Math.hypot(mx-rd.x,my-rd.y);
+        if(!Number.isFinite(d)||d>r)continue;
+        const number=p.MONUMENTENNUMMER||"";
+        const key=`${layer.name}:${number||f.id||`${mx},${my}`}`;
+        if(monumentSeen.has(key))continue;
+        monumentSeen.add(key);
+        const ll=rdToWgs84(mx,my);
+        const address=[p.STRAATNAAM,p.HUISNUMMERS].filter(Boolean).join(" ");
+        let popup="<div style=\"min-width:250px\"><b>🏛 "+esc(layer.label)+"</b><br>";
+        popup+="Monumentnummer: <b>"+esc(number||"Onbekend")+"</b><br>";
+        if(address)popup+="Adres: <b>"+esc(address)+"</b><br>";
+        if(p.PLAATSNAAM)popup+=esc(p.PLAATSNAAM);
+        if(p.MIP_NR)popup+="<br>MIP: "+esc(p.MIP_NR);
+        if(p.IND_WAARDERING)popup+="<br>Waardering: "+esc(p.IND_WAARDERING);
+        popup+="<hr style=\"margin:8px 0\"><small>Bron: Provincie Overijssel · B73 Cultuur</small></div>";
+        const isRM=layer.name==="B73_Rijksmonumenten";
+        const icon=L.divIcon({
+          className:"",
+          html:"<div style=\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">"+(isRM?"RM":"GM")+"</div>",
+          iconSize:[30,30],iconAnchor:[15,15]
+        });
+        monumentLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
+      }
+    }catch(e){console.error("Overijssel monument WFS fout:",e);}
   }
-
-  setStatus(`WFS-detail Ommen: ${results.join(" || ")}`);
-  console.log("Overijssel WFS-detailtest",results);
 }
 /* =========================================================
    RCE FUNCTIE 1
@@ -953,15 +970,13 @@ async function loadBAG(lat,lng,radius){
 
       bagLabel.addLayer(lab);
 
-      // TIJDELIJK UIT tijdens WFS-test:
-      // loadRCEForPand(o);
+      loadOverijsselMonumentenVoorPand(o);
 
     });
 
-    // TIJDELIJK UIT tijdens WFS-test:
-    // setStatus(
-    //   `${list.length} BAG binnen ${radius}m`
-    // );
+    setStatus(
+      `${list.length} BAG binnen ${radius}m`
+    );
 
   }catch(e){
 
@@ -1065,7 +1080,7 @@ map.on("click",async e=>{
 yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 window.addEventListener("load",()=>{
-  setTimeout(testOverijsselMonumentenWFSDebug,2500);
+  // Monumenten worden ruimtelijk geladen per BAG-pand.
   if(toggleKadasterColors)toggleKadasterColors.checked=true;
   setTimeout(()=>{
     if(navigator.geolocation){
