@@ -425,7 +425,7 @@ async function loadOverijsselMonumentenVoorPand(o){
         const hiddenKeys=new Set([
           "OBJECTID","geometry","SHAPE","SHAPE_LENGTH","SHAPE_AREA",
           "MONUMENTENNUMMER","STRAATNAAM","HUISNUMMERS","PLAATSNAAM",
-          "MIP_NR","IND_WAARDERING"
+          "MIP_NR","IND_WAARDERING","TOELICHTING","PREVIEW"
         ]);
 
         const preferredKeys=[
@@ -502,7 +502,7 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         // Neem ook overige niet-technische WFS-attributen mee.
         Object.keys(p).forEach(key=>{
-          if(used.has(key)||hiddenKeys.has(key)||key.startsWith("_"))return;
+          if(used.has(key)||hiddenKeys.has(key)||key.startsWith("_")||String(key).trim().toLowerCase()==="toelichting"||String(key).trim().toLowerCase()==="preview")return;
           const value=displayValue(p[key]);
           if(!value)return;
           detailRows+=fieldRow(key);
@@ -524,6 +524,8 @@ async function loadOverijsselMonumentenVoorPand(o){
               ${address ? esc(address) : "Onbekend"}
               ${p.PLAATSNAAM ? ", "+esc(p.PLAATSNAAM) : ""}
             </div>
+
+            <!--GEMEENTE_PREVIEW-->
 
             ${detailRows
               ? `<div style="border-top:1px solid #ddd;padding-top:2px">${detailRows}</div>`
