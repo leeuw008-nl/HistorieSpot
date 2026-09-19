@@ -425,6 +425,41 @@ async function loadOverijsselMonumentenVoorPand(o){
         const d=Math.hypot(mx-rd.x,my-rd.y);
         if(!Number.isFinite(d)||d>r)continue;
 
+        /*
+           GEMEENTELIJKE MONUMENTEN
+           Hersteld uit de werkende versie van commit
+           545ef58a0dcff48d269483bca087d1b991b93520.
+           Alleen deze GM-rendering wordt hier gebruikt;
+           de bestaande RM-rendering hieronder blijft ongemoeid.
+        */
+        if(layer.name==="B73_Gemeentelijke_Monumenten"){
+          const number=String(p.MONUMENTENNUMMER||"").trim();
+          const key=layer.name+":"+(number||f.id||(mx+","+my));
+          if(monumentSeen.has(key))continue;
+          monumentSeen.add(key);
+
+          const ll=rdToWgs84(mx,my);
+          const address=[p.STRAATNAAM,p.HUISNUMMERS].filter(Boolean).join(" ");
+
+          let popup="<div style=\"min-width:250px\"><b>🏛 Gemeentelijk monument</b><br>";
+          popup+="Monumentnummer: <b>"+esc(number||"Onbekend")+"</b><br>";
+          if(address)popup+="Adres: <b>"+esc(address)+"</b><br>";
+          if(p.PLAATSNAAM)popup+=esc(p.PLAATSNAAM);
+          if(p.MIP_NR)popup+="<br>MIP: "+esc(p.MIP_NR);
+          if(p.IND_WAARDERING)popup+="<br>Waardering: "+esc(p.IND_WAARDERING);
+          popup+="<hr style=\"margin:8px 0\"><small>Bron: Provincie Overijssel · B73 Cultuur</small></div>";
+
+          const icon=L.divIcon({
+            className:"",
+            html:"<div style=\"background:#1d5d8f;color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">GM</div>",
+            iconSize:[30,30],
+            iconAnchor:[15,15]
+          });
+
+          monumentLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
+          continue;
+        }
+
         const getProp=(...keys)=>{
           for(const key of keys){
             const value=p[key];
