@@ -373,8 +373,6 @@ async function loadOverijsselMonumentenVoorPand(o){
 
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
 
-  // RM komt nu uit de landelijke RCE-bron.
-  // GM blijft bewust de bestaande Overijssel-bron gebruiken.
   const layers=[
     {
       name:"Rijksmonumenten",
@@ -389,6 +387,15 @@ async function loadOverijsselMonumentenVoorPand(o){
       typeName:"B73_Cultuur:B73_Gemeentelijke_Monumenten"
     }
   ];
+
+  // BAG-adres wordt als betrouwbare fallback gebruikt voor het RM-adres.
+  let bagAddresses=[];
+  try{
+    bagAddresses=await getBAGAddresses(o.f.properties||{},o);
+  }catch(e){
+    console.warn("BAG-adres voor monument-popup:",e);
+  }
+  const bagAddress=bagAddresses[0]||null;
 
   for(const layer of layers){
     try{
@@ -418,52 +425,90 @@ async function loadOverijsselMonumentenVoorPand(o){
         const d=Math.hypot(mx-rd.x,my-rd.y);
         if(!Number.isFinite(d)||d>r)continue;
 
-        const number=
-          p.MONUMENTENNUMMER||
-          p.Rijksmonumentnummer||
-          p.rijksmonumentnummer||
-          p.Ref_nr||
-          p.OBJECTNUMMER||
-          "";
+        const getProp=(...keys)=>{
+          for(const key of keys){
+            const value=p[key];
+            if(value!==undefined&&value!==null&&String(value).trim()!=="")
+              return value;
+          }
+          return "";
+        };
+
+        const number=String(getProp(
+          "MONUMENTENNUMMER",
+          "monumenten_nummer",
+          "rijksmonumentnummer",
+          "Rijksmonumentnummer",
+          "RIJKSMONUMENTNUMMER",
+          "Ref_nr",
+          "OBJECTNUMMER"
+        )||"").trim();
+
+        const isRM=layer.name==="Rijksmonumenten";
+
+        const naam=String(getProp(
+          "NAAM","Naam","BENAMING","Benaming",
+          "naam","benaming"
+        )||"").trim();
+
+        const status=String(getProp(
+          "STATUS","Status","status",
+          "JURIDISCHE_STATUS","juridische_status"
+        )||"").trim();
+
+        const omschrijving=String(getProp(
+          "OMSCHRIJVING","Omschrijving","omschrijving"
+        )||"").trim();
+
+        const straat=String(getProp(
+          "STRAATNAAM","straatnaam","Straat","straat",
+          "OPENBARERUIMTE","openbare_ruimte","openbareRuimte"
+        )||"").trim();
+
+        const huisnummer=String(getProp(
+          "HUISNUMMERS","huisnummers","HUISNUMMER","huisnummer",
+          "Huisnummer"
+        )||"").trim();
+
+        const postcode=String(getProp(
+          "POSTCODE","postcode","Postcode"
+        )||"").trim();
+
+        const plaats=String(getProp(
+          "PLAATSNAAM","plaatsnaam","Plaats","plaats",
+          "WOONPLAATS","woonplaats","woonplaats_naam"
+        )||"").trim();
+
+        const url=String(getProp(
+          "RIJKSMONUMENTURL","rijksmonumenturl",
+          "RIJKSMONUMENT_URL","RijksmonumentURL",
+          "URL","Url","url","KICH_URL"
+        )||"").trim();
+
+        // Voor het RM-adres: eerst de RCE/WFS-velden, daarna BAG.
+        const finalStraat=straat || (bagAddress?.straat||"");
+        const finalHuisnummer=huisnummer || (bagAddress?.huisnummer||"");
+        const finalHuisletter=bagAddress?.huisletter||"";
+        const finalToevoeging=bagAddress?.toevoeging||"";
+        const finalPostcode=postcode || (bagAddress?.postcode||"");
+        const finalPlaats=plaats || (bagAddress?.woonplaats||"");
+
+        const addressText=[
+          finalStraat,
+          finalHuisnummer+finalHuisletter+finalToevoeging
+        ].filter(Boolean).join(" ");
+
+        const nummer=number||"Onbekend";
+        const registerUrl=url ||
+          (isRM && number
+            ? "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(number)
+            : "");
 
         const key=`${layer.name}:${number||f.id||`${mx},${my}`}`;
         if(monumentSeen.has(key))continue;
         monumentSeen.add(key);
 
         const ll=rdToWgs84(mx,my);
-        const address=[
-          p.STRAATNAAM||p.Straat||p.openbareRuimte||"",
-          p.HUISNUMMERS||p.Huisnummer||p.huisnummer||""
-        ].filter(Boolean).join(" ");
-
-        const nummer=number||"Onbekend";
-        const isRM=layer.name==="Rijksmonumenten";
-
-        const naam=
-          p.NAAM||
-          p.Naam||
-          p.BENAMING||
-          p.Benaming||
-          "";
-
-        const status=
-          p.STATUS||
-          p.Status||
-          p.status||
-          "";
-
-        const omschrijving=
-          p.OMSCHRIJVING||
-          p.Omschrijving||
-          p.omschrijving||
-          "";
-
-        const url=
-          p.URL||
-          p.Url||
-          p.url||
-          p.KICH_URL||
-          "";
 
         const popup=`
           <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
@@ -478,17 +523,18 @@ async function loadOverijsselMonumentenVoorPand(o){
 
             <div style="margin-bottom:9px">
               <b>Adres</b><br>
-              ${address ? esc(address) : "Onbekend"}
-              ${p.PLAATSNAAM||p.Plaats ? ", "+esc(p.PLAATSNAAM||p.Plaats) : ""}
+              ${addressText ? esc(addressText) : "Onbekend"}
+              ${finalPostcode ? "<br>"+esc(finalPostcode) : ""}
+              ${finalPlaats ? "<br>"+esc(finalPlaats) : ""}
             </div>
 
             ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
             ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
             ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
 
-            ${isRM && number
+            ${isRM && registerUrl
               ? `<div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
-                  <a href="https://monumentenregister.cultureelerfgoed.nl/monumenten/${encodeURIComponent(number)}" target="_blank" rel="noopener" style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
+                  <a href="${esc(registerUrl)}" target="_blank" rel="noopener" style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
                     Rijksmonumentenregister
                   </a>
                 </div>`
@@ -512,8 +558,8 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
           loadGemeenteMonumentImages({
-            straat:p.STRAATNAAM||"",
-            huisnummer:p.HUISNUMMERS||""
+            straat:straat,
+            huisnummer:huisnummer
           }).then(images=>{
             if(!images.length)return;
             const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
