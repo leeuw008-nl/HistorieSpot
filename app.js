@@ -453,9 +453,12 @@ async function loadOverijsselMonumentenVoorPand(o){
           "naam","benaming"
         )||"").trim();
 
-        const status=String(getProp(
-          "STATUS","Status","status",
-          "JURIDISCHE_STATUS","juridische_status"
+        const monumentType=String(getProp(
+          "MONUMENTTYPE","Monumenttype","monumenttype",
+          "TYPE","Type","type",
+          "OBJECTTYPE","Objecttype","objecttype",
+          "OORSPRONKELIJKE_FUNCTIE","OorspronkelijkeFunctie",
+          "FUNCTIE","Functie","functie"
         )||"").trim();
 
         const omschrijving=String(getProp(
@@ -504,10 +507,12 @@ async function loadOverijsselMonumentenVoorPand(o){
           finalHuisnummer+finalHuisletter+finalToevoeging
         ].filter(Boolean).join(" ");
 
-        const nummer=number||"Onbekend";
+        // Als het WFS-nummer ontbreekt, haal het nummer uit de werkende RCE-registerlink.
+        const nummerUitUrl=(url.match(/(?:monumenten\\/|monument\\/)(\\d+)/i)||[])[1]||"";
+        const nummer=number||nummerUitUrl||"Onbekend";
         const registerUrl=url ||
-          (isRM && number
-            ? "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(number)
+          (isRM && nummer!=="Onbekend"
+            ? "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(nummer)
             : "");
 
         const key=`${layer.name}:${number||f.id||`${mx},${my}`}`;
@@ -535,7 +540,7 @@ async function loadOverijsselMonumentenVoorPand(o){
             </div>
 
             ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
-            ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
+            ${monumentType ? `<div style="margin-top:8px"><b>Monumenttype</b><br>${esc(monumentType)}</div>` : ""}
             ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
 
             ${isRM && registerUrl
