@@ -435,16 +435,20 @@ async function loadOverijsselMonumentenVoorPand(o){
         };
 
         const number=String(getProp(
+          "MONUMENTENNUMMER",
           "Rijksmonnr",
           "rijksmonument_num",
           "rijksmonumentnummer",
-          "MONUMENTENNUMMER",
           "monumenten_nummer",
           "Rijksmonumentnummer",
           "RIJKSMONUMENTNUMMER",
           "Ref_nr",
           "OBJECTNUMMER"
         )||"").trim();
+
+        // Exacte B73-velden voor gemeentelijke monumenten.
+        const mipNr=String(getProp("MIP_NR")||"").trim();
+        const waardering=String(getProp("IND_WAARDERING")||"").trim();
 
         const isRM=layer.name==="Rijksmonumenten";
 
@@ -543,6 +547,8 @@ async function loadOverijsselMonumentenVoorPand(o){
               ${finalPlaats ? "<br>"+esc(finalPlaats) : ""}
             </div>
 
+            ${!isRM && mipNr ? `<div style="margin-top:8px"><b>MIP-nummer</b><br>${esc(mipNr)}</div>` : ""}
+            ${!isRM && waardering ? `<div style="margin-top:8px"><b>Waardering</b><br>${esc(waardering)}</div>` : ""}
             ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
             ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
             ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
