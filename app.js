@@ -508,7 +508,7 @@ async function loadOverijsselMonumentenVoorPand(o){
         ].filter(Boolean).join(" ");
 
         // Als het WFS-nummer ontbreekt, haal het nummer uit de werkende RCE-registerlink.
-        const nummerUitUrl=(url.match(/(?:monumenten\\/|monument\\/)(\\d+)/i)||[])[1]||"";
+        const nummerUitUrl=(url.match(/(?:monumenten\/|monument\/)(\d+)/i)||[])[1]||"";
         const nummer=number||nummerUitUrl||"Onbekend";
         const registerUrl=url ||
           (isRM && nummer!=="Onbekend"
@@ -540,7 +540,7 @@ async function loadOverijsselMonumentenVoorPand(o){
             </div>
 
             ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
-            ${monumentType ? `<div style="margin-top:8px"><b>Monumenttype</b><br>${esc(monumentType)}</div>` : ""}
+            ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
             ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
 
             ${isRM && registerUrl
