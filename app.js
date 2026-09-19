@@ -266,6 +266,51 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 const monumentLayer=L.layerGroup().addTo(map);
 const monumentSeen=new Set();
 
+/* =========================================================
+   NATIONALE RIJKSMONUMENTEN - RCE WFS
+   Zoekt uitsluitend ruimtelijk rond GPS/klikpositie.
+   De marker wordt geplaatst op de WFS-geometry zelf.
+   ========================================================= */
+const nationalRMLayer=L.layerGroup().addTo(map);
+let nationalRMRequest=0;
+
+async function loadNationalRijksmonumenten(lat,lng,radius){
+  const requestId=++nationalRMRequest;
+  nationalRMLayer.clearLayers();
+  try{
+    const rd=wgs84ToRD(lat,lng);
+    const params=new URLSearchParams({
+      service:"WFS",version:"2.0.0",request:"GetFeature",
+      typeNames:"rce:NationalListedMonumentPoints",
+      srsName:"EPSG:28992",
+      bbox:rd.x-radius+","+rd.y-radius+","+rd.x+radius+","+rd.y+radius+",EPSG:28992",
+      outputFormat:"application/json",count:"100"
+    });
+    const res=await fetch("https://services.rce.geovoorziening.nl/rce/wfs?"+params);
+    if(!res.ok)return;
+    const data=await res.json();
+    if(requestId!==nationalRMRequest)return;
+    const features=Array.isArray(data.features)?data.features:[];
+    for(const f of features){
+      const g=f.geometry||{},p=f.properties||{};
+      if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)continue;
+      const x=Number(g.coordinates[0]),y=Number(g.coordinates[1]);
+      if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+      const d=Math.hypot(x-rd.x,y-rd.y);
+      if(!Number.isFinite(d)||d>radius)continue;
+      const number=p.monumentnummer||p.MONUMENTNUMMER||p.rijksmonumentnummer||p.RIJKSMONUMENTNUMMER||p.identificatie||p.IDENTIFICATIE||f.id||String(x)+","+String(y);
+      const name=p.naam||p.NAAM||p.benaming||p.BENAMING||"";
+      const address=p.adres||p.ADRES||p.straatnaam||p.STRAATNAAM||"";
+      const place=p.plaatsnaam||p.PLAATSNAAM||p.woonplaats||p.WOONPLAATS||"";
+      const registerUrl=/^\d+$/.test(String(number))?"https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(number):"";
+      const ll=rdToWgs84(x,y);
+      const popup="<div style=\"min-width:270px;max-width:360px;font-size:14px;line-height:1.45\"><div style=\"font-size:18px;font-weight:700;margin-bottom:9px\">🏛 Rijksmonument</div><div style=\"background:#f7eeee;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px\"><div style=\"font-size:12px;color:#666\">Rijksmonumentnummer</div><div style=\"font-size:17px;font-weight:700\">"+esc(number)+"</div></div>"+(name?"<div><b>Naam</b><br>"+esc(name)+"</div>":"")+(address?"<div style=\"margin-top:8px\"><b>Adres</b><br>"+esc(address)+(place?", "+esc(place):"")+"</div>":"")+(registerUrl?"<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><a href=\""+registerUrl+"\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px\">Rijksmonumentenregister</a></div>":"")+"<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: Rijksdienst voor het Cultureel Erfgoed · RCE WFS</div></div>";
+      const icon=L.divIcon({className:"",html:"<div style=\"background:#7b1e1e;color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">RM</div>",iconSize:[30,30],iconAnchor:[15,15]});
+      nationalRMLayer.addLayer(L.marker([ll.lat,ll.lon],{icon:icon}).bindPopup(popup));
+    }
+  }catch(e){console.warn("Nationaal Rijksmonumenten WFS fout:",e);}
+}
+
 function rdToWgs84(x,y){
   const dx=(x-155000)/100000;
   const dy=(y-463000)/100000;
@@ -1276,6 +1321,7 @@ locateBtn&&locateBtn.addEventListener(
         });
         accCircle=L.circle([lat,lng],{radius:acc,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
         loadBAG(lat,lng,r);
+        loadNationalRijksmonumenten(lat,lng,r);
         closeMenu();
       },
       ()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},
@@ -1291,6 +1337,7 @@ radiusSel&&radiusSel.addEventListener(
     if(curMarker){
       const ll=curMarker.getLatLng();
       loadBAG(ll.lat,ll.lng,r);
+      loadNationalRijksmonumenten(ll.lat,ll.lng,r);
     }else{
       loadBAG(52.516,6.42,r);
     }
@@ -1317,6 +1364,7 @@ map.on("click",async e=>{
   selectedMarker=L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
   setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
   loadBAG(lat,lng,r);
+  loadNationalRijksmonumenten(lat,lng,r);
   loadHistForLocation(lat,lng);
   try{
     if(map.hasLayer(minuutLayer)){
@@ -1344,12 +1392,12 @@ window.addEventListener("load",()=>{
         map.setView([lat,lng],18);
         curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
         accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);loadHistForLocation(lat,lng);
+        loadBAG(lat,lng,r);loadNationalRijksmonumenten(lat,lng,r);loadHistForLocation(lat,lng);
       },()=>{
-        loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
+        loadBAG(52.516,6.42,Number(radiusSel.value));loadNationalRijksmonumenten(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
       },{enableHighAccuracy:true,timeout:8000});
     }else{
-      loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
+      loadBAG(52.516,6.42,Number(radiusSel.value));loadNationalRijksmonumenten(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
     }
   },600);
 });
