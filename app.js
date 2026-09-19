@@ -540,6 +540,7 @@ async function loadOverijsselMonumentenVoorPand(o){
             </div>
 
             ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
+            ${monumentType ? `<div style="margin-top:8px"><b>Type</b><br>${esc(monumentType)}</div>` : ""}
             ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
             ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
             ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
