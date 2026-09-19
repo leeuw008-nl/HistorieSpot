@@ -435,9 +435,11 @@ async function loadOverijsselMonumentenVoorPand(o){
         };
 
         const number=String(getProp(
+          "Rijksmonnr",
+          "rijksmonument_num",
+          "rijksmonumentnummer",
           "MONUMENTENNUMMER",
           "monumenten_nummer",
-          "rijksmonumentnummer",
           "Rijksmonumentnummer",
           "RIJKSMONUMENTNUMMER",
           "Ref_nr",
@@ -461,27 +463,31 @@ async function loadOverijsselMonumentenVoorPand(o){
         )||"").trim();
 
         const straat=String(getProp(
-          "STRAATNAAM","straatnaam","Straat","straat",
+          "Straat",
+          "STRAATNAAM","straatnaam","straat",
           "OPENBARERUIMTE","openbare_ruimte","openbareRuimte"
         )||"").trim();
 
         const huisnummer=String(getProp(
-          "HUISNUMMERS","huisnummers","HUISNUMMER","huisnummer",
-          "Huisnummer"
+          "Huisnummer",
+          "HUISNUMMERS","huisnummers","HUISNUMMER","huisnummer"
         )||"").trim();
 
         const postcode=String(getProp(
-          "POSTCODE","postcode","Postcode"
+          "Postcode",
+          "POSTCODE","postcode"
         )||"").trim();
 
         const plaats=String(getProp(
-          "PLAATSNAAM","plaatsnaam","Plaats","plaats",
+          "BAG_plaats",
+          "Plaats",
+          "PLAATSNAAM","plaatsnaam","plaats",
           "WOONPLAATS","woonplaats","woonplaats_naam"
         )||"").trim();
 
         const url=String(getProp(
-          "RIJKSMONUMENTURL","rijksmonumenturl",
-          "RIJKSMONUMENT_URL","RijksmonumentURL",
+          "rijksmonumenturl",
+          "RIJKSMONUMENTURL","RIJKSMONUMENT_URL","RijksmonumentURL",
           "URL","Url","url","KICH_URL"
         )||"").trim();
 
