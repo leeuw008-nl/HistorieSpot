@@ -368,13 +368,113 @@ async function loadGemeenteMonumentImages(address){
   return result;
 }
 
+
+async function getRijksmonumentDetails(number){
+  if(!number || number==="Onbekend") return null;
+
+  try{
+    const url=
+      "https://api.linkeddata.cultureelerfgoed.nl/"+
+      "queries/rce/rest-api-rijksmonumenten/run?"+
+      "page=1&pageSize=10&rijksmonumentnummer="+
+      encodeURIComponent(String(number));
+
+    const res=await fetch(url);
+    if(!res.ok) return null;
+
+    const data=await res.json();
+    if(!Array.isArray(data) || !data.length) return null;
+
+    return data[0];
+  }catch(e){
+    console.warn("RCE detailgegevens fout:",e);
+    return null;
+  }
+}
+
+function buildRijksmonumentPopup(rce,number,fallbackAddress){
+  const bag=rce?.heeftBAGRelatie||{};
+
+  const adres=
+    bag.volledigAdres ||
+    fallbackAddress ||
+    "Onbekend";
+
+  const postcode=bag.postcode||"";
+  const plaats=bag.woonplaatsnaam||"";
+
+  const inschrijving=rce?.datumInschrijvingInMonumentenregister
+    ? new Date(rce.datumInschrijvingInMonumentenregister).toLocaleDateString("nl-NL")
+    : "";
+
+  const functie=
+    rce?.heeftOorspronkelijkeFunctie?.heeftFunctieNaam?.["skos:prefLabel"]||"";
+
+  const omschrijving=
+    rce?.heeftOmschrijving?.["ceo:omschrijving"]||
+    rce?.heeftKennisregistratie?.[0]?.["ceo:omschrijving"]||
+    "";
+
+  const aard=
+    rce?.heeftMonumentAard?.["skos:prefLabel"]||"";
+
+  const status=
+    rce?.heeftJuridischeStatus?.["skos:prefLabel"]||"";
+
+  const registerUrl=
+    "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+
+    encodeURIComponent(String(number));
+
+  return `
+    <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
+      <div style="font-size:18px;font-weight:700;margin-bottom:9px">
+        🏛 Rijksmonument
+      </div>
+
+      <div style="background:#f7eeee;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px">
+        <div style="font-size:12px;color:#666">Rijksmonumentnummer</div>
+        <div style="font-size:17px;font-weight:700">${esc(number)}</div>
+      </div>
+
+      <div style="margin-bottom:9px">
+        <b>Adres</b><br>
+        ${esc(adres)}
+        ${postcode ? "<br>"+esc(postcode) : ""}
+        ${plaats ? "<br>"+esc(plaats) : ""}
+      </div>
+
+      ${aard ? `<div style="margin-top:8px"><b>Monumentaard</b><br>${esc(aard)}</div>` : ""}
+      ${status ? `<div style="margin-top:8px"><b>Juridische status</b><br>${esc(status)}</div>` : ""}
+      ${inschrijving ? `<div style="margin-top:8px"><b>Inschrijving register</b><br>${esc(inschrijving)}</div>` : ""}
+      ${functie ? `<div style="margin-top:8px"><b>Oorspronkelijke functie</b><br>${esc(functie)}</div>` : ""}
+
+      ${omschrijving
+        ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd">
+            <b>Omschrijving</b><br>
+            <span style="font-size:13px">${esc(omschrijving)}</span>
+          </div>`
+        : ""}
+
+      <div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
+        <a href="${registerUrl}" target="_blank" rel="noopener"
+           style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
+          Rijksmonumentenregister
+        </a>
+      </div>
+
+      <div style="font-size:11px;color:#666;margin-top:8px">
+        Bron: Rijksdienst voor het Cultureel Erfgoed
+      </div>
+    </div>
+  `;
+}
+
+
 async function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
 
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
 
-  // Rijksmonumenten komen uit de landelijke RCE-WFS.
-  // Gemeentelijke monumenten blijven bewust de bestaande Overijssel-bron gebruiken.
   const layers=[
     {
       name:"Rijksmonumenten",
@@ -418,102 +518,132 @@ async function loadOverijsselMonumentenVoorPand(o){
         const d=Math.hypot(mx-rd.x,my-rd.y);
         if(!Number.isFinite(d)||d>r)continue;
 
-        const number=
-          p.MONUMENTENNUMMER||
-          p.Monumentnummer||
-          p.monumentnummer||
-          p.Rijksmonumentnummer||
-          p.rijksmonumentnummer||
-          p.rijksmonumentnr||
-          p.Rijksmonumentnr||
-          p.RCE_NUMMER||
-          p.RCE_NR||
-          p.rce_nummer||
-          p.rce_nr||
-          p.Ref_nr||
-          p.OBJECTNUMMER||
-          p.objectnummer||
-          p.ID||
-          p.id||
-          "";
+        const getProp=(...keys)=>{
+          for(const key of keys){
+            const value=p[key];
+            if(value!==undefined&&value!==null&&String(value).trim()!=="")
+              return value;
+          }
+          return "";
+        };
+
+        const number=String(getProp(
+          "Rijksmonnr",
+          "rijksmonument_num",
+          "rijksmonumentnummer",
+          "MONUMENTENNUMMER",
+          "monumenten_nummer",
+          "Rijksmonumentnummer",
+          "RIJKSMONUMENTNUMMER",
+          "Ref_nr",
+          "OBJECTNUMMER",
+          "objectnummer",
+          "ID",
+          "id"
+        )||"").trim();
 
         const key=`${layer.name}:${number||f.id||`${mx},${my}`}`;
         if(monumentSeen.has(key))continue;
         monumentSeen.add(key);
 
         const ll=rdToWgs84(mx,my);
+        const isRM=layer.name==="Rijksmonumenten";
+
+        const straat=String(getProp(
+          "Straat","STRAATNAAM","straatnaam","straat",
+          "OPENBARERUIMTE","openbare_ruimte","openbareRuimte"
+        )||"").trim();
+
+        const huisnummer=String(getProp(
+          "Huisnummer","HUISNUMMERS","huisnummers",
+          "HUISNUMMER","huisnummer"
+        )||"").trim();
+
+        const postcode=String(getProp(
+          "Postcode","POSTCODE","postcode"
+        )||"").trim();
+
+        const plaats=String(getProp(
+          "BAG_plaats","Plaats","PLAATSNAAM","plaatsnaam",
+          "plaats","WOONPLAATS","woonplaats","woonplaats_naam"
+        )||"").trim();
+
         const address=[
-          p.STRAATNAAM||p.Straat||p.openbareRuimte||"",
-          p.HUISNUMMERS||p.Huisnummer||p.huisnummer||""
+          straat,
+          huisnummer
         ].filter(Boolean).join(" ");
 
         const nummer=number||"Onbekend";
-        const isRM=layer.name==="Rijksmonumenten";
 
-        const naam=
-          p.NAAM||
-          p.Naam||
-          p.BENAMING||
-          p.Benaming||
-          "";
+        let popup;
 
-        const status=
-          p.STATUS||
-          p.Status||
-          p.status||
-          "";
+        if(isRM){
+          popup=buildRijksmonumentPopup(null,nummer,address);
 
-        const omschrijving=
-          p.OMSCHRIJVING||
-          p.Omschrijving||
-          p.omschrijving||
-          "";
+          // De WFS levert de marker en het nummer.
+          // De officiële RCE Linked Data API levert de inhoudelijke velden.
+          if(number){
+            getRijksmonumentDetails(number).then(details=>{
+              if(!details)return;
 
-        const url=
-          p.URL||
-          p.Url||
-          p.url||
-          p.KICH_URL||
-          "";
+              const enrichedAddress=
+                details?.heeftBAGRelatie?.volledigAdres||
+                address||
+                "Onbekend";
 
-        const popup=`
-          <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
-            <div style="font-size:18px;font-weight:700;margin-bottom:9px">
-              🏛 ${esc(layer.label)}
+              monumentMarker.setPopupContent(
+                buildRijksmonumentPopup(
+                  details,
+                  number,
+                  enrichedAddress
+                )
+              );
+            }).catch(e=>console.warn("RCE RM-verrijking:",e));
+          }
+        }else{
+          const naam=String(getProp(
+            "NAAM","Naam","BENAMING","Benaming","naam","benaming"
+          )||"").trim();
+
+          const status=String(getProp(
+            "STATUS","Status","status"
+          )||"").trim();
+
+          const omschrijving=String(getProp(
+            "OMSCHRIJVING","Omschrijving","omschrijving"
+          )||"").trim();
+
+          popup=`
+            <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
+              <div style="font-size:18px;font-weight:700;margin-bottom:9px">
+                🏛 Gemeentelijk monument
+              </div>
+
+              <div style="background:#f3f5f7;border-left:4px solid #1d5d8f;border-radius:6px;padding:9px 10px;margin-bottom:10px">
+                <div style="font-size:12px;color:#666">Monumentnummer</div>
+                <div style="font-size:17px;font-weight:700">${esc(nummer)}</div>
+              </div>
+
+              <div style="margin-bottom:9px">
+                <b>Adres</b><br>
+                ${address ? esc(address) : "Onbekend"}
+                ${plaats ? ", "+esc(plaats) : ""}
+              </div>
+
+              ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
+              ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
+              ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
+
+              <div style="font-size:11px;color:#666;margin-top:8px">
+                Bron: Provincie Overijssel · B73 Cultuur
+              </div>
             </div>
-
-            <div style="background:#f3f5f7;border-left:4px solid ${isRM?"#7b1e1e":"#1d5d8f"};border-radius:6px;padding:9px 10px;margin-bottom:10px">
-              <div style="font-size:12px;color:#666">${isRM?"Rijksmonumentnummer":"Monumentnummer"}</div>
-              <div style="font-size:17px;font-weight:700">${esc(nummer)}</div>
-            </div>
-
-            <div style="margin-bottom:9px">
-              <b>Adres</b><br>
-              ${address ? esc(address) : "Onbekend"}
-              ${p.PLAATSNAAM||p.Plaats ? ", "+esc(p.PLAATSNAAM||p.Plaats) : ""}
-            </div>
-
-            ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
-            ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
-            ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
-
-            ${isRM && number
-              ? `<div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
-                  <a href="https://monumentenregister.cultureelerfgoed.nl/monumenten/${encodeURIComponent(number)}" target="_blank" rel="noopener" style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
-                    Rijksmonumentenregister
-                  </a>
-                </div>`
-              : ""}
-
-            <div style="font-size:11px;color:#666;margin-top:8px">
-              Bron: ${isRM?"Rijksdienst voor het Cultureel Erfgoed":"Provincie Overijssel · B73 Cultuur"}
-            </div>
-          </div>
-        `;
+          `;
+        }
 
         const icon=L.divIcon({
           className:"",
-          html:"<div style=\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">"+(isRM?"RM":"GM")+"</div>",
+          html:"<div style=\\\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\\\">"+(isRM?"RM":"GM")+"</div>",
           iconSize:[30,30],
           iconAnchor:[15,15]
         });
@@ -523,12 +653,16 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
           loadGemeenteMonumentImages({
-            straat:p.STRAATNAAM||"",
-            huisnummer:p.HUISNUMMERS||""
+            straat:straat,
+            huisnummer:huisnummer
           }).then(images=>{
             if(!images.length)return;
-            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
+            const gallery="<div style=\\\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\\\"><b>Preview</b><div style=\\\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\\\">"+images.map(img=>"<a href=\\\""+esc(img.url)+"\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\"><img src=\\\""+esc(img.url)+"\\\" alt=\\\""+esc(img.label)+"\\\" loading=\\\"lazy\\\" onerror=\\\"this.parentElement.style.display='none'\\\" style=\\\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\\\"></a>").join("")+"</div><div style=\\\"font-size:10px;color:#666;margin-top:5px\\\">Bron: Gemeenteblad 2026, 30438</div></div>";
+            monumentMarker.setPopupContent(
+              monumentMarker.getPopup()?.getContent() || popup
+            );
+            const current=monumentMarker.getPopup()?.getContent()||popup;
+            monumentMarker.setPopupContent(current+gallery);
           }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
         }
       }
@@ -1198,136 +1332,3 @@ async function loadBAG(lat,lng,radius){
 
       const lab=L.marker(
         [o.c.lat,o.c.lng],
-        {icon:ic}
-      ).bindPopup(popup);
-
-      bagLabel.addLayer(lab);
-
-      loadOverijsselMonumentenVoorPand(o);
-
-    });
-
-    setStatus(
-      `${list.length} BAG binnen ${radius}m`
-    );
-
-  }catch(e){
-
-    console.error(
-      "BAG fout:",
-      e
-    );
-
-    setStatus("BAG fout");
-
-  }
-}
-
-locateBtn&&locateBtn.addEventListener(
-  "click",
-  ()=>{
-    if(!navigator.geolocation){
-      setStatus("Geen geolocatie");
-      return;
-    }
-
-    setStatus("Locatie bepalen...");
-    locateBtn.disabled=true;
-
-    navigator.geolocation.getCurrentPosition(
-      p=>{
-        locateBtn.disabled=false;
-        const lat=p.coords.latitude,
-              lng=p.coords.longitude,
-              acc=Math.round(p.coords.accuracy),
-              r=Number(radiusSel.value);
-        map.setView([lat,lng],18);
-        if(curMarker)map.removeLayer(curMarker);
-        if(accCircle)map.removeLayer(accCircle);
-        if(selectedMarker){map.removeLayer(selectedMarker);selectedMarker=null;}
-        if(curMarker)map.removeLayer(curMarker);
-        curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie").openPopup();
-        curMarker.on("click",()=>{
-          loadBAG(lat,lng,r);
-          loadHistForLocation(lat,lng);
-          setStatus("Huidige positie – BAG laden...");
-        });
-        accCircle=L.circle([lat,lng],{radius:acc,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);
-        closeMenu();
-      },
-      ()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},
-      {enableHighAccuracy:true,timeout:15000}
-    );
-  }
-);
-
-radiusSel&&radiusSel.addEventListener(
-  "change",
-  ()=>{
-    const r=Number(radiusSel.value);
-    if(curMarker){
-      const ll=curMarker.getLatLng();
-      loadBAG(ll.lat,ll.lng,r);
-    }else{
-      loadBAG(52.516,6.42,r);
-    }
-  }
-);
-
-async function loadHistForLocation(lat,lng){
-  try{
-    if(!map.hasLayer(minuutLayer)) minuutLayer.addTo(map);
-    const rd=wgs84ToRD(lat,lng);
-    const b=[rd.x-50,rd.y-50,rd.x+50,rd.y+50].join(",");
-    const url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-    const res=await fetch(url); const data=await res.json(); if(!data.features||!data.features.length) return;
-    let code=data.features[0].properties.CODE; const orig=code; code=corr(code);
-    if(window.histLayer) map.removeLayer(window.histLayer);
-    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
-  }catch(e){console.error("hist 1832 load fail",e);}
-}
-
-let selectedMarker=null;
-map.on("click",async e=>{
-  const lat=e.latlng.lat, lng=e.latlng.lng, r=Number(radiusSel.value);
-  if(selectedMarker) map.removeLayer(selectedMarker);
-  selectedMarker=L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
-  setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
-  loadBAG(lat,lng,r);
-  loadHistForLocation(lat,lng);
-  try{
-    if(map.hasLayer(minuutLayer)){
-      const rd=wgs84ToRD(lat,lng),b=[rd.x-20,rd.y-20,rd.x+20,rd.y+20].join(","),url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
-      const res=await fetch(url),data=await res.json();if(data.features&&data.features.length){
-        let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
-        if(window.histLayer)map.removeLayer(window.histLayer);
-        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
-        const p=data.features[0].properties;
-        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><small>Geklikte positie wordt nu gebruikt voor BAG</small></div>`).openOn(map);
-      }
-    }
-  }catch(err){console.error(err);}
-});
-
-yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
-toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
-window.addEventListener("load",()=>{
-  // Monumenten worden ruimtelijk geladen per BAG-pand.
-  if(toggleKadasterColors)toggleKadasterColors.checked=true;
-  setTimeout(()=>{
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(p=>{
-        const lat=p.coords.latitude,lng=p.coords.longitude,r=Number(radiusSel.value);
-        map.setView([lat,lng],18);
-        curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
-        accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);loadHistForLocation(lat,lng);
-      },()=>{
-        loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
-      },{enableHighAccuracy:true,timeout:8000});
-    }else{
-      loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
-    }
-  },600);
-});
