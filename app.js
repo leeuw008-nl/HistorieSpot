@@ -608,11 +608,35 @@ async function loadOverijsselMonumentenVoorPand(o){
         monumentLayer.addLayer(monumentMarker);
 
         if(isRM && number){
-          getRijksmonumentDetails(number).then(details=>{
-            if(!details)return;
-            const enriched=buildRijksmonumentPopup(details,number,details.address||address);
-            monumentMarker.setPopupContent(enriched);
-          });
+          getBAGAddresses(p,o).then(addresses=>{
+            const work=addresses.map(addr=>
+              findRCEByAddress(addr).then(results=>{
+                const match=results.find(x=>
+                  String(x.rijksmonumentnummer||"").trim()===String(number).trim()
+                );
+                if(!match)return;
+
+                const bag=match.heeftBAGRelatie||{};
+                const enriched={
+                  address:[
+                    bag.openbareRuimte,
+                    bag.huisnummer,
+                    bag.postcode
+                  ].filter(Boolean).join(" "),
+                  aard:match.monumentAard||"",
+                  juridischeStatus:match.juridischeStatus||"",
+                  inschrijving:match.inschrijving||"",
+                  functie:match.functie||"",
+                  omschrijving:match.omschrijving||""
+                };
+
+                monumentMarker.setPopupContent(
+                  buildRijksmonumentPopup(enriched,number,enriched.address||address)
+                );
+              })
+            );
+            return Promise.all(work);
+          }).catch(e=>console.warn("RCE veldinformatie:",e));
         }
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
@@ -926,13 +950,39 @@ async function findRCEByAddress(address){
           "cultuurhistorischObjectnummer"
         );
 
-      results.push({
+      const monumentAard=
+        getLiteral(monumentSubject,"heeftMonumentaard") ||
+        getLiteral(monumentSubject,"monumentaard") ||
+        getLiteral(monumentSubject,"aardMonument");
 
+      const juridischeStatus=
+        getLiteral(monumentSubject,"heeftJuridischeStatus") ||
+        getLiteral(monumentSubject,"juridischeStatus") ||
+        getLiteral(monumentSubject,"juridische_status");
+
+      const inschrijving=
+        getLiteral(monumentSubject,"datumInschrijvingInMonumentenregister");
+
+      const omschrijving=
+        getLiteral(monumentSubject,"omschrijving") ||
+        getLiteral(monumentSubject,"heeftOmschrijving");
+
+      const functieSubject=getUri(monumentSubject,"heeftOorspronkelijkeFunctie");
+      const functie=functieSubject
+        ? getLiteral(functieSubject,"prefLabel") || getLiteral(functieSubject,"skos:prefLabel")
+        : getLiteral(monumentSubject,"heeftOorspronkelijkeFunctie");
+
+      results.push({
         rijksmonumentnummer:
           rijksmonumentnummer ||
           cultuurhistorischObjectnummer,
 
         cultuurhistorischObjectnummer,
+        monumentAard,
+        juridischeStatus,
+        inschrijving,
+        omschrijving,
+        functie,
 
         heeftBAGRelatie:{
           huisnummer:rceHuisnummer,
@@ -942,7 +992,6 @@ async function findRCEByAddress(address){
           heeftVerblijfsobject:
             rceVerblijfsobject
         }
-
       });
     }
 
