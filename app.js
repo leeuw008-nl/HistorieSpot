@@ -477,8 +477,29 @@ async function loadOverijsselMonumentenVoorPand(o){
           "";
 
         const popup=isRM
-          ? `\n              <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">\n                <div style="font-size:18px;font-weight:700;margin-bottom:9px">\n                  🏛 Rijksmonument\n                </div>\n\n                <div style="background:#f3f5f7;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px">\n                  <div style="font-size:12px;color:#666">Rijksmonumentnummer</div>\n                  <div style="font-size:17px;font-weight:700">\${esc(nummer)}</div>\n                </div>\n\n                <div style="margin-bottom:9px">\n                  <b>Adres</b><br>\n                  \${address ? esc(address) : "Onbekend"}\n                  \${p.PLAATSNAAM||p.Plaats ? ", "+esc(p.PLAATSNAAM||p.Plaats) : ""}\n                </div>\n\n                <div style="font-size:11px;color:#666;margin-top:8px">\n                  Bron: Rijksdienst voor het Cultureel Erfgoed\n                </div>\n              </div>\n            `
-          : `\n              <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">\n                <div style="font-size:18px;font-weight:700;margin-bottom:9px">\n                  🏛 Gemeentelijk monument\n                </div>\n\n                <div style="background:#f3f5f7;border-left:4px solid #1d5d8f;border-radius:6px;padding:9px 10px;margin-bottom:10px">\n                  <div style="font-size:12px;color:#666">Monumentnummer</div>\n                  <div style="font-size:17px;font-weight:700">\${esc(nummer)}</div>\n                </div>\n\n                <div style="margin-bottom:9px">\n                  <b>Adres</b><br>\n                  \${address ? esc(address) : "Onbekend"}\n                  \${p.PLAATSNAAM||p.Plaats ? ", "+esc(p.PLAATSNAAM||p.Plaats) : ""}\n                </div>\n\n                \${naam ? \`<div style="margin-top:8px"><b>Naam</b><br>\${esc(naam)}</div>\` : ""}\n                \${status ? \`<div style="margin-top:8px"><b>Status</b><br>\${esc(status)}</div>\` : ""}\n                \${omschrijving ? \`<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">\${esc(omschrijving)}</span></div>\` : ""}\n\n                <div style="font-size:11px;color:#666;margin-top:8px">\n                  Bron: Provincie Overijssel · B73 Cultuur\n                </div>\n              </div>\n            `;
+          ? '<div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">'+
+            '<div style="font-size:18px;font-weight:700;margin-bottom:9px">🏛 Rijksmonument</div>'+
+            '<div style="background:#f3f5f7;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px">'+
+            '<div style="font-size:12px;color:#666">Rijksmonumentnummer</div>'+
+            '<div style="font-size:17px;font-weight:700">'+esc(nummer)+'</div></div>'+
+            '<div style="margin-bottom:9px"><b>Adres</b><br>'+
+            (address ? esc(address) : 'Onbekend')+
+            ((p.PLAATSNAAM||p.Plaats) ? ', '+esc(p.PLAATSNAAM||p.Plaats) : '')+
+            '</div>'+
+            '<div style="font-size:11px;color:#666;margin-top:8px">Bron: Rijksdienst voor het Cultureel Erfgoed</div></div>'
+          : '<div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">'+
+            '<div style="font-size:18px;font-weight:700;margin-bottom:9px">🏛 Gemeentelijk monument</div>'+
+            '<div style="background:#f3f5f7;border-left:4px solid #1d5d8f;border-radius:6px;padding:9px 10px;margin-bottom:10px">'+
+            '<div style="font-size:12px;color:#666">Monumentnummer</div>'+
+            '<div style="font-size:17px;font-weight:700">'+esc(nummer)+'</div></div>'+
+            '<div style="margin-bottom:9px"><b>Adres</b><br>'+
+            (address ? esc(address) : 'Onbekend')+
+            ((p.PLAATSNAAM||p.Plaats) ? ', '+esc(p.PLAATSNAAM||p.Plaats) : '')+
+            '</div>'+
+            (naam ? '<div style="margin-top:8px"><b>Naam</b><br>'+esc(naam)+'</div>' : '')+
+            (status ? '<div style="margin-top:8px"><b>Status</b><br>'+esc(status)+'</div>' : '')+
+            (omschrijving ? '<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">'+esc(omschrijving)+'</span></div>' : '')+
+            '<div style="font-size:11px;color:#666;margin-top:8px">Bron: Provincie Overijssel · B73 Cultuur</div></div>';
 
         const icon=L.divIcon({
           className:"",
