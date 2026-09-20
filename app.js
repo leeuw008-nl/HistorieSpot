@@ -530,6 +530,7 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         const number=String(getProp(
           "Rijksmonnr",
+          "rijksmonument_nummer",
           "rijksmonument_num",
           "rijksmonumentnummer",
           "MONUMENTENNUMMER",
