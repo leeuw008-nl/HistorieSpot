@@ -690,292 +690,71 @@ async function getBAGAddresses(p,o){
   return results;
 }
 
-async function findRCEByAddress(address){
+async function loadNationalRijksmonumenten(lat,lng,radius){
   try{
-    const straat=String(address?.straat||"").trim();
-    const huisnummer=String(address?.huisnummer||"").trim();
-    const huisletter=String(address?.huisletter||"").trim();
-    const toevoeging=String(address?.toevoeging||"").trim();
-    const postcode=String(address?.postcode||"").replace(/\s+/g,"").trim();
-
-    if(!straat || !huisnummer)
-      return [];
-
-    const candidates=[];
-    const seenIds=new Set();
-
-    async function queryRCE(extra){
-      const params=new URLSearchParams({
-        page:"1",
-        pageSize:"10",
-        status:"rijksmonument",
-        ...extra
-      });
-
-      const url=
-        "https://api.linkeddata.cultureelerfgoed.nl/" +
-        "queries/rce/rest-api-rijksmonumenten/run?" +
-        params.toString();
-
-      const res=await fetch(url,{headers:{"Accept":"application/json"}});
-      if(!res.ok) return;
-
-      const data=await res.json();
-      if(!Array.isArray(data)) return;
-
-      data.forEach(rce=>{
-        if(!rce || rce["@type"]!=="Rijksmonument") return;
-        const id=String(rce.rijksmonumentnummer||rce["@id"]||"");
-        if(id && seenIds.has(id)) return;
-        if(id) seenIds.add(id);
-        candidates.push(rce);
-      });
-    }
-
-    // Eerst exact adres. Daarna ruimere landelijke zoekopdrachten als vangnet.
-    const volledigAdres=
-      [straat,huisnummer+huisletter+toevoeging]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-
-    if(volledigAdres)
-      await queryRCE({volledigAdres});
-
-    if(!candidates.length && postcode)
-      await queryRCE({postcode});
-
-    if(!candidates.length)
-      await queryRCE({straat});
-
-    const results=[];
-
-    for(const rce of candidates){
-      const bag=
-        rce.heeftBasisregistratieRelatie?.heeftBAGRelatie ||
-        rce.heeftBAGRelatie ||
-        {};
-
-      const rceStraat=String(bag.openbareRuimte||"").trim();
-      const rceHuisnummer=String(bag.huisnummer||"").trim();
-      const rcePostcode=String(bag.postcode||"").replace(/\s+/g,"").trim();
-
-      const straatMatch=
-        rceStraat.toLowerCase()===straat.toLowerCase();
-
-      const huisnummerMatch=
-        rceHuisnummer===huisnummer;
-
-      const postcodeMatch=
-        !postcode ||
-        !rcePostcode ||
-        rcePostcode===postcode;
-
-      if(!straatMatch || !huisnummerMatch || !postcodeMatch)
-        continue;
-
-      results.push(rce);
-    }
-
-    return results;
-
-  }catch(e){
-    console.error("RCE Rijksmonumenten fout:",e);
-    return [];
-  }
-}
-
-/* =========================================================
-   RCE FUNCTIE 3
-   Toon gevonden Rijksmonumenten als aparte marker.
-   Bestaande BAG-popup blijft onaangetast.
-   ========================================================= */
-
-function showRCE(rce,address,lat,lng){
-
-  const number=
-    rce.rijksmonumentnummer ||
-    rce.cultuurhistorischObjectnummer ||
-    "";
-
-  if(!number)
-    return;
-
-  if(rceSeen.has(number))
-    return;
-
-  rceSeen.add(number);
-
-  const bag=
-    rce.heeftBAGRelatie || {};
-
-  const omschrijving=
-    rce.heeftOmschrijving &&
-    rce.heeftOmschrijving["ceo:omschrijving"]
-      ? rce.heeftOmschrijving["ceo:omschrijving"]
-      : (
-          rce.heeftKennisregistratie &&
-          rce.heeftKennisregistratie[0] &&
-          rce.heeftKennisregistratie[0]["ceo:omschrijving"]
-            ? rce.heeftKennisregistratie[0]["ceo:omschrijving"]
-            : ""
-        );
-
-  const functie=
-    rce.heeftOorspronkelijkeFunctie &&
-    rce.heeftOorspronkelijkeFunctie.heeftFunctieNaam &&
-    rce.heeftOorspronkelijkeFunctie.heeftFunctieNaam["skos:prefLabel"]
-      ? rce.heeftOorspronkelijkeFunctie.heeftFunctieNaam["skos:prefLabel"]
-      : "";
-
-  const inschrijving=
-    rce.datumInschrijvingInMonumentenregister
-      ? new Date(
-          rce.datumInschrijvingInMonumentenregister
-        ).toLocaleDateString("nl-NL")
-      : "";
-
-  const adres=
-    bag.volledigAdres ||
-    `${address.straat} ${address.huisnummer}`;
-
-  const registerUrl=
-    "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+
-    encodeURIComponent(number);
-
-  const popup=`
-    <div style="min-width:300px;max-width:360px;font-size:14px;line-height:1.45">
-      <div style="font-size:18px;font-weight:700;margin-bottom:8px">
-        🏛 Rijksmonument
-      </div>
-
-      <div style="background:#f7eeee;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px">
-        <div style="font-size:12px;color:#666">Rijksmonumentnummer</div>
-        <div style="font-size:17px;font-weight:700">${esc(number)}</div>
-      </div>
-
-      <div style="margin-bottom:8px">
-        <b>Adres</b><br>
-        ${esc(adres)}
-        ${address.postcode ? ", "+esc(address.postcode) : ""}
-        ${address.woonplaats ? "<br>"+esc(address.woonplaats) : ""}
-      </div>
-
-      ${
-        inschrijving
-          ? `<div style="margin-top:8px">
-               <b>Inschrijving register</b><br>${esc(inschrijving)}
-             </div>`
-          : ""
-      }
-
-      ${
-        functie
-          ? `<div style="margin-top:8px">
-               <b>Oorspronkelijke functie</b><br>${esc(functie)}
-             </div>`
-          : ""
-      }
-
-      ${
-        omschrijving
-          ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd">
-               <b>Omschrijving</b><br>
-               <span style="font-size:13px">${esc(omschrijving)}</span>
-             </div>`
-          : ""
-      }
-
-      <div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
-        <a href="${registerUrl}" target="_blank" rel="noopener"
-           style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
-          Rijksmonumentenregister
-        </a>
-      </div>
-
-      <div style="font-size:11px;color:#666;margin-top:8px">
-        Bron: Rijksdienst voor het Cultureel Erfgoed
-      </div>
-    </div>
-  `;
-
-  const icon=L.divIcon({
-    className:"",
-    html:
-      `<div style="
-        background:#7b1e1e;
-        color:white;
-        width:28px;
-        height:28px;
-        border-radius:50%;
-        border:2px solid white;
-        box-shadow:0 1px 5px rgba(0,0,0,.45);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:13px;
-        font-weight:bold;
-        cursor:pointer;
-      ">RM</div>`,
-    iconSize:[28,28],
-    iconAnchor:[14,14]
-  });
-
-  const marker=L.marker(
-    [lat,lng],
-    {icon:icon}
-  ).bindPopup(popup);
-
-  rceLayer.addLayer(marker);
-}
-
-/* =========================================================
-   RCE FUNCTIE 4
-   BAG-pand -> verblijfsobject -> adres -> RCE.
-   ========================================================= */
-
-async function loadRCEForPand(o){
-
-  if(!o || !o.f)
-    return;
-
-  const p=o.f.properties || {};
-
-  const addresses=
-    await getBAGAddresses(p,o);
-
-  if(!addresses.length){
-    return;
-  }
-
-  for(const address of addresses){
-
-    const monuments=
-      await findRCEByAddress(address);
-
-    const adresDiagnose=
-      `${address.straat} ${address.huisnummer}${address.huisletter || ""}${address.toevoeging || ""}, ${address.postcode || "postcode onbekend"}, ${address.woonplaats}`;
-
-    setStatus(
-      `RCE-diagnose: BAG verblijfsobject → ${adresDiagnose} → ${monuments.length} RCE-resultaat/resultaten`
-    );
-
-    if(!monuments.length)
-      continue;
-
-    monuments.forEach(rce=>{
-      showRCE(
-        rce,
-        address,
-        o.c.lat,
-        o.c.lng
-      );
+    const rd=wgs84ToRD(lat,lng);
+    const params=new URLSearchParams({
+      service:"WFS",version:"2.0.0",request:"GetFeature",
+      typeNames:"geolinq:rijksmonumentpunten",
+      srsName:"EPSG:28992",
+      bbox:rd.x-radius+","+rd.y-radius+","+rd.x+radius+","+rd.y+radius+",EPSG:28992",
+      outputFormat:"application/json",count:"100"
     });
+    const res=await fetch("https://data.geo.cultureelerfgoed.nl/openbaar/wfs?"+params);
+    if(!res.ok)return;
+    const data=await res.json();
+    const features=Array.isArray(data.features)?data.features:[];
+    for(const f of features){
+      const g=f.geometry||{},p=f.properties||{};
+      if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)continue;
+      const x=Number(g.coordinates[0]),y=Number(g.coordinates[1]);
+      if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+      const d=Math.hypot(x-rd.x,y-rd.y);
+      if(!Number.isFinite(d)||d>radius)continue;
+
+      const number=p.monumentnummer||p.MONUMENTNUMMER||p.rijksmonumentnummer||p.RIJKSMONUMENTNUMMER||p.identificatie||p.IDENTIFICATIE||f.id||"";
+      const name=p.naam||p.NAAM||p.benaming||p.BENAMING||"";
+      const address=p.adres||p.ADRES||p.straatnaam||p.STRAATNAAM||"";
+      const place=p.plaatsnaam||p.PLAATSNAAM||p.woonplaats||p.WOONPLAATS||"";
+      const key=String(number||f.id||x+","+y);
+
+      if(rceSeen.has(key))continue;
+      rceSeen.add(key);
+
+      const registerUrl=/^\d+$/.test(String(number))
+        ?"https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(number)
+        :"";
+      const ll=rdToWgs84(x,y);
+
+      const popup=
+        "<div style=\"min-width:270px;max-width:360px;font-size:14px;line-height:1.45\">"+
+        "<div style=\"font-size:18px;font-weight:700;margin-bottom:9px\">🏛 Rijksmonument</div>"+
+        "<div style=\"background:#f7eeee;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px\">"+
+        "<div style=\"font-size:12px;color:#666\">Rijksmonumentnummer</div>"+
+        "<div style=\"font-size:17px;font-weight:700\">"+esc(number)+"</div></div>"+
+        (name?"<div><b>Naam</b><br>"+esc(name)+"</div>":"")+
+        (address?"<div style=\"margin-top:8px\"><b>Adres</b><br>"+esc(address)+(place?", "+esc(place):"")+"</div>":"")+
+        (registerUrl?"<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><a href=\""+registerUrl+"\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px\">Rijksmonumentenregister</a></div>":"")+
+        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: Rijksdienst voor het Cultureel Erfgoed · RCE WFS</div></div>";
+
+      const icon=L.divIcon({
+        className:"",
+        html:"<div style=\"background:#7b1e1e;color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">RM</div>",
+        iconSize:[30,30],iconAnchor:[15,15]
+      });
+
+      rceLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
+    }
+  }catch(e){
+    console.warn("Nationaal Rijksmonumenten WFS fout:",e);
   }
 }
 
 /* =========================================================
    BESTAANDE BAG-FUNCTIE
+   =========================================================
+*/
+
    ========================================================= */
 
 async function loadBAG(lat,lng,radius){
@@ -1124,13 +903,14 @@ async function loadBAG(lat,lng,radius){
       bagLabel.addLayer(lab);
 
       loadOverijsselMonumentenVoorPand(o);
-      loadRCEForPand(o);
 
     });
 
     setStatus(
       `${list.length} BAG binnen ${radius}m`
     );
+
+    await loadNationalRijksmonumenten(lat,lng,radius);
 
   }catch(e){
 
