@@ -712,7 +712,7 @@ async function loadOverijsselMonumentenVoorPand(o){
                 ${plaats ? ", "+esc(plaats) : ""}
               </div>
 
-              ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
+              <!--GM_PREVIEW-->\n\n              ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
               ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
               ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
 
@@ -830,13 +830,13 @@ async function loadOverijsselMonumentenVoorPand(o){
             const diagnose=`<details open style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd;font-size:11px"><summary style="cursor:pointer;font-weight:700">GM-diagnose</summary><div style="margin-top:7px;line-height:1.45">WFS-adres: <b>${esc(wfsAdres)}</b><br>BAG-adres: <b>${esc(bagAdres)}</b><br>Afbeeldingen gevonden: <b>${images.length}</b>${errorMessage ? "<br>Fout: <b>"+esc(errorMessage)+"</b>" : ""}</div></details>`;
 
             if(!images.length){
-              monumentMarker.setPopupContent(popup+diagnose);
+              monumentMarker.setPopupContent(popup.replace("<!--GM_PREVIEW-->",diagnose));
               return;
             }
 
             const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
 
-            monumentMarker.setPopupContent(popup+gallery+diagnose);
+            monumentMarker.setPopupContent(popup.replace("<!--GM_PREVIEW-->",gallery+diagnose));
           })();
         }
       }
