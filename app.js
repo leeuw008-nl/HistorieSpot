@@ -798,17 +798,31 @@ async function loadOverijsselMonumentenVoorPand(o){
         }
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          loadGemeenteMonumentImages({
-            straat:straat,
-            huisnummer:huisnummer
-          }).then(images=>{
-            if(!images.length)return;
-            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            // Voeg de Preview toe aan de oorspronkelijke GM-popup.
-            // Gebruik niet getPopup().getContent(): na openen kan dat een DOM-element
-            // zijn en daarmee zouden de bestaande GM-velden verloren kunnen gaan.
-            monumentMarker.setPopupContent(popup+gallery);
-          }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
+          (async()=>{
+            try{
+              // Gebruik voor de koppeling met de officiële monumentafbeeldingen
+              // het BAG-adres van het aangeklikte pand. Dat is robuuster dan
+              // straat/huisnummer-velden die per WFS-versie kunnen verschillen.
+              const bagAddresses=await getBAGAddresses(p,o);
+              const bagAddress=bagAddresses[0]||null;
+
+              const imageAddress={
+                straat:bagAddress?.straat||straat,
+                huisnummer:bagAddress?.huisnummer||huisnummer
+              };
+
+              const images=await loadGemeenteMonumentImages(imageAddress);
+              if(!images.length)return;
+
+              const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
+
+              // Altijd de oorspronkelijke GM-popup behouden en alleen de Preview
+              // eraan toevoegen.
+              monumentMarker.setPopupContent(popup+gallery);
+            }catch(e){
+              console.warn("Gemeentelijke monumentafbeeldingen:",e);
+            }
+          })();
         }
       }
     }catch(e){
