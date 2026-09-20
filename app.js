@@ -548,13 +548,44 @@ async function loadOverijsselMonumentenVoorPand(o){
         const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
         monumentLayer.addLayer(monumentMarker);
 
-        // Gemeentelijke monumenten: afbeeldingen uit de officiële HTML.
+        // Gemeentelijke monumenten: laad de lokale afbeeldingen pas bij het openen
+        // van de popup. Daardoor blijft de preview ook beschikbaar wanneer een
+        // monumentmarker al eerder op de kaart stond.
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          loadGemeenteMonumentImages({straat:p.STRAATNAAM||"",huisnummer:p.HUISNUMMERS||""}).then(images=>{
-            if(!images.length) return;
-            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
-          }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
+          monumentMarker.on("popupopen",async()=>{
+            try{
+              const images=await loadGemeenteMonumentImages({
+                straat:p.STRAATNAAM||"",
+                huisnummer:p.HUISNUMMERS||""
+              });
+
+              if(!images.length) return;
+
+              const gallery=
+                "<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\">"+
+                "<b>Preview</b>"+
+                "<div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+
+                images.map(img=>
+                  "<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\">"+
+                  "<img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" "+
+                  "onerror=\"this.parentElement.style.display='none'\" "+
+                  "style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\">"+
+                  "</a>"
+                ).join("")+
+                "</div>"+
+                "<div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div>"+
+                "</div>";
+
+              monumentMarker.setPopupContent(
+                monumentMarker.getPopup().getContent().replace(
+                  "<!--GEMEENTE_PREVIEW-->",
+                  gallery
+                )
+              );
+            }catch(e){
+              console.warn("Gemeentelijke monumentafbeeldingen:",e);
+            }
+          });
         }
       }
     }catch(e){console.error("Overijssel monument WFS fout:",e);}
@@ -663,43 +694,68 @@ async function findRCEByAddress(address){
   try{
     const straat=String(address?.straat||"").trim();
     const huisnummer=String(address?.huisnummer||"").trim();
+    const huisletter=String(address?.huisletter||"").trim();
+    const toevoeging=String(address?.toevoeging||"").trim();
     const postcode=String(address?.postcode||"").replace(/\\s+/g,"").trim();
 
     if(!straat || !huisnummer)
       return [];
 
-    const params=new URLSearchParams({
-      page:"1",
-      pageSize:"10",
-      straat:straat
-    });
+    const candidates=[];
+    const seenIds=new Set();
 
-    if(postcode)
-      params.set("postcode",postcode);
+    async function queryRCE(extra){
+      const params=new URLSearchParams({
+        page:"1",
+        pageSize:"10",
+        status:"rijksmonument",
+        ...extra
+      });
 
-    const url=
-      "https://api.linkeddata.cultureelerfgoed.nl/" +
-      "queries/rce/rest-api-rijksmonumenten/run?" +
-      params.toString();
+      const url=
+        "https://api.linkeddata.cultureelerfgoed.nl/" +
+        "queries/rce/rest-api-rijksmonumenten/run?" +
+        params.toString();
 
-    const res=await fetch(url,{
-      headers:{
-        "Accept":"application/json"
-      }
-    });
+      const res=await fetch(url,{headers:{"Accept":"application/json"}});
+      if(!res.ok) return;
 
-    if(!res.ok)
-      return [];
+      const data=await res.json();
+      if(!Array.isArray(data)) return;
 
-    const data=await res.json();
-    const records=Array.isArray(data)?data:[];
+      data.forEach(rce=>{
+        if(!rce || rce["@type"]!=="Rijksmonument") return;
+        const id=String(rce.rijksmonumentnummer||rce["@id"]||"");
+        if(id && seenIds.has(id)) return;
+        if(id) seenIds.add(id);
+        candidates.push(rce);
+      });
+    }
+
+    // Eerst exact adres. Daarna ruimere landelijke zoekopdrachten als vangnet.
+    const volledigAdres=
+      [straat,huisnummer+huisletter+toevoeging]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+    if(volledigAdres)
+      await queryRCE({volledigAdres});
+
+    if(!candidates.length && postcode)
+      await queryRCE({postcode});
+
+    if(!candidates.length)
+      await queryRCE({straat});
+
     const results=[];
 
-    for(const rce of records){
-      if(!rce || rce["@type"]!=="Rijksmonument")
-        continue;
+    for(const rce of candidates){
+      const bag=
+        rce.heeftBasisregistratieRelatie?.heeftBAGRelatie ||
+        rce.heeftBAGRelatie ||
+        {};
 
-      const bag=rce.heeftBasisregistratieRelatie?.heeftBAGRelatie || {};
       const rceStraat=String(bag.openbareRuimte||"").trim();
       const rceHuisnummer=String(bag.huisnummer||"").trim();
       const rcePostcode=String(bag.postcode||"").replace(/\\s+/g,"").trim();
@@ -711,7 +767,9 @@ async function findRCEByAddress(address){
         rceHuisnummer===huisnummer;
 
       const postcodeMatch=
-        !postcode || !rcePostcode || rcePostcode===postcode;
+        !postcode ||
+        !rcePostcode ||
+        rcePostcode===postcode;
 
       if(!straatMatch || !huisnummerMatch || !postcodeMatch)
         continue;
