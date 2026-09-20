@@ -798,16 +798,46 @@ async function loadOverijsselMonumentenVoorPand(o){
         }
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          loadGemeenteMonumentImages({
-            straat:straat,
-            huisnummer:huisnummer
-          }).then(images=>{
-            if(!images.length)return;
+          (async()=>{
+            let images=[];
+            let bagAddress=null;
+            let errorMessage="";
+            try{
+              images=await loadGemeenteMonumentImages({
+                straat:straat,
+                huisnummer:huisnummer
+              });
+
+              if(!images.length){
+                const bagAddresses=await getBAGAddresses(p,o);
+                bagAddress=bagAddresses[0]||null;
+                if(bagAddress){
+                  images=await loadGemeenteMonumentImages({
+                    straat:bagAddress.straat,
+                    huisnummer:bagAddress.huisnummer
+                  });
+                }
+              }
+            }catch(e){
+              errorMessage=String(e?.message||e);
+            }
+
+            const wfsAdres=[straat,huisnummer].filter(Boolean).join(" ")||"leeg";
+            const bagAdres=bagAddress
+              ? [bagAddress.straat,bagAddress.huisnummer,bagAddress.huisletter,bagAddress.toevoeging].filter(Boolean).join(" ")
+              : "niet gevonden";
+
+            const diagnose=`<details open style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd;font-size:11px"><summary style="cursor:pointer;font-weight:700">GM-diagnose</summary><div style="margin-top:7px;line-height:1.45">WFS-adres: <b>${esc(wfsAdres)}</b><br>BAG-adres: <b>${esc(bagAdres)}</b><br>Afbeeldingen gevonden: <b>${images.length}</b>${errorMessage ? "<br>Fout: <b>"+esc(errorMessage)+"</b>" : ""}</div></details>`;
+
+            if(!images.length){
+              monumentMarker.setPopupContent(popup+diagnose);
+              return;
+            }
+
             const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            // Behoud de volledige oorspronkelijke GM-popup en voeg alleen de Preview toe.
-            // getPopup().getContent() kan na openen een DOM-element opleveren.
-            monumentMarker.setPopupContent(popup+gallery);
-          }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
+
+            monumentMarker.setPopupContent(popup+gallery+diagnose);
+          })();
         }
       }
     }catch(e){
