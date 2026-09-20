@@ -798,46 +798,18 @@ async function loadOverijsselMonumentenVoorPand(o){
         }
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          (async()=>{
-            try{
-              // Gebruik voor de koppeling met de officiële monumentafbeeldingen
-              // het BAG-adres van het aangeklikte pand. Dat is robuuster dan
-              // straat/huisnummer-velden die per WFS-versie kunnen verschillen.
-              let images=await loadGemeenteMonumentImages({
-                straat,
-                huisnummer
-              });
-
-              // Als de WFS-adresvelden leeg of afwijkend zijn, gebruik BAG als fallback.
-              let bagAddresses=[];
-              let bagAddress=null;
-              if(!images.length){
-                bagAddresses=await getBAGAddresses(p,o);
-                bagAddress=bagAddresses[0]||null;
-                if(bagAddress){
-                  images=await loadGemeenteMonumentImages({
-                    straat:bagAddress.straat,
-                    huisnummer:bagAddress.huisnummer
-                  });
-                }
-              }
-
-              const gmDiagnose=\`<details style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd;font-size:11px"><summary style="cursor:pointer;font-weight:700">GM-diagnose</summary><div style="margin-top:7px;line-height:1.4">WFS-adres: <b>\${esc(straat||"leeg")} \${esc(huisnummer||"leeg")}</b><br>BAG-adres: <b>\${esc(bagAddress ? [bagAddress.straat,bagAddress.huisnummer,bagAddress.huisletter,bagAddress.toevoeging].filter(Boolean).join(" ") : "niet gevonden")}</b><br>Afbeeldingen gevonden: <b>\${images.length}</b></div></details>\`;
-
-              if(!images.length){
-                monumentMarker.setPopupContent(popup+gmDiagnose);
-                return;
-              }
-
-              const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-
-              // Altijd de oorspronkelijke GM-popup behouden en alleen de Preview
-              // eraan toevoegen.
-              monumentMarker.setPopupContent(popup+gallery);
-            }catch(e){
-              console.warn("Gemeentelijke monumentafbeeldingen:",e);
-            }
-          })();
+          loadGemeenteMonumentImages({
+            straat:straat,
+            huisnummer:huisnummer
+          }).then(images=>{
+            if(!images.length)return;
+            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
+            monumentMarker.setPopupContent(
+              monumentMarker.getPopup()?.getContent() || popup
+            );
+            const current=monumentMarker.getPopup()?.getContent()||popup;
+            monumentMarker.setPopupContent(current+gallery);
+          }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
         }
       }
     }catch(e){
