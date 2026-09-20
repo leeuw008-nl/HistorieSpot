@@ -509,8 +509,10 @@ async function loadBAG(lat,lng,radius){
       ).bindPopup(popup);
 
       bagLabel.addLayer(lab);
-      loadNationalRijksmonumenten(lat,lng,radius);
 });
+
+    // Landelijke Rijksmonumenten worden één keer per kaartselectie geladen.
+    loadNationalRijksmonumenten(lat,lng,radius);
 
     setStatus(
       `${list.length} BAG binnen ${radius}m`
