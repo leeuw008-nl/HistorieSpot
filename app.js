@@ -1226,6 +1226,7 @@ async function loadBAG(lat,lng,radius){
       bagLabel.addLayer(lab);
 
       loadOverijsselMonumentenVoorPand(o);
+      loadRCEForPand(o);
 
     });
 
