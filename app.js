@@ -476,6 +476,15 @@ async function loadOverijsselMonumentenVoorPand(o){
           p.KICH_URL||
           "";
 
+        const rmVelden=Object.entries(p)
+          .filter(([k,v])=>v!==null&&v!==undefined&&String(v)!=="")
+          .map(([k,v])=>
+            '<div style="margin-top:7px">'+
+            '<span style="font-size:11px;color:#666">'+esc(k)+'</span><br>'+
+            '<span>'+esc(typeof v==="object"?JSON.stringify(v):v)+'</span>'+
+            '</div>'
+          ).join("");
+
         const popup=isRM
           ? '<div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">'+
             '<div style="font-size:18px;font-weight:700;margin-bottom:9px">🏛 Rijksmonument</div>'+
@@ -486,7 +495,8 @@ async function loadOverijsselMonumentenVoorPand(o){
             (address ? esc(address) : 'Onbekend')+
             ((p.PLAATSNAAM||p.Plaats) ? ', '+esc(p.PLAATSNAAM||p.Plaats) : '')+
             '</div>'+
-            '<div style="font-size:11px;color:#666;margin-top:8px">Bron: Rijksdienst voor het Cultureel Erfgoed</div></div>'
+            (rmVelden ? '<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Gegevens uit landelijke RM-WFS</b>'+rmVelden+'</div>' : '')+
+            '<div style="font-size:11px;color:#666;margin-top:8px">Bron: landelijke Rijksmonumenten-WFS van de Rijksdienst voor het Cultureel Erfgoed</div></div>'
           : '<div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">'+
             '<div style="font-size:18px;font-weight:700;margin-bottom:9px">🏛 Gemeentelijk monument</div>'+
             '<div style="background:#f3f5f7;border-left:4px solid #1d5d8f;border-radius:6px;padding:9px 10px;margin-bottom:10px">'+
