@@ -695,12 +695,12 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
     const rd=wgs84ToRD(lat,lng);
     const params=new URLSearchParams({
       service:"WFS",version:"2.0.0",request:"GetFeature",
-      typeNames:"geolinq:rijksmonumentpunten",
+      typeNames:"rce:NationalListedMonumentPoints",
       srsName:"EPSG:28992",
       bbox:rd.x-radius+","+rd.y-radius+","+rd.x+radius+","+rd.y+radius+",EPSG:28992",
       outputFormat:"application/json",count:"100"
     });
-    const res=await fetch("https://data.geo.cultureelerfgoed.nl/openbaar/wfs?"+params);
+    const res=await fetch("https://services.rce.geovoorziening.nl/rce/wfs?"+params);
     if(!res.ok)return;
     const data=await res.json();
     const features=Array.isArray(data.features)?data.features:[];
@@ -749,7 +749,6 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
     console.warn("Nationaal Rijksmonumenten WFS fout:",e);
   }
 }
-
 /* =========================================================
    BESTAANDE BAG-FUNCTIE
    =========================================================
