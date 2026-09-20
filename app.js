@@ -803,15 +803,22 @@ async function loadOverijsselMonumentenVoorPand(o){
               // Gebruik voor de koppeling met de officiële monumentafbeeldingen
               // het BAG-adres van het aangeklikte pand. Dat is robuuster dan
               // straat/huisnummer-velden die per WFS-versie kunnen verschillen.
-              const bagAddresses=await getBAGAddresses(p,o);
-              const bagAddress=bagAddresses[0]||null;
+              let images=await loadGemeenteMonumentImages({
+                straat,
+                huisnummer
+              });
 
-              const imageAddress={
-                straat:bagAddress?.straat||straat,
-                huisnummer:bagAddress?.huisnummer||huisnummer
-              };
-
-              const images=await loadGemeenteMonumentImages(imageAddress);
+              // Als de WFS-adresvelden leeg of afwijkend zijn, gebruik BAG als fallback.
+              if(!images.length){
+                const bagAddresses=await getBAGAddresses(p,o);
+                const bagAddress=bagAddresses[0]||null;
+                if(bagAddress){
+                  images=await loadGemeenteMonumentImages({
+                    straat:bagAddress.straat,
+                    huisnummer:bagAddress.huisnummer
+                  });
+                }
+              }
               if(!images.length)return;
 
               const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
