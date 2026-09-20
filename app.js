@@ -13,7 +13,6 @@ const bagLayer=L.layerGroup().addTo(map),
    RCE Rijksmonumenten - NIEUW
    ========================================================= */
 const rceLayer=L.layerGroup().addTo(map);
-const rceSeen=new Set();
 let nationalRMRequest=0;
 
 /* ========================================================= */
@@ -203,6 +202,14 @@ function wgs84ToRD(lat,lon){
   return{x,y};
 }
 
+function rdToWgs84(x,y){
+  const dx=(x-155000)/100000;
+  const dy=(y-463000)/100000;
+  const lat=52.15517440+(3235.65389*dy-32.58297*dx*dx-0.2475*dy*dy-0.84978*dx*dx*dy-0.0655*dy*dy*dy-0.01709*dx*dx*dy*dy-0.00738*dx+0.0053*dx*dx*dx*dx-0.00039*dx*dx*dy*dy*dy+0.00033*dx*dx*dx*dx*dy-0.00012*dx*dy)/3600;
+  const lon=5.38720621+(5260.52916*dx+105.94684*dx*dy+2.45656*dx*dy*dy-0.81885*dx*dx*dx+0.05594*dx*dy*dy*dy-0.05607*dx*dx*dx*dy+0.01199*dy-0.00256*dx*dx*dy+0.00128*dx*dx*dx*dx+0.00022*dy*dy-0.00022*dx*dx*dy*dy+0.00026*dx*dx*dx*dx*dx*dx)/3600;
+  return{lat,lon};
+}
+
 const minuutLayer=L.tileLayer.wms(
   "https://services.rce.geovoorziening.nl/misc/wms",
   {
@@ -261,8 +268,7 @@ toggleBAGBtn&&toggleBAGBtn.addEventListener(
 
 
 /* =========================================================
-   RCE FUNCTIE 1
-   Haalt het verblijfsobject op dat bij een BAG-pand hoort.
+   BAG-FUNCTIE
    ========================================================= */
 
 async function getBAGAddresses(p,o){
@@ -437,8 +443,6 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
    BESTAANDE BAG-FUNCTIE
    ========================================================= */
 
-async   loadRCEForPand(o);
-
 function loadBAG(lat,lng,radius){
   window.rceDiagnosisShown=false;
 
@@ -446,7 +450,6 @@ function loadBAG(lat,lng,radius){
   bagLabel.clearLayers();
 
   rceLayer.clearLayers();
-  rceSeen.clear();
 
   const b=box(lat,lng,radius);
 
