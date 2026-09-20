@@ -809,9 +809,11 @@ async function loadOverijsselMonumentenVoorPand(o){
               });
 
               // Als de WFS-adresvelden leeg of afwijkend zijn, gebruik BAG als fallback.
+              let bagAddresses=[];
+              let bagAddress=null;
               if(!images.length){
-                const bagAddresses=await getBAGAddresses(p,o);
-                const bagAddress=bagAddresses[0]||null;
+                bagAddresses=await getBAGAddresses(p,o);
+                bagAddress=bagAddresses[0]||null;
                 if(bagAddress){
                   images=await loadGemeenteMonumentImages({
                     straat:bagAddress.straat,
@@ -819,8 +821,6 @@ async function loadOverijsselMonumentenVoorPand(o){
                   });
                 }
               }
-              const bagAddresses=images.length ? [] : await getBAGAddresses(p,o);
-              const bagAddress=bagAddresses[0]||null;
 
               const gmDiagnose=\`<details style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd;font-size:11px"><summary style="cursor:pointer;font-weight:700">GM-diagnose</summary><div style="margin-top:7px;line-height:1.4">WFS-adres: <b>\${esc(straat||"leeg")} \${esc(huisnummer||"leeg")}</b><br>BAG-adres: <b>\${esc(bagAddress ? [bagAddress.straat,bagAddress.huisnummer,bagAddress.huisletter,bagAddress.toevoeging].filter(Boolean).join(" ") : "niet gevonden")}</b><br>Afbeeldingen gevonden: <b>\${images.length}</b></div></details>\`;
 
