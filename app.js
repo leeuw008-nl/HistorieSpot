@@ -643,7 +643,7 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         const icon=L.divIcon({
           className:"",
-          html:"<div style=\\\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\\\">"+(isRM?"RM":"GM")+"</div>",
+          html:"<div style=\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">"+(isRM?"RM":"GM")+"</div>",
           iconSize:[30,30],
           iconAnchor:[15,15]
         });
@@ -657,7 +657,7 @@ async function loadOverijsselMonumentenVoorPand(o){
             huisnummer:huisnummer
           }).then(images=>{
             if(!images.length)return;
-            const gallery="<div style=\\\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\\\"><b>Preview</b><div style=\\\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\\\">"+images.map(img=>"<a href=\\\""+esc(img.url)+"\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\"><img src=\\\""+esc(img.url)+"\\\" alt=\\\""+esc(img.label)+"\\\" loading=\\\"lazy\\\" onerror=\\\"this.parentElement.style.display='none'\\\" style=\\\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\\\"></a>").join("")+"</div><div style=\\\"font-size:10px;color:#666;margin-top:5px\\\">Bron: Gemeenteblad 2026, 30438</div></div>";
+            const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
             monumentMarker.setPopupContent(
               monumentMarker.getPopup()?.getContent() || popup
             );
@@ -1197,138 +1197,3 @@ async function loadBAG(lat,lng,radius){
 
   bagLayer.clearLayers();
   bagLabel.clearLayers();
-
-  rceLayer.clearLayers();
-  rceSeen.clear();
-
-  const b=box(lat,lng,radius);
-
-  const url=
-    `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
-
-  try{
-
-    const res=await fetch(url);
-
-    if(!res.ok)
-      throw new Error(`BAG HTTP ${res.status}`);
-
-    const data=await res.json();
-
-    const list=data.features.map(f=>{
-
-      const c=centerOf(f);
-
-      if(!c)
-        return null;
-
-      const d=dist(
-        lat,
-        lng,
-        c.lat,
-        c.lng
-      );
-
-      if(d>radius)
-        return null;
-
-      return{
-        f,
-        c,
-        d
-      };
-
-    })
-    .filter(Boolean)
-    .sort((a,b)=>a.d-b.d);
-
-    list.forEach(o=>{
-
-      const p=o.f.properties || {};
-
-      const y=
-        (p.bouwjaar!==null &&
-         p.bouwjaar!==undefined &&
-         p.bouwjaar!=="")
-          ? String(p.bouwjaar)
-          : "Onbekend";
-
-      if(!matchesYearFilter(y))
-        return;
-
-      const bagId=
-        p.identificatie ||
-        "Onbekend";
-
-      const documentdatum=
-        p.documentdatum ||
-        "Onbekend";
-
-      const documentnummer=
-        p.documentnummer ||
-        "Onbekend";
-
-      const status=
-        p.status ||
-        "Onbekend";
-
-      const geconstateerd=
-        p.geconstateerd ||
-        "Onbekend";
-
-      const gebruiksdoel=
-        p.gebruiksdoel ||
-        "Onbekend";
-
-      const cl=yearClass(y);
-
-      const col=
-        useKadaster
-          ? kadasterColor(y)
-          : "#0b5cab";
-
-      const popup=`
-        <div style="min-width:250px">
-          <b>BAG-pand</b><br>
-          Bouwjaar: <b>${esc(y)}</b><br>
-          Afstand: ${Math.round(o.d)} m
-          <hr style="margin:8px 0">
-          <small>
-            BAG-identificatie: ${esc(bagId)}<br>
-            Status: ${esc(status)}<br>
-            Gebruiksdoel: ${esc(gebruiksdoel)}<br>
-            Geconstateerd: ${esc(geconstateerd)}<br>
-            BAG-document: ${esc(documentnummer)}<br>
-            Documentdatum: ${esc(documentdatum)}
-          </small>
-        </div>
-      `;
-
-      const poly=L.geoJSON(
-        o.f,
-        {
-          style:{
-            weight:1.2,
-            color:col,
-            fillColor:
-              useKadaster
-                ? col
-                : "#0b5cab",
-            fillOpacity:0.15
-          }
-        }
-      ).bindPopup(popup);
-
-      bagLayer.addLayer(poly);
-
-      const ic=L.divIcon({
-        className:"",
-        html:
-          `<div class="year-badge ${cl}" style="cursor:pointer">
-            ${esc(y)}
-          </div>`,
-        iconSize:null
-      });
-
-      const lab=L.marker(
-        [o.c.lat,o.c.lng],
