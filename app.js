@@ -395,32 +395,47 @@ async function getRijksmonumentDetails(number){
 
 function buildRijksmonumentPopup(rce,number,fallbackAddress){
   const bag=rce?.heeftBAGRelatie||{};
+  const fallback=typeof fallbackAddress==="object"
+    ? fallbackAddress
+    : {full:fallbackAddress||""};
 
   const adres=
     bag.volledigAdres ||
-    fallbackAddress ||
+    fallback.full ||
     "Onbekend";
 
-  const postcode=bag.postcode||"";
-  const plaats=bag.woonplaatsnaam||"";
+  const postcode=bag.postcode||fallback.postcode||"";
+  const plaats=bag.woonplaatsnaam||fallback.plaats||"";
 
-  const inschrijving=rce?.datumInschrijvingInMonumentenregister
-    ? new Date(rce.datumInschrijvingInMonumentenregister).toLocaleDateString("nl-NL")
-    : "";
+  const inschrijving=
+    rce?.datumInschrijvingInMonumentenregister ||
+    rce?.inschrijving
+      ? new Date(
+          rce.datumInschrijvingInMonumentenregister ||
+          rce.inschrijving
+        ).toLocaleDateString("nl-NL")
+      : "";
 
   const functie=
-    rce?.heeftOorspronkelijkeFunctie?.heeftFunctieNaam?.["skos:prefLabel"]||"";
+    rce?.heeftOorspronkelijkeFunctie?.heeftFunctieNaam?.["skos:prefLabel"]||
+    rce?.functie||
+    "";
 
   const omschrijving=
     rce?.heeftOmschrijving?.["ceo:omschrijving"]||
     rce?.heeftKennisregistratie?.[0]?.["ceo:omschrijving"]||
+    rce?.omschrijving||
     "";
 
   const aard=
-    rce?.heeftMonumentAard?.["skos:prefLabel"]||"";
+    rce?.heeftMonumentAard?.["skos:prefLabel"]||
+    rce?.monumentAard||
+    "";
 
   const status=
-    rce?.heeftJuridischeStatus?.["skos:prefLabel"]||"";
+    rce?.heeftJuridischeStatus?.["skos:prefLabel"]||
+    rce?.juridischeStatus||
+    "";
 
   const registerUrl=
     "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+
@@ -580,27 +595,14 @@ async function loadOverijsselMonumentenVoorPand(o){
         let popup;
 
         if(isRM){
+          // De landelijke monument-WFS levert betrouwbaar het RM-nummer,
+          // maar niet de inhoudelijke adres-/registervelden.
+          // Gebruik daarom dezelfde bewezen RCE-adresquery als de bestaande RCE-logica.
           popup=buildRijksmonumentPopup(null,nummer,address);
 
-          // De WFS levert de marker en het nummer.
-          // De officiële RCE Linked Data API levert de inhoudelijke velden.
           if(number){
-            getRijksmonumentDetails(number).then(details=>{
-              if(!details)return;
-
-              const enrichedAddress=
-                details?.heeftBAGRelatie?.volledigAdres||
-                address||
-                "Onbekend";
-
-              marker.setPopupContent(
-                buildRijksmonumentPopup(
-                  details,
-                  number,
-                  enrichedAddress
-                )
-              );
-            }).catch(e=>console.warn("RCE RM-verrijking:",e));
+            // De verrijking gebeurt direct na het aanmaken van de marker hieronder.
+            // Zo gebruiken we het BAG-adres van exact dit pand.
           }
         }else{
           const naam=String(getProp(
@@ -652,6 +654,61 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
         monumentLayer.addLayer(monumentMarker);
+
+        if(isRM && number){
+          (async()=>{
+            try{
+              const addresses=await getBAGAddresses(p,o);
+
+              for(const a of addresses){
+                const monuments=await findRCEByAddress(a);
+                const match=monuments.find(m=>
+                  String(
+                    m.rijksmonumentnummer ||
+                    m.cultuurhistorischObjectnummer ||
+                    ""
+                  ).trim()===String(number).trim()
+                );
+
+                if(match){
+                  monumentMarker.setPopupContent(
+                    buildRijksmonumentPopup(
+                      match,
+                      number,
+                      {
+                        full:[a.straat,a.huisnummer,a.huisletter,a.toevoeging]
+                          .filter(Boolean).join(" "),
+                        postcode:a.postcode,
+                        plaats:a.woonplaats
+                      }
+                    )
+                  );
+                  return;
+                }
+              }
+
+              // Ook als de RCE-registerquery niets teruggeeft,
+              // tonen we het officiële BAG-adres in plaats van "Onbekend".
+              if(addresses.length){
+                const a=addresses[0];
+                monumentMarker.setPopupContent(
+                  buildRijksmonumentPopup(
+                    null,
+                    number,
+                    {
+                      full:[a.straat,a.huisnummer,a.huisletter,a.toevoeging]
+                        .filter(Boolean).join(" "),
+                      postcode:a.postcode,
+                      plaats:a.woonplaats
+                    }
+                  )
+                );
+              }
+            }catch(e){
+              console.warn("RCE RM-verrijking:",e);
+            }
+          })();
+        }
 
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
           loadGemeenteMonumentImages({
