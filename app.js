@@ -733,7 +733,8 @@ async function loadOverijsselMonumentenVoorPand(o){
                         .filter(Boolean).join(" "),
                       postcode:a.postcode,
                       plaats:a.woonplaats
-                    }
+                    },
+                    p
                   )
                 );
 
@@ -750,7 +751,8 @@ async function loadOverijsselMonumentenVoorPand(o){
                           .filter(Boolean).join(" "),
                         postcode:a.postcode,
                         plaats:a.woonplaats
-                      }
+                      },
+                      p
                     )
                   );
                   return;
@@ -764,7 +766,8 @@ async function loadOverijsselMonumentenVoorPand(o){
                   buildRijksmonumentPopup(
                     details,
                     number,
-                    address||"Onbekend"
+                    address||"Onbekend",
+                    p
                   )
                 );
               }
