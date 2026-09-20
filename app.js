@@ -661,228 +661,68 @@ async function getBAGAddresses(p,o){
 
 async function findRCEByAddress(address){
   try{
-    const params=new URLSearchParams();
+    const straat=String(address?.straat||"").trim();
+    const huisnummer=String(address?.huisnummer||"").trim();
+    const postcode=String(address?.postcode||"").replace(/\\s+/g,"").trim();
 
-    params.set("page","1");
-    params.set("pageSize","10");
+    if(!straat || !huisnummer)
+      return [];
 
-    const straat=String(address.straat || "").trim();
-    const rceStraat=
-      straat ? straat.charAt(0).toUpperCase()+straat.slice(1) : "";
-    const huisnummer=String(address.huisnummer || "").trim();
-    const huisletter=String(address.huisletter || "").trim();
-    const toevoeging=String(address.toevoeging || "").trim();
-    const verblijfsobjectId=
-      String(address.verblijfsobjectId || "")
-        .trim()
-        .replace(/^.*\/verblijfsobject\//,"");
+    const params=new URLSearchParams({
+      page:"1",
+      pageSize:"10",
+      straat:straat
+    });
 
-    if(straat)
-      params.set("straat",straat);
+    if(postcode)
+      params.set("postcode",postcode);
 
     const url=
       "https://api.linkeddata.cultureelerfgoed.nl/" +
       "queries/rce/rest-api-rijksmonumenten/run?" +
-      "page=1&pageSize=10&straat=" +
-      encodeURIComponent(rceStraat);
+      params.toString();
 
-    const res=await fetch(url);
+    const res=await fetch(url,{
+      headers:{
+        "Accept":"application/json"
+      }
+    });
+
     if(!res.ok)
       return [];
 
-    const raw=await res.text();
-    if(!raw.trim())
-      return [];
-
-    const triples=[];
-
-    for(const line of raw.split(/\r?\n/)){
-
-      const m=line.match(
-        /^<([^>]+)>\s+<([^>]+)>\s+(?:"([^"]*)"|<([^>]+)>)(?:\^\^<[^>]+>)?\s*\.$/
-      );
-
-      if(!m)
-        continue;
-
-      triples.push({
-        subject:m[1],
-        predicate:m[2],
-        literal:
-          m[3] !== undefined
-            ? m[3]
-            : null,
-        uri:
-          m[4] !== undefined
-            ? m[4]
-            : null
-      });
-    }
-
-    const subjects=new Map();
-
-    for(const t of triples){
-
-      if(!subjects.has(t.subject))
-        subjects.set(t.subject,[]);
-
-      subjects.get(t.subject).push(t);
-    }
-
-    function getLiteral(subject,predicate){
-
-      const list=subjects.get(subject) || [];
-
-      const t=list.find(x =>
-        x.predicate.endsWith("#"+predicate)
-      );
-
-      return t
-        ? (t.literal !== null ? t.literal : t.uri)
-        : "";
-    }
-
-    function getUri(subject,predicate){
-
-      const list=subjects.get(subject) || [];
-
-      const t=list.find(x =>
-        x.predicate.endsWith("#"+predicate)
-      );
-
-      return t ? t.uri : "";
-    }
-
-    function normalize(value){
-
-      return String(value || "")
-        .toLowerCase()
-        .replace(/\s+/g," ")
-        .trim();
-    }
-
+    const data=await res.json();
+    const records=Array.isArray(data)?data:[];
     const results=[];
 
-    for(const [monumentSubject,monumentTriples] of subjects){
-
-      const isRijksmonument=
-        monumentTriples.some(t =>
-          t.predicate.endsWith("#type") &&
-          t.uri &&
-          t.uri.endsWith("#Rijksmonument")
-        );
-
-      if(!isRijksmonument)
+    for(const rce of records){
+      if(!rce || rce["@type"]!=="Rijksmonument")
         continue;
 
-      const basisSubject=
-        getUri(
-          monumentSubject,
-          "heeftBasisregistratieRelatie"
-        );
-
-      if(!basisSubject)
-        continue;
-
-      const bagSubject=
-        getUri(
-          basisSubject,
-          "heeftBAGRelatie"
-        );
-
-      if(!bagSubject)
-        continue;
-
-      const rceStraat=
-        getLiteral(
-          bagSubject,
-          "openbareRuimte"
-        );
-
-      const rceHuisnummer=
-        getLiteral(
-          bagSubject,
-          "huisnummer"
-        );
-
-      const rcePostcode=
-        getLiteral(
-          bagSubject,
-          "postcode"
-        );
-
-      const rceVerblijfsobject=
-        getUri(
-          bagSubject,
-          "heeftVerblijfsobject"
-        );
-
-      const rceVerblijfsobjectId=
-        String(rceVerblijfsobject || "")
-          .replace(/^.*\/verblijfsobject\//,"")
-          .trim();
-
-      const bagIdMatch=
-        verblijfsobjectId &&
-        rceVerblijfsobjectId &&
-        verblijfsobjectId === rceVerblijfsobjectId;
+      const bag=rce.heeftBasisregistratieRelatie?.heeftBAGRelatie || {};
+      const rceStraat=String(bag.openbareRuimte||"").trim();
+      const rceHuisnummer=String(bag.huisnummer||"").trim();
+      const rcePostcode=String(bag.postcode||"").replace(/\\s+/g,"").trim();
 
       const straatMatch=
-        normalize(rceStraat) ===
-        normalize(straat);
+        rceStraat.toLowerCase()===straat.toLowerCase();
 
       const huisnummerMatch=
-        String(rceHuisnummer).trim() ===
-        String(huisnummer).trim();
+        rceHuisnummer===huisnummer;
 
-      const adresMatch=
-        straatMatch &&
-        huisnummerMatch;
+      const postcodeMatch=
+        !postcode || !rcePostcode || rcePostcode===postcode;
 
-      if(!bagIdMatch && !adresMatch)
+      if(!straatMatch || !huisnummerMatch || !postcodeMatch)
         continue;
 
-      const rijksmonumentnummer=
-        getLiteral(
-          monumentSubject,
-          "rijksmonumentnummer"
-        );
-
-      const cultuurhistorischObjectnummer=
-        getLiteral(
-          monumentSubject,
-          "cultuurhistorischObjectnummer"
-        );
-
-      results.push({
-
-        rijksmonumentnummer:
-          rijksmonumentnummer ||
-          cultuurhistorischObjectnummer,
-
-        cultuurhistorischObjectnummer,
-
-        heeftBAGRelatie:{
-          huisnummer:rceHuisnummer,
-          openbareRuimte:rceStraat,
-          postcode:rcePostcode,
-
-          heeftVerblijfsobject:
-            rceVerblijfsobject
-        }
-
-      });
+      results.push(rce);
     }
 
     return results;
 
   }catch(e){
-
-    console.error(
-      "RCE Rijksmonumenten fout:",
-      e
-    );
-
+    console.error("RCE Rijksmonumenten fout:",e);
     return [];
   }
 }
