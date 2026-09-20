@@ -14,6 +14,7 @@ const bagLayer=L.layerGroup().addTo(map),
    ========================================================= */
 const rceLayer=L.layerGroup().addTo(map);
 const rceSeen=new Set();
+let nationalRMRequest=0;
 
 /* ========================================================= */
 
@@ -583,9 +584,10 @@ function loadBAG(lat,lng,radius){
 
       bagLabel.addLayer(lab);
 
-      loadOverijsselMonumentenVoorPand(o);
 
     });
+
+    loadNationalRijksmonumenten(lat,lng,radius);
 
     setStatus(
       `${list.length} BAG binnen ${radius}m`
