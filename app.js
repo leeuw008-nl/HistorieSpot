@@ -696,7 +696,7 @@ async function findRCEByAddress(address){
     const huisnummer=String(address?.huisnummer||"").trim();
     const huisletter=String(address?.huisletter||"").trim();
     const toevoeging=String(address?.toevoeging||"").trim();
-    const postcode=String(address?.postcode||"").replace(/\\s+/g,"").trim();
+    const postcode=String(address?.postcode||"").replace(/\s+/g,"").trim();
 
     if(!straat || !huisnummer)
       return [];
@@ -758,7 +758,7 @@ async function findRCEByAddress(address){
 
       const rceStraat=String(bag.openbareRuimte||"").trim();
       const rceHuisnummer=String(bag.huisnummer||"").trim();
-      const rcePostcode=String(bag.postcode||"").replace(/\\s+/g,"").trim();
+      const rcePostcode=String(bag.postcode||"").replace(/\s+/g,"").trim();
 
       const straatMatch=
         rceStraat.toLowerCase()===straat.toLowerCase();
