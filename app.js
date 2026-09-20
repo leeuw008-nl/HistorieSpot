@@ -641,7 +641,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
     setStatus("Landelijke RM: "+shown+" gevonden ("+features.length+" WFS-punten)");
   }catch(e){
     console.warn("Landelijke Rijksmonumenten WFS fout:",e);
-    setStatus("Landelijke RM-WFS fout");
+    setStatus("Landelijke RM-WFS fout: "+(e&&e.message?e.message:"onbekende fout"));
   }
 }
 
