@@ -368,46 +368,66 @@ async function getBAGAddresses(p,o){
 async function loadNationalRijksmonumenten(lat,lng,radius){
   const requestId=++nationalRMRequest;
   rceLayer.clearLayers();
+
   try{
     const rd=wgs84ToRD(lat,lng);
+
     const params=new URLSearchParams({
-      service:"WFS",version:"2.0.0",request:"GetFeature",
-      typeNames:"rce:NationalListedMonumentPoints",
+      service:"WFS",
+      version:"2.0.0",
+      request:"GetFeature",
+      typeNames:"geolinq:rijksmonumentpunten",
       srsName:"EPSG:28992",
-      bbox:rd.x-radius+","+rd.y-radius+","+rd.x+radius+","+rd.y+radius+",EPSG:28992",
-      outputFormat:"application/json",count:"100"
+      bbox:
+        rd.x-radius+","+rd.y-radius+","+
+        rd.x+radius+","+rd.y+radius+",EPSG:28992",
+      outputFormat:"application/json"
     });
-    const res=await fetch("https://services.rce.geovoorziening.nl/rce/wfs?"+params);
-    if(!res.ok)return;
+
+    const res=await fetch(
+      "https://data.geo.cultureelerfgoed.nl/openbaar/wfs?"+params
+    );
+
+    if(!res.ok)
+      throw new Error("landelijke RCE WFS HTTP "+res.status);
+
     const data=await res.json();
-    if(requestId!==nationalRMRequest)return;
+
+    if(requestId!==nationalRMRequest)
+      return;
 
     const features=Array.isArray(data.features)?data.features:[];
-    for(const f of features){
-      const g=f.geometry||{},p=f.properties||{};
-      if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)continue;
 
-      const x=Number(g.coordinates[0]),y=Number(g.coordinates[1]);
-      if(!Number.isFinite(x)||!Number.isFinite(y))continue;
+    for(const f of features){
+      const g=f.geometry||{};
+      const p=f.properties||{};
+
+      if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)
+        continue;
+
+      const x=Number(g.coordinates[0]);
+      const y=Number(g.coordinates[1]);
+
+      if(!Number.isFinite(x)||!Number.isFinite(y))
+        continue;
 
       const d=Math.hypot(x-rd.x,y-rd.y);
-      if(!Number.isFinite(d)||d>radius)continue;
+      if(!Number.isFinite(d)||d>radius)
+        continue;
 
       const number=
+        p.rijksmonumentnr||
+        p.Rijksmonumentnr||
         p.monumentnummer||
         p.MONUMENTNUMMER||
-        p.rijksmonumentnummer||
-        p.RIJKSMONUMENTNUMMER||
-        p.identificatie||
-        p.IDENTIFICATIE||
+        p.id||
         f.id||
-        String(x)+","+String(y);
+        "";
 
-      const name=p.naam||p.NAAM||p.benaming||p.BENAMING||"";
-      const address=p.adres||p.ADRES||p.straatnaam||p.STRAATNAAM||"";
-      const place=p.plaatsnaam||p.PLAATSNAAM||p.woonplaats||p.WOONPLAATS||"";
+      const description=p.omschrijving||p.naam||p.benaming||"";
+      const place=p.plaats||p.woonplaats||"";
 
-      const registerUrl=/^\\d+$/.test(String(number))
+      const registerUrl=/^\d+$/.test(String(number))
         ?"https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(number)
         :"";
 
@@ -418,11 +438,14 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
         "<div style=\"font-size:18px;font-weight:700;margin-bottom:9px\">🏛 Rijksmonument</div>"+
         "<div style=\"background:#f7eeee;border-left:4px solid #7b1e1e;border-radius:6px;padding:9px 10px;margin-bottom:10px\">"+
         "<div style=\"font-size:12px;color:#666\">Rijksmonumentnummer</div>"+
-        "<div style=\"font-size:17px;font-weight:700\">"+esc(number)+"</div></div>"+
-        (name?"<div><b>Naam</b><br>"+esc(name)+"</div>":"")+
-        (address?"<div style=\"margin-top:8px\"><b>Adres</b><br>"+esc(address)+(place?", "+esc(place):"")+"</div>":"")+
-        (registerUrl?"<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><a href=\""+registerUrl+"\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px\">Rijksmonumentenregister</a></div>":"")+
-        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: Rijksdienst voor het Cultureel Erfgoed · RCE WFS</div></div>";
+        "<div style=\"font-size:17px;font-weight:700\">"+esc(number||"Onbekend")+"</div>"+
+        "</div>"+
+        (description?"<div><b>Omschrijving</b><br>"+esc(description)+"</div>":"")+
+        (place?"<div style=\"margin-top:8px\"><b>Plaats</b><br>"+esc(place)+"</div>":"")+
+        (registerUrl
+          ?"<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><a href=\""+registerUrl+"\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px\">Rijksmonumentenregister</a></div>"
+          :"")+
+        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: Rijksdienst voor het Cultureel Erfgoed · landelijke WFS</div></div>";
 
       const icon=L.divIcon({
         className:"",
@@ -432,233 +455,16 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
       });
 
       rceLayer.addLayer(
-        L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup)
+        L.marker([ll.lat,ll.lon],{icon:icon}).bindPopup(popup)
       );
     }
+
+    setStatus("Landelijke RM-WFS: "+features.length+" punten gevonden");
   }catch(e){
-    console.warn("Nationaal Rijksmonumenten WFS fout:",e);
+    console.warn("Landelijke Rijksmonumenten WFS fout:",e);
+    setStatus("Landelijke RM-WFS fout");
   }
 }
-/* =========================================================
-   BESTAANDE BAG-FUNCTIE
-   ========================================================= */
-
-function loadBAG(lat,lng,radius){
-  window.rceDiagnosisShown=false;
-
-  bagLayer.clearLayers();
-  bagLabel.clearLayers();
-
-  rceLayer.clearLayers();
-
-  const b=box(lat,lng,radius);
-
-  const url=
-    `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
-
-  try{
-
-    const res=await fetch(url);
-
-    if(!res.ok)
-      throw new Error(`BAG HTTP ${res.status}`);
-
-    const data=await res.json();
-
-    const list=data.features.map(f=>{
-
-      const c=centerOf(f);
-
-      if(!c)
-        return null;
-
-      const d=dist(
-        lat,
-        lng,
-        c.lat,
-        c.lng
-      );
-
-      if(d>radius)
-        return null;
-
-      return{
-        f,
-        c,
-        d
-      };
-
-    })
-    .filter(Boolean)
-    .sort((a,b)=>a.d-b.d);
-
-    list.forEach(o=>{
-
-      const p=o.f.properties || {};
-
-      const y=
-        (p.bouwjaar!==null &&
-         p.bouwjaar!==undefined &&
-         p.bouwjaar!=="")
-          ? String(p.bouwjaar)
-          : "Onbekend";
-
-      if(!matchesYearFilter(y))
-        return;
-
-      const bagId=
-        p.identificatie ||
-        "Onbekend";
-
-      const documentdatum=
-        p.documentdatum ||
-        "Onbekend";
-
-      const documentnummer=
-        p.documentnummer ||
-        "Onbekend";
-
-      const status=
-        p.status ||
-        "Onbekend";
-
-      const geconstateerd=
-        p.geconstateerd ||
-        "Onbekend";
-
-      const gebruiksdoel=
-        p.gebruiksdoel ||
-        "Onbekend";
-
-      const cl=yearClass(y);
-
-      const col=
-        useKadaster
-          ? kadasterColor(y)
-          : "#0b5cab";
-
-      const popup=`
-        <div style="min-width:250px">
-          <b>BAG-pand</b><br>
-          Bouwjaar: <b>${esc(y)}</b><br>
-          Afstand: ${Math.round(o.d)} m
-          <hr style="margin:8px 0">
-          <small>
-            BAG-identificatie: ${esc(bagId)}<br>
-            Status: ${esc(status)}<br>
-            Gebruiksdoel: ${esc(gebruiksdoel)}<br>
-            Geconstateerd: ${esc(geconstateerd)}<br>
-            BAG-document: ${esc(documentnummer)}<br>
-            Documentdatum: ${esc(documentdatum)}
-          </small>
-        </div>
-      `;
-
-      const poly=L.geoJSON(
-        o.f,
-        {
-          style:{
-            weight:1.2,
-            color:col,
-            fillColor:
-              useKadaster
-                ? col
-                : "#0b5cab",
-            fillOpacity:0.15
-          }
-        }
-      ).bindPopup(popup);
-
-      bagLayer.addLayer(poly);
-
-      const ic=L.divIcon({
-        className:"",
-        html:
-          `<div class="year-badge ${cl}" style="cursor:pointer">
-            ${esc(y)}
-          </div>`,
-        iconSize:null
-      });
-
-      const lab=L.marker(
-        [o.c.lat,o.c.lng],
-        {icon:ic}
-      ).bindPopup(popup);
-
-      bagLabel.addLayer(lab);
-
-
-    });
-
-    loadNationalRijksmonumenten(lat,lng,radius);
-
-    setStatus(
-      `${list.length} BAG binnen ${radius}m`
-    );
-
-  }catch(e){
-
-    console.error(
-      "BAG fout:",
-      e
-    );
-
-    setStatus("BAG fout");
-
-  }
-}
-
-locateBtn&&locateBtn.addEventListener(
-  "click",
-  ()=>{
-    if(!navigator.geolocation){
-      setStatus("Geen geolocatie");
-      return;
-    }
-
-    setStatus("Locatie bepalen...");
-    locateBtn.disabled=true;
-
-    navigator.geolocation.getCurrentPosition(
-      p=>{
-        locateBtn.disabled=false;
-        const lat=p.coords.latitude,
-              lng=p.coords.longitude,
-              acc=Math.round(p.coords.accuracy),
-              r=Number(radiusSel.value);
-        map.setView([lat,lng],18);
-        if(curMarker)map.removeLayer(curMarker);
-        if(accCircle)map.removeLayer(accCircle);
-        if(selectedMarker){map.removeLayer(selectedMarker);selectedMarker=null;}
-        if(curMarker)map.removeLayer(curMarker);
-        curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie").openPopup();
-        curMarker.on("click",()=>{
-          loadBAG(lat,lng,r);
-          loadHistForLocation(lat,lng);
-          setStatus("Huidige positie – BAG laden...");
-        });
-        accCircle=L.circle([lat,lng],{radius:acc,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);
-        closeMenu();
-      },
-      ()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},
-      {enableHighAccuracy:true,timeout:15000}
-    );
-  }
-);
-
-radiusSel&&radiusSel.addEventListener(
-  "change",
-  ()=>{
-    const r=Number(radiusSel.value);
-    if(curMarker){
-      const ll=curMarker.getLatLng();
-      loadBAG(ll.lat,ll.lng,r);
-    }else{
-      loadBAG(52.516,6.42,r);
-    }
-  }
-);
 
 async function loadHistForLocation(lat,lng){
   try{
