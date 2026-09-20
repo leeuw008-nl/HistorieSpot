@@ -791,7 +791,7 @@ async function loadOverijsselMonumentenVoorPand(o){
           detailRows+=fieldRow(key);
         });
 
-        const popup=`
+        popup=`
           <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
             <div style="font-size:18px;font-weight:700;margin-bottom:9px">
               🏛 ${esc(monumentType)}
