@@ -804,11 +804,9 @@ async function loadOverijsselMonumentenVoorPand(o){
           }).then(images=>{
             if(!images.length)return;
             const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
-            monumentMarker.setPopupContent(
-              monumentMarker.getPopup()?.getContent() || popup
-            );
-            const current=monumentMarker.getPopup()?.getContent()||popup;
-            monumentMarker.setPopupContent(current+gallery);
+            // Behoud de volledige oorspronkelijke GM-popup en voeg alleen de Preview toe.
+            // getPopup().getContent() kan na openen een DOM-element opleveren.
+            monumentMarker.setPopupContent(popup+gallery);
           }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
         }
       }
