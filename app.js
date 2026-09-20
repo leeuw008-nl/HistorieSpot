@@ -755,8 +755,6 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
    =========================================================
 */
 
-   ========================================================= */
-
 async function loadBAG(lat,lng,radius){
   window.rceDiagnosisShown=false;
 
