@@ -370,265 +370,196 @@ async function loadGemeenteMonumentImages(address){
 
 async function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
-
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
-
   const layers=[
-    {
-      name:"Rijksmonumenten",
-      label:"Rijksmonument",
-      wfs:"https://data.geo.cultureelerfgoed.nl/openbaar/wfs",
-      typeName:"geolinq:rijksmonumentpunten"
-    },
-    {
-      name:"B73_Gemeentelijke_Monumenten",
-      label:"Gemeentelijk monument",
-      wfs:"https://services.geodataoverijssel.nl/geoserver/B73_Cultuur/wfs",
-      typeName:"B73_Cultuur:B73_Gemeentelijke_Monumenten"
-    }
+    {name:"B73_Rijksmonumenten",label:"Rijksmonument"},
+    {name:"B73_Gemeentelijke_Monumenten",label:"Gemeentelijk monument"}
   ];
-
-  // BAG-adres wordt als betrouwbare fallback gebruikt voor het RM-adres.
-  let bagAddresses=[];
-  try{
-    bagAddresses=await getBAGAddresses(o.f.properties||{},o);
-  }catch(e){
-    console.warn("BAG-adres voor monument-popup:",e);
-  }
-  const bagAddress=bagAddresses[0]||null;
-
   for(const layer of layers){
     try{
       const params=new URLSearchParams({
-        service:"WFS",
-        version:"2.0.0",
-        request:"GetFeature",
-        typeNames:layer.typeName,
-        srsName:"EPSG:28992",
+        service:"WFS",version:"2.0.0",request:"GetFeature",
+        typeNames:`B73_Cultuur:${layer.name}`,srsName:"EPSG:28992",
         bbox:`${rd.x-r},${rd.y-r},${rd.x+r},${rd.y+r},EPSG:28992`,
-        outputFormat:"application/json",
-        count:"20"
+        outputFormat:"application/json",count:"20"
       });
-
-      const res=await fetch(`${layer.wfs}?${params}`);
+      const res=await fetch(`https://services.geodataoverijssel.nl/geoserver/B73_Cultuur/wfs?${params}`);
       if(!res.ok)continue;
-
       const data=await res.json();
       const features=Array.isArray(data.features)?data.features:[];
-
       for(const f of features){
         const p=f.properties||{},g=f.geometry||{};
         if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)continue;
-
-        const mx=Number(g.coordinates[0]);
-        const my=Number(g.coordinates[1]);
-        const d=Math.hypot(mx-rd.x,my-rd.y);
+        const mx=Number(g.coordinates[0]),my=Number(g.coordinates[1]),d=Math.hypot(mx-rd.x,my-rd.y);
         if(!Number.isFinite(d)||d>r)continue;
-
-        /*
-           GEMEENTELIJKE MONUMENTEN
-           Hersteld uit de werkende versie van commit
-           545ef58a0dcff48d269483bca087d1b991b93520.
-           Alleen deze GM-rendering wordt hier gebruikt;
-           de bestaande RM-rendering hieronder blijft ongemoeid.
-        */
-        if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          const number=String(p.MONUMENTENNUMMER||"").trim();
-          const key=layer.name+":"+(number||f.id||(mx+","+my));
-          if(monumentSeen.has(key))continue;
-          monumentSeen.add(key);
-
-          const ll=rdToWgs84(mx,my);
-          const address=[p.STRAATNAAM,p.HUISNUMMERS].filter(Boolean).join(" ");
-
-          let popup="<div style=\"min-width:250px\"><b>🏛 Gemeentelijk monument</b><br>";
-          popup+="Monumentnummer: <b>"+esc(number||"Onbekend")+"</b><br>";
-          if(address)popup+="Adres: <b>"+esc(address)+"</b><br>";
-          if(p.PLAATSNAAM)popup+=esc(p.PLAATSNAAM);
-          if(p.MIP_NR)popup+="<br>MIP: "+esc(p.MIP_NR);
-          if(p.IND_WAARDERING)popup+="<br>Waardering: "+esc(p.IND_WAARDERING);
-          popup+="<hr style=\"margin:8px 0\"><small>Bron: Provincie Overijssel · B73 Cultuur</small></div>";
-
-          const icon=L.divIcon({
-            className:"",
-            html:"<div style=\"background:#1d5d8f;color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">GM</div>",
-            iconSize:[30,30],
-            iconAnchor:[15,15]
-          });
-
-          monumentLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
-          continue;
-        }
-
-        const getProp=(...keys)=>{
-          for(const key of keys){
-            const value=p[key];
-            if(value!==undefined&&value!==null&&String(value).trim()!=="")
-              return value;
-          }
-          return "";
-        };
-
-        const number=String(getProp(
-          "MONUMENTENNUMMER",
-          "Rijksmonnr",
-          "rijksmonument_num",
-          "rijksmonumentnummer",
-          "monumenten_nummer",
-          "Rijksmonumentnummer",
-          "RIJKSMONUMENTNUMMER",
-          "Ref_nr",
-          "OBJECTNUMMER"
-        )||"").trim();
-
-        // Exacte B73-velden voor gemeentelijke monumenten.
-        const mipNr=String(getProp("MIP_NR")||"").trim();
-        const waardering=String(getProp("IND_WAARDERING")||"").trim();
-
-        const isRM=layer.name==="Rijksmonumenten";
-
-        const naam=String(getProp(
-          "NAAM","Naam","BENAMING","Benaming",
-          "naam","benaming"
-        )||"").trim();
-
-        const monumentType=String(getProp(
-          "MONUMENTTYPE","Monumenttype","monumenttype",
-          "TYPE","Type","type",
-          "OBJECTTYPE","Objecttype","objecttype",
-          "OORSPRONKELIJKE_FUNCTIE","OorspronkelijkeFunctie",
-          "FUNCTIE","Functie","functie"
-        )||"").trim();
-
-        const omschrijving=String(getProp(
-          "OMSCHRIJVING","Omschrijving","omschrijving"
-        )||"").trim();
-
-        const status=String(getProp(
-          "STATUS","Status","status"
-        )||"").trim();
-
-        const straat=String(getProp(
-          "Straat",
-          "STRAATNAAM","straatnaam","straat",
-          "OPENBARERUIMTE","openbare_ruimte","openbareRuimte"
-        )||"").trim();
-
-        const huisnummer=String(getProp(
-          "Huisnummer",
-          "HUISNUMMERS","huisnummers","HUISNUMMER","huisnummer"
-        )||"").trim();
-
-        const postcode=String(getProp(
-          "Postcode",
-          "POSTCODE","postcode"
-        )||"").trim();
-
-        const plaats=String(getProp(
-          "BAG_plaats",
-          "Plaats",
-          "PLAATSNAAM","plaatsnaam","plaats",
-          "WOONPLAATS","woonplaats","woonplaats_naam"
-        )||"").trim();
-
-        const url=String(getProp(
-          "rijksmonumenturl",
-          "RIJKSMONUMENTURL","RIJKSMONUMENT_URL","RijksmonumentURL",
-          "URL","Url","url","KICH_URL"
-        )||"").trim();
-
-        // Voor het RM-adres: eerst de RCE/WFS-velden, daarna BAG.
-        const finalStraat=straat || (bagAddress?.straat||"");
-        const finalHuisnummer=huisnummer || (bagAddress?.huisnummer||"");
-        const finalHuisletter=bagAddress?.huisletter||"";
-        const finalToevoeging=bagAddress?.toevoeging||"";
-        const finalPostcode=postcode || (bagAddress?.postcode||"");
-        const finalPlaats=plaats || (bagAddress?.woonplaats||"");
-
-        const addressText=[
-          finalStraat,
-          finalHuisnummer+finalHuisletter+finalToevoeging
-        ].filter(Boolean).join(" ");
-
-        // Als het WFS-nummer ontbreekt, haal het nummer uit de werkende RCE-registerlink.
-        const nummerUitUrl=(url.match(/(?:monumenten\/|monument\/)(\d+)/i)||[])[1]||"";
-        const nummer=number||nummerUitUrl||"Onbekend";
-        const registerUrl=url ||
-          (isRM && nummer!=="Onbekend"
-            ? "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(nummer)
-            : "");
-
+        const number=p.MONUMENTENNUMMER||"";
         const key=`${layer.name}:${number||f.id||`${mx},${my}`}`;
         if(monumentSeen.has(key))continue;
         monumentSeen.add(key);
-
         const ll=rdToWgs84(mx,my);
+        const address=[p.STRAATNAAM,p.HUISNUMMERS].filter(Boolean).join(" ");
+        const monumentType=layer.label;
+        const nummer=number||"Onbekend";
+
+        // Toon alle inhoudelijk bruikbare monumentgegevens die de WFS werkelijk levert.
+        // De locatie, ruimtelijke koppeling en zoekradius blijven ongewijzigd.
+        const labelMap={
+          MONUMENTENNUMMER:"Monumentnummer",
+          NAAM:"Naam",
+          BENAMING:"Benaming",
+          OMSCHRIJVING:"Omschrijving",
+          BOUWJAAR:"Bouwjaar",
+          BOUWPERIODE:"Bouwperiode",
+          FUNCTIE:"Functie",
+          OORSPRONKELIJKE_FUNCTIE:"Oorspronkelijke functie",
+          STRAATNAAM:"Straat",
+          HUISNUMMERS:"Huisnummer",
+          PLAATSNAAM:"Plaats",
+          MIP_NR:"MIP-nummer",
+          IND_WAARDERING:"Waardering",
+          TYPE:"Type",
+          CATEGORIE:"Categorie",
+          STATUS:"Status"
+        };
+
+        const hiddenKeys=new Set([
+          "OBJECTID","geometry","SHAPE","SHAPE_LENGTH","SHAPE_AREA",
+          "MONUMENTENNUMMER","STRAATNAAM","HUISNUMMERS","PLAATSNAAM",
+          "MIP_NR","IND_WAARDERING","TOELICHTING","PREVIEW"
+        ]);
+
+        const preferredKeys=[
+          "NAAM","BENAMING","OMSCHRIJVING","BOUWJAAR","BOUWPERIODE",
+          "FUNCTIE","OORSPRONKELIJKE_FUNCTIE","TYPE","CATEGORIE","STATUS"
+        ];
+
+        function displayValue(v){
+          if(v===null||v===undefined||v==="")return "";
+          if(Array.isArray(v))return v.join(", ");
+          if(typeof v==="object")return JSON.stringify(v);
+          return String(v);
+        }
+
+        function absoluteUrl(v){
+          const s=String(v||"").trim();
+          return s.startsWith("http://") || s.startsWith("https://") ? s : "";
+        }
+
+        function fieldRow(key){
+          const value=displayValue(p[key]);
+          if(!value)return "";
+          const label=labelMap[key]||key.replaceAll("_"," ");
+          const url=absoluteUrl(value);
+          const isPreview=/^preview$/i.test(key)||/preview/i.test(label)||/preview/i.test(value);
+
+          // Het Overijssel-WFS veld "Preview" bevat een afbeelding/afbeeldings-URL.
+          // Toon die direct als afbeelding in plaats van de technische URL-tekst.
+          if(isPreview && url){
+            return `
+              <div style="margin-top:9px;padding-top:2px">
+                <b>Preview</b>
+                <a href="${esc(url)}" target="_blank" rel="noopener" style="display:block;margin-top:6px;text-decoration:none">
+                  <img src="${esc(url)}"
+                       alt="Monument preview"
+                       loading="lazy"
+                       style="display:block;width:100%;max-width:340px;max-height:240px;object-fit:contain;border:1px solid #ccc;border-radius:6px;background:#f5f5f5">
+                </a>
+              </div>`;
+          }
+
+          if(url){
+            return `
+              <div style="margin-top:7px">
+                <b>${esc(label)}</b><br>
+                <a href="${esc(url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:3px;padding:5px 8px;background:#1d5d8f;color:white;text-decoration:none;border-radius:4px">
+                  ${esc(label)} openen
+                </a>
+              </div>`;
+          }
+
+          // Lange technische preview-/URL-achtige waarden niet meer over de popup laten doorlopen.
+          const compactValue=value.length>180 ? value.slice(0,177)+"…" : value;
+
+          return `
+            <div style="margin-top:7px;overflow-wrap:anywhere">
+              <b>${esc(label)}</b><br>
+              <span>${esc(compactValue)}</span>
+            </div>`;
+        }
+
+        let detailRows="";
+        const used=new Set();
+
+        preferredKeys.forEach(key=>{
+          if(Object.prototype.hasOwnProperty.call(p,key)){
+            const row=fieldRow(key);
+            if(row){
+              detailRows+=row;
+              used.add(key);
+            }
+          }
+        });
+
+        // Neem ook overige niet-technische WFS-attributen mee.
+        Object.keys(p).forEach(key=>{
+          if(used.has(key)||hiddenKeys.has(key)||key.startsWith("_")||String(key).trim().toLowerCase()==="toelichting"||String(key).trim().toLowerCase()==="preview")return;
+          const value=displayValue(p[key]);
+          if(!value)return;
+          detailRows+=fieldRow(key);
+        });
 
         const popup=`
           <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
             <div style="font-size:18px;font-weight:700;margin-bottom:9px">
-              🏛 ${esc(layer.label)}
+              🏛 ${esc(monumentType)}
             </div>
 
-            <div style="background:#f3f5f7;border-left:4px solid ${isRM?"#7b1e1e":"#1d5d8f"};border-radius:6px;padding:9px 10px;margin-bottom:10px">
-              <div style="font-size:12px;color:#666">${isRM?"Rijksmonumentnummer":"Monumentnummer"}</div>
+            <div style="background:#f3f5f7;border-left:4px solid ${layer.name==="B73_Rijksmonumenten"?"#7b1e1e":"#1d5d8f"};border-radius:6px;padding:9px 10px;margin-bottom:10px">
+              <div style="font-size:12px;color:#666">Monumentnummer</div>
               <div style="font-size:17px;font-weight:700">${esc(nummer)}</div>
             </div>
 
             <div style="margin-bottom:9px">
               <b>Adres</b><br>
-              ${addressText ? esc(addressText) : "Onbekend"}
-              ${finalPostcode ? "<br>"+esc(finalPostcode) : ""}
-              ${finalPlaats ? "<br>"+esc(finalPlaats) : ""}
+              ${address ? esc(address) : "Onbekend"}
+              ${p.PLAATSNAAM ? ", "+esc(p.PLAATSNAAM) : ""}
             </div>
 
-            ${!isRM && mipNr ? `<div style="margin-top:8px"><b>MIP-nummer</b><br>${esc(mipNr)}</div>` : ""}
-            ${!isRM && waardering ? `<div style="margin-top:8px"><b>Waardering</b><br>${esc(waardering)}</div>` : ""}
-            ${naam ? `<div style="margin-top:8px"><b>Naam</b><br>${esc(naam)}</div>` : ""}
-            ${status ? `<div style="margin-top:8px"><b>Status</b><br>${esc(status)}</div>` : ""}
-            ${omschrijving ? `<div style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd"><b>Omschrijving</b><br><span style="font-size:13px">${esc(omschrijving)}</span></div>` : ""}
+            <!--GEMEENTE_PREVIEW-->
 
-            ${isRM && registerUrl
-              ? `<div style="margin-top:11px;padding-top:9px;border-top:1px solid #ddd">
-                  <a href="${esc(registerUrl)}" target="_blank" rel="noopener" style="display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px">
-                    Rijksmonumentenregister
-                  </a>
-                </div>`
+            ${detailRows
+              ? `<div style="border-top:1px solid #ddd;padding-top:2px">${detailRows}</div>`
               : ""}
 
-            <div style="font-size:11px;color:#666;margin-top:8px">
-              Bron: ${isRM?"Rijksdienst voor het Cultureel Erfgoed":"Provincie Overijssel · B73 Cultuur"}
+            <hr style="margin:11px 0 8px">
+
+            <div style="font-size:11px;color:#666">
+              Bron: Provincie Overijssel · B73 Cultuur
             </div>
           </div>
         `;
 
+        const isRM=layer.name==="B73_Rijksmonumenten";
         const icon=L.divIcon({
           className:"",
           html:"<div style=\"background:"+(isRM?"#7b1e1e":"#1d5d8f")+";color:white;width:30px;height:30px;border-radius:50%;border:2px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;cursor:pointer;\">"+(isRM?"RM":"GM")+"</div>",
-          iconSize:[30,30],
-          iconAnchor:[15,15]
+          iconSize:[30,30],iconAnchor:[15,15]
         });
-
         const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
         monumentLayer.addLayer(monumentMarker);
 
+        // Gemeentelijke monumenten: afbeeldingen uit de officiële HTML.
         if(layer.name==="B73_Gemeentelijke_Monumenten"){
-          loadGemeenteMonumentImages({
-            straat:straat,
-            huisnummer:huisnummer
-          }).then(images=>{
-            if(!images.length)return;
+          loadGemeenteMonumentImages({straat:p.STRAATNAAM||"",huisnummer:p.HUISNUMMERS||""}).then(images=>{
+            if(!images.length) return;
             const gallery="<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><b>Preview</b><div style=\"display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px\">"+images.map(img=>"<a href=\""+esc(img.url)+"\" target=\"_blank\" rel=\"noopener\"><img src=\""+esc(img.url)+"\" alt=\""+esc(img.label)+"\" loading=\"lazy\" onerror=\"this.parentElement.style.display='none'\" style=\"display:block;width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:5px;background:#f5f5f5\"></a>").join("")+"</div><div style=\"font-size:10px;color:#666;margin-top:5px\">Bron: Gemeenteblad 2026, 30438</div></div>";
             monumentMarker.setPopupContent(popup.replace("<!--GEMEENTE_PREVIEW-->",gallery));
           }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
         }
       }
-    }catch(e){
-      console.error(layer.label+" WFS fout:",e);
-    }
+    }catch(e){console.error("Overijssel monument WFS fout:",e);}
   }
 }
-
 /* =========================================================
    RCE FUNCTIE 1
    Haalt het verblijfsobject op dat bij een BAG-pand hoort.
