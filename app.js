@@ -593,7 +593,7 @@ async function loadOverijsselMonumentenVoorPand(o){
                 address||
                 "Onbekend";
 
-              monumentMarker.setPopupContent(
+              marker.setPopupContent(
                 buildRijksmonumentPopup(
                   details,
                   number,
