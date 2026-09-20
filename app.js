@@ -372,7 +372,6 @@ async function loadBAG(lat,lng,radius){
   bagLabel.clearLayers();
 
   rceLayer.clearLayers();
-  rceSeen.clear();
 
   const b=box(lat,lng,radius);
 
