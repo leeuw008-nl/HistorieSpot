@@ -540,7 +540,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
       service:"WFS",
       version:"2.0.0",
       request:"GetFeature",
-      typeNames:"rce:NationalListedMonumentPoints",
+      typeNames:"ps-ch:rce_inspire_points",
       srsName:"EPSG:28992",
       bbox:
         rd.x-radius+","+rd.y-radius+","+
@@ -550,7 +550,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
     });
 
     const res=await fetch(
-      "https://services.rce.geovoorziening.nl/rce/wfs?"+params
+      "https://service.pdok.nl/rce/ps-ch/wfs/v1_0?"+params
     );
 
     if(!res.ok)
@@ -583,7 +583,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
         continue;
 
       const number=
-        p.rijksmonumentnummer||
+        p.rijksmonumentnummer||p.localId||p.inspireId||
         p.rijksmonumentnr||
         p.monumentnummer||
         p.monumentnr||
