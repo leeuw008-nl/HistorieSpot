@@ -496,6 +496,24 @@ function buildRijksmonumentPopup(rce,number,fallbackAddress,wfs){
   const subcategorie=String(wfs?.subcategorie||"").trim();
   const kwaliteit=String(wfs?.kwaliteit_geometrie||"").trim();
 
+  const diagnoseKeys=Object.keys(wfs||{})
+    .filter(k=>wfs[k]!==null&&wfs[k]!==undefined&&String(wfs[k]).trim()!=="")
+    .sort();
+
+  const diagnoseRows=diagnoseKeys
+    .slice(0,40)
+    .map(k=>`<div><b>${esc(k)}</b>: ${esc(wfs[k])}</div>`)
+    .join("");
+
+  const diagnose=`
+    <details style="margin-top:10px;padding-top:9px;border-top:1px solid #ddd;font-size:11px">
+      <summary style="cursor:pointer;font-weight:700">RM-diagnose: WFS-velden (${diagnoseKeys.length})</summary>
+      <div style="margin-top:7px;line-height:1.35">
+        ${diagnoseRows||"<i>Geen niet-lege WFS-velden gevonden</i>"}
+      </div>
+    </details>
+  `;
+
   return `
     <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
       <div style="font-size:18px;font-weight:700;margin-bottom:9px">
@@ -535,6 +553,8 @@ function buildRijksmonumentPopup(rce,number,fallbackAddress,wfs){
           Rijksmonumentenregister
         </a>
       </div>
+
+      ${diagnose}
 
       <div style="font-size:11px;color:#666;margin-top:8px">
         Bron: Rijksdienst voor het Cultureel Erfgoed
