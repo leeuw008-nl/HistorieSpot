@@ -445,8 +445,8 @@ async function getRijksmonumentDetailsByAddress(address,number){
   }
 }
 
-function buildRijksmonumentPopup(rce,number,fallbackAddress){
-  const bag=rce?.heeftBAGRelatie||{};
+function buildRijksmonumentPopup(rce,number,fallbackAddress,wfs){
+  const bag=rce?.heeftBAGRelatie||rce?.heeftBasisregistratieRelatie?.heeftBAGRelatie||{};
   const fallback=typeof fallbackAddress==="object"
     ? fallbackAddress
     : {full:fallbackAddress||""};
@@ -482,16 +482,19 @@ function buildRijksmonumentPopup(rce,number,fallbackAddress){
   const aard=
     rce?.heeftMonumentAard?.["skos:prefLabel"]||
     rce?.monumentAard||
+    wfs?.aard_monument||
     "";
 
   const status=
     rce?.heeftJuridischeStatus?.["skos:prefLabel"]||
     rce?.juridischeStatus||
+    wfs?.juridische_status||
     "";
 
-  const registerUrl=
-    "https://monumentenregister.cultureelerfgoed.nl/monumenten/"+
-    encodeURIComponent(String(number));
+  const registerUrl=wfs?.rijksmonumenturl||("https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(String(number)));
+  const hoofdcategorie=String(wfs?.hoofdcategorie||"").trim();
+  const subcategorie=String(wfs?.subcategorie||"").trim();
+  const kwaliteit=String(wfs?.kwaliteit_geometrie||"").trim();
 
   return `
     <div style="min-width:300px;max-width:380px;font-size:14px;line-height:1.45">
@@ -513,6 +516,9 @@ function buildRijksmonumentPopup(rce,number,fallbackAddress){
 
       ${aard ? `<div style="margin-top:8px"><b>Monumentaard</b><br>${esc(aard)}</div>` : ""}
       ${status ? `<div style="margin-top:8px"><b>Juridische status</b><br>${esc(status)}</div>` : ""}
+      ${hoofdcategorie ? `<div style="margin-top:8px"><b>Hoofdcategorie</b><br>${esc(hoofdcategorie)}</div>` : ""}
+      ${subcategorie ? `<div style="margin-top:8px"><b>Subcategorie</b><br>${esc(subcategorie)}</div>` : ""}
+      ${kwaliteit ? `<div style="margin-top:8px"><b>Kwaliteit geometrie</b><br>${esc(kwaliteit)}</div>` : ""}
       ${inschrijving ? `<div style="margin-top:8px"><b>Inschrijving register</b><br>${esc(inschrijving)}</div>` : ""}
       ${functie ? `<div style="margin-top:8px"><b>Oorspronkelijke functie</b><br>${esc(functie)}</div>` : ""}
 
@@ -650,7 +656,7 @@ async function loadOverijsselMonumentenVoorPand(o){
           // De landelijke monument-WFS levert betrouwbaar het RM-nummer,
           // maar niet de inhoudelijke adres-/registervelden.
           // Gebruik daarom dezelfde bewezen RCE-adresquery als de bestaande RCE-logica.
-          popup=buildRijksmonumentPopup(null,nummer,address);
+          popup=buildRijksmonumentPopup(null,nummer,address,p);
 
           if(number){
             // De verrijking gebeurt direct na het aanmaken van de marker hieronder.
