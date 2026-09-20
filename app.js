@@ -550,7 +550,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
     });
 
     const res=await fetch(
-      "https://service.pdok.nl/rce/ps-ch/wfs/v1_0?"+params
+      "https://service.pdok.nl/rce/beschermde-gebieden-cultuurhistorie/wfs/v1_0?"+params
     );
 
     if(!res.ok)
@@ -622,7 +622,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
         (registerUrl
           ?"<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><a href=\""+registerUrl+"\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px\">Rijksmonumentenregister</a></div>"
           :"")+
-        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: RCE · NationalListedMonumentPoints</div></div>";
+        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: RCE · ps-ch:rce_inspire_points</div></div>";
 
       const icon=L.divIcon({
         className:"",
