@@ -909,7 +909,6 @@ async function loadOverijsselMonumentenVoorPand(o){
             );
           }).catch(e=>console.warn("Gemeentelijke monumentafbeeldingen:",e));
         }
-        }
       }
     }catch(e){
       console.error(layer.label+" WFS fout:",e);
