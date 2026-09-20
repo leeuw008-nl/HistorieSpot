@@ -384,11 +384,63 @@ async function getRijksmonumentDetails(number){
     if(!res.ok) return null;
 
     const data=await res.json();
-    if(!Array.isArray(data) || !data.length) return null;
 
-    return data[0];
+    const list=
+      Array.isArray(data) ? data :
+      Array.isArray(data?.results) ? data.results :
+      Array.isArray(data?.data) ? data.data :
+      [];
+
+    if(!list.length) return null;
+
+    return list.find(x=>
+      String(x?.rijksmonumentnummer||"").trim()===String(number).trim()
+    ) || list[0];
   }catch(e){
     console.warn("RCE detailgegevens fout:",e);
+    return null;
+  }
+}
+
+async function getRijksmonumentDetailsByAddress(address,number){
+  if(!address?.straat) return null;
+
+  try{
+    const params=new URLSearchParams({
+      page:"1",
+      pageSize:"10",
+      straat:String(address.straat),
+      postcode:String(address.postcode||"")
+    });
+
+    const url=
+      "https://api.linkeddata.cultureelerfgoed.nl/"+
+      "queries/rce/rest-api-rijksmonumenten/run?"+
+      params.toString();
+
+    const res=await fetch(url);
+    if(!res.ok) return null;
+
+    const data=await res.json();
+    const list=
+      Array.isArray(data) ? data :
+      Array.isArray(data?.results) ? data.results :
+      Array.isArray(data?.data) ? data.data :
+      [];
+
+    const wantedNumber=String(address.huisnummer||"").trim();
+
+    return list.find(x=>{
+      const n=String(x?.rijksmonumentnummer||"").trim();
+      const bag=x?.heeftBasisregistratieRelatie?.heeftBAGRelatie||x?.heeftBAGRelatie||{};
+      const h=String(bag.huisnummer||"").trim();
+      return n===String(number).trim() &&
+             (!wantedNumber || h===wantedNumber);
+    }) || list.find(x=>
+      String(x?.rijksmonumentnummer||"").trim()===String(number).trim()
+    ) || null;
+  }catch(e){
+    console.warn("RCE adresgegevens fout:",e);
     return null;
   }
 }
@@ -658,22 +710,34 @@ async function loadOverijsselMonumentenVoorPand(o){
         if(isRM && number){
           (async()=>{
             try{
+              // Eerst het BAG-adres van exact dit pand ophalen.
+              // Dit is onafhankelijk van de RCE-detailquery.
               const addresses=await getBAGAddresses(p,o);
 
-              for(const a of addresses){
-                const monuments=await findRCEByAddress(a);
-                const match=monuments.find(m=>
-                  String(
-                    m.rijksmonumentnummer ||
-                    m.cultuurhistorischObjectnummer ||
-                    ""
-                  ).trim()===String(number).trim()
+              if(addresses.length){
+                const a=addresses[0];
+
+                // Toon direct het bekende BAG-adres.
+                monumentMarker.setPopupContent(
+                  buildRijksmonumentPopup(
+                    null,
+                    number,
+                    {
+                      full:[a.straat,a.huisnummer,a.huisletter,a.toevoeging]
+                        .filter(Boolean).join(" "),
+                      postcode:a.postcode,
+                      plaats:a.woonplaats
+                    }
+                  )
                 );
 
-                if(match){
+                // Daarna de inhoudelijke RCE-registergegevens ophalen.
+                const details=await getRijksmonumentDetailsByAddress(a,number);
+
+                if(details){
                   monumentMarker.setPopupContent(
                     buildRijksmonumentPopup(
-                      match,
+                      details,
                       number,
                       {
                         full:[a.straat,a.huisnummer,a.huisletter,a.toevoeging]
@@ -687,20 +751,14 @@ async function loadOverijsselMonumentenVoorPand(o){
                 }
               }
 
-              // Ook als de RCE-registerquery niets teruggeeft,
-              // tonen we het officiële BAG-adres in plaats van "Onbekend".
-              if(addresses.length){
-                const a=addresses[0];
+              // Laatste fallback: rechtstreeks op RM-nummer.
+              const details=await getRijksmonumentDetails(number);
+              if(details){
                 monumentMarker.setPopupContent(
                   buildRijksmonumentPopup(
-                    null,
+                    details,
                     number,
-                    {
-                      full:[a.straat,a.huisnummer,a.huisletter,a.toevoeging]
-                        .filter(Boolean).join(" "),
-                      postcode:a.postcode,
-                      plaats:a.woonplaats
-                    }
+                    address||"Onbekend"
                   )
                 );
               }
