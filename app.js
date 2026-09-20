@@ -365,6 +365,169 @@ async function getBAGAddresses(p,o){
   return results;
 }
 
+async function loadBAG(lat,lng,radius){
+  window.rceDiagnosisShown=false;
+
+  bagLayer.clearLayers();
+  bagLabel.clearLayers();
+
+  rceLayer.clearLayers();
+  rceSeen.clear();
+
+  const b=box(lat,lng,radius);
+
+  const url=
+    `https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=1000&f=json`;
+
+  try{
+
+    const res=await fetch(url);
+
+    if(!res.ok)
+      throw new Error(`BAG HTTP ${res.status}`);
+
+    const data=await res.json();
+
+    const list=data.features.map(f=>{
+
+      const c=centerOf(f);
+
+      if(!c)
+        return null;
+
+      const d=dist(
+        lat,
+        lng,
+        c.lat,
+        c.lng
+      );
+
+      if(d>radius)
+        return null;
+
+      return{
+        f,
+        c,
+        d
+      };
+
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.d-b.d);
+
+    list.forEach(o=>{
+
+      const p=o.f.properties || {};
+
+      const y=
+        (p.bouwjaar!==null &&
+         p.bouwjaar!==undefined &&
+         p.bouwjaar!=="")
+          ? String(p.bouwjaar)
+          : "Onbekend";
+
+      if(!matchesYearFilter(y))
+        return;
+
+      const bagId=
+        p.identificatie ||
+        "Onbekend";
+
+      const documentdatum=
+        p.documentdatum ||
+        "Onbekend";
+
+      const documentnummer=
+        p.documentnummer ||
+        "Onbekend";
+
+      const status=
+        p.status ||
+        "Onbekend";
+
+      const geconstateerd=
+        p.geconstateerd ||
+        "Onbekend";
+
+      const gebruiksdoel=
+        p.gebruiksdoel ||
+        "Onbekend";
+
+      const cl=yearClass(y);
+
+      const col=
+        useKadaster
+          ? kadasterColor(y)
+          : "#0b5cab";
+
+      const popup=`
+        <div style="min-width:250px">
+          <b>BAG-pand</b><br>
+          Bouwjaar: <b>${esc(y)}</b><br>
+          Afstand: ${Math.round(o.d)} m
+          <hr style="margin:8px 0">
+          <small>
+            BAG-identificatie: ${esc(bagId)}<br>
+            Status: ${esc(status)}<br>
+            Gebruiksdoel: ${esc(gebruiksdoel)}<br>
+            Geconstateerd: ${esc(geconstateerd)}<br>
+            BAG-document: ${esc(documentnummer)}<br>
+            Documentdatum: ${esc(documentdatum)}
+          </small>
+        </div>
+      `;
+
+      const poly=L.geoJSON(
+        o.f,
+        {
+          style:{
+            weight:1.2,
+            color:col,
+            fillColor:
+              useKadaster
+                ? col
+                : "#0b5cab",
+            fillOpacity:0.15
+          }
+        }
+      ).bindPopup(popup);
+
+      bagLayer.addLayer(poly);
+
+      const ic=L.divIcon({
+        className:"",
+        html:
+          `<div class="year-badge ${cl}" style="cursor:pointer">
+            ${esc(y)}
+          </div>`,
+        iconSize:null
+      });
+
+      const lab=L.marker(
+        [o.c.lat,o.c.lng],
+        {icon:ic}
+      ).bindPopup(popup);
+
+      bagLabel.addLayer(lab);
+      loadNationalRijksmonumenten(lat,lng,radius);
+});
+
+    setStatus(
+      `${list.length} BAG binnen ${radius}m`
+    );
+
+  }catch(e){
+
+    console.error(
+      "BAG fout:",
+      e
+    );
+
+    setStatus("BAG fout");
+
+  }
+}
+
 async function loadNationalRijksmonumenten(lat,lng,radius){
   const requestId=++nationalRMRequest;
   rceLayer.clearLayers();
