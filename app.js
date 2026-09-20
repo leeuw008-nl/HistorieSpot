@@ -528,17 +528,18 @@ async function loadOverijsselMonumentenVoorPand(o){
         };
 
         const number=String(getProp(
-          "rijksmonument_nummer",
-          "Rijksmonumentnummer",
-          "rijksmonumentnummer",
-          "RIJKSMONUMENTNUMMER",
           "Rijksmonnr",
           "rijksmonument_num",
+          "rijksmonumentnummer",
           "MONUMENTENNUMMER",
           "monumenten_nummer",
+          "Rijksmonumentnummer",
+          "RIJKSMONUMENTNUMMER",
           "Ref_nr",
           "OBJECTNUMMER",
-          "objectnummer"
+          "objectnummer",
+          "ID",
+          "id"
         )||"").trim();
 
         const key=`${layer.name}:${number||f.id||`${mx},${my}`}`;
