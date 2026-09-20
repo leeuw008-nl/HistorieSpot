@@ -540,16 +540,17 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
       service:"WFS",
       version:"2.0.0",
       request:"GetFeature",
-      typeNames:"geolinq:rijksmonumentpunten",
+      typeNames:"rce:NationalListedMonumentPoints",
       srsName:"EPSG:28992",
       bbox:
         rd.x-radius+","+rd.y-radius+","+
         rd.x+radius+","+rd.y+radius+",EPSG:28992",
-      outputFormat:"application/json"
+      outputFormat:"application/json",
+      count:"100"
     });
 
     const res=await fetch(
-      "https://data.geo.cultureelerfgoed.nl/openbaar/wfs?"+params
+      "https://services.rce.geovoorziening.nl/rce/wfs?"+params
     );
 
     if(!res.ok)
@@ -561,6 +562,8 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
       return;
 
     const features=Array.isArray(data.features)?data.features:[];
+
+    let shown=0;
 
     for(const f of features){
       const g=f.geometry||{};
@@ -580,16 +583,26 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
         continue;
 
       const number=
+        p.rijksmonumentnummer||
         p.rijksmonumentnr||
-        p.Rijksmonumentnr||
         p.monumentnummer||
-        p.MONUMENTNUMMER||
+        p.monumentnr||
         p.id||
         f.id||
         "";
 
-      const description=p.omschrijving||p.naam||p.benaming||"";
-      const place=p.plaats||p.woonplaats||"";
+      const description=
+        p.omschrijving||
+        p.naam||
+        p.benaming||
+        p.objectnaam||
+        "";
+
+      const place=
+        p.plaats||
+        p.woonplaats||
+        p.gemeente||
+        "";
 
       const registerUrl=/^\d+$/.test(String(number))
         ?"https://monumentenregister.cultureelerfgoed.nl/monumenten/"+encodeURIComponent(number)
@@ -605,11 +618,11 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
         "<div style=\"font-size:17px;font-weight:700\">"+esc(number||"Onbekend")+"</div>"+
         "</div>"+
         (description?"<div><b>Omschrijving</b><br>"+esc(description)+"</div>":"")+
-        (place?"<div style=\"margin-top:8px\"><b>Plaats</b><br>"+esc(place)+"</div>":"")+
+        (place?"<div style=\"margin-top:8px\"><b>Plaats/gemeente</b><br>"+esc(place)+"</div>":"")+
         (registerUrl
           ?"<div style=\"margin-top:11px;padding-top:9px;border-top:1px solid #ddd\"><a href=\""+registerUrl+"\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;padding:7px 10px;background:#7b1e1e;color:white;text-decoration:none;border-radius:5px\">Rijksmonumentenregister</a></div>"
           :"")+
-        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: Rijksdienst voor het Cultureel Erfgoed · landelijke WFS</div></div>";
+        "<div style=\"font-size:11px;color:#666;margin-top:8px\">Bron: RCE · NationalListedMonumentPoints</div></div>";
 
       const icon=L.divIcon({
         className:"",
@@ -621,9 +634,11 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
       rceLayer.addLayer(
         L.marker([ll.lat,ll.lon],{icon:icon}).bindPopup(popup)
       );
+
+      shown++;
     }
 
-    setStatus("Landelijke RM-WFS: "+features.length+" punten gevonden");
+    setStatus("Landelijke RM: "+shown+" gevonden ("+features.length+" WFS-punten)");
   }catch(e){
     console.warn("Landelijke Rijksmonumenten WFS fout:",e);
     setStatus("Landelijke RM-WFS fout");
