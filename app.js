@@ -15,6 +15,13 @@ const bagLayer=L.layerGroup().addTo(map),
 const rceLayer=L.layerGroup().addTo(map);
 const rceSeen=new Set();
 
+/* =========================================================
+   NATIONALE RIJKSMONUMENTEN - APARTE LAAG
+   Onafhankelijk van de Overijssel-monumentenlogica.
+   ========================================================= */
+const nationalRMLayer=L.layerGroup().addTo(map);
+let nationalRMRequest=0;
+
 /* ========================================================= */
 
 const CORR={"MIN04041B02":"MIN04041B03","MIN04041B03":"MIN04041B02"};
@@ -691,6 +698,8 @@ async function getBAGAddresses(p,o){
 }
 
 async function loadNationalRijksmonumenten(lat,lng,radius){
+  const requestId=++nationalRMRequest;
+  nationalRMLayer.clearLayers();
   try{
     const rd=wgs84ToRD(lat,lng);
     const params=new URLSearchParams({
@@ -704,6 +713,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
     if(!res.ok)return;
     const data=await res.json();
     const features=Array.isArray(data.features)?data.features:[];
+    if(requestId!==nationalRMRequest)return;
     for(const f of features){
       const g=f.geometry||{},p=f.properties||{};
       if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2)continue;
@@ -743,7 +753,7 @@ async function loadNationalRijksmonumenten(lat,lng,radius){
         iconSize:[30,30],iconAnchor:[15,15]
       });
 
-      rceLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
+      nationalRMLayer.addLayer(L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup));
     }
   }catch(e){
     console.warn("Nationaal Rijksmonumenten WFS fout:",e);
@@ -907,8 +917,6 @@ async function loadBAG(lat,lng,radius){
       `${list.length} BAG binnen ${radius}m`
     );
 
-    await loadNationalRijksmonumenten(lat,lng,radius);
-
   }catch(e){
 
     console.error(
@@ -952,6 +960,7 @@ locateBtn&&locateBtn.addEventListener(
         });
         accCircle=L.circle([lat,lng],{radius:acc,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
         loadBAG(lat,lng,r);
+        loadNationalRijksmonumenten(lat,lng,r);
         closeMenu();
       },
       ()=>{locateBtn.disabled=false;setStatus("Locatie geweigerd");},
@@ -967,8 +976,10 @@ radiusSel&&radiusSel.addEventListener(
     if(curMarker){
       const ll=curMarker.getLatLng();
       loadBAG(ll.lat,ll.lng,r);
+      loadNationalRijksmonumenten(ll.lat,ll.lng,r);
     }else{
       loadBAG(52.516,6.42,r);
+      loadNationalRijksmonumenten(52.516,6.42,r);
     }
   }
 );
@@ -993,6 +1004,7 @@ map.on("click",async e=>{
   selectedMarker=L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
   setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
   loadBAG(lat,lng,r);
+  loadNationalRijksmonumenten(lat,lng,r);
   loadHistForLocation(lat,lng);
   try{
     if(map.hasLayer(minuutLayer)){
@@ -1020,12 +1032,12 @@ window.addEventListener("load",()=>{
         map.setView([lat,lng],18);
         curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
         accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);loadHistForLocation(lat,lng);
+        loadBAG(lat,lng,r);loadNationalRijksmonumenten(lat,lng,r);loadHistForLocation(lat,lng);
       },()=>{
-        loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
+        loadBAG(52.516,6.42,Number(radiusSel.value));loadNationalRijksmonumenten(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
       },{enableHighAccuracy:true,timeout:8000});
     }else{
-      loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
+      loadBAG(52.516,6.42,Number(radiusSel.value));loadNationalRijksmonumenten(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
     }
   },600);
 });
