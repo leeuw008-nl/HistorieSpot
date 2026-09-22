@@ -1697,7 +1697,7 @@ async function hisgisOatProof(lat,lng,code){
   setStatus("HisGIS 1832: OAT-gegevens laden...");
   try{
     const b=box(lat,lng,40);
-    const bagUrl=\`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=\${b.minLo},\${b.minLa},\${b.maxLo},\${b.maxLa}&limit=100&f=json\`;
+    const bagUrl=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=100&f=json`;
     const bagRes=await fetch(bagUrl);
     if(!bagRes.ok) throw new Error("BAG HTTP "+bagRes.status);
     const bagData=await bagRes.json();
