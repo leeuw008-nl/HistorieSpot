@@ -1719,7 +1719,7 @@ async function hisgisOatProof(lat,lng,code){
     const articles=Array.isArray(s.artikelen)?s.artikelen:[];
     const articleMap=new Map();
     articles.forEach(a=>{let id=String(a.artikelnr||"");if(a.artikelnrtvg)id+=String(a.artikelnrtvg);articleMap.set(id,a);});
-    const match=rows.find(p=>(p.huisnrs||[]).some(h=>String(typeof h==="object"?(h.nr??h.huisnummer??h.waarde??""):h).trim()===huisnummer));
+    const match=null; // Ruimtelijke perceelkoppeling volgt in een aparte proef; OAT-lijst blijft intact.
     if(!match){ if(resultBox){ const proef=rows.slice(0,20).map(p=>{const aid=String(p.artikelLink?.artikelnr||"")+(p.artikelLink?.artikelnrtvg||"");const a=articleMap.get(aid);const owners=(a?.rechtsPersonen||[]).map(rp=>{const q=rp.persoon||rp.persoonsVerwijzing?.persoon||{};if(Object.keys(q).length)return [q.titel,q.voornaam,q.voorvoegsel,q.achternaam].filter(Boolean).join(" ")+(q.beroep||q.woonplaats?" ("+[q.beroep,q.woonplaats].filter(Boolean).join(" te ")+")":"");return rp.instantie?.naam||""}).filter(Boolean);return {perceel:p.perceelnr||"",artikel:p.artikelLink||null,eigenaar:owners.join("; "),gebruik:p.grondGebruik||"",oppervlak:p.oppervlak||""};}); resultBox.innerHTML="<div style=\"margin-top:8px;padding-top:9px;border-top:1px solid #ddd\"><b>HisGIS OAT – blad 61 (gegevensproef)</b><br><small>"+esc(JSON.stringify(proef))+"</small></div>"; } setStatus("HisGIS 1832: OAT blad 61 opgehaald – "+rows.length+" records"); return; }
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
