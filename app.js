@@ -1719,7 +1719,7 @@ async function hisgisOatProof(lat,lng,code){
     const articles=Array.isArray(s.artikelen)?s.artikelen:[];
     const articleMap=new Map();
     articles.forEach(a=>{let id=String(a.artikelnr||"");if(a.artikelnrtvg)id+=String(a.artikelnrtvg);articleMap.set(id,a);});
-    const match=rows.find(p=>(p.huisnrs||[]).some(h=>String(h.nr||"").trim()===huisnummer));
+    const match=rows.find(p=>(p.huisnrs||[]).some(h=>String(typeof h==="object"?(h.nr??h.huisnummer??h.waarde??""):h).trim()===huisnummer));
     if(!match) throw new Error("Geen OAT-perceel met huisnummer "+huisnummer+" gevonden");
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
