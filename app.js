@@ -1720,7 +1720,7 @@ async function hisgisOatProof(lat,lng,code){
     const articleMap=new Map();
     articles.forEach(a=>{let id=String(a.artikelnr||"");if(a.artikelnrtvg)id+=String(a.artikelnrtvg);articleMap.set(id,a);});
     const match=rows.find(p=>(p.huisnrs||[]).some(h=>String(typeof h==="object"?(h.nr??h.huisnummer??h.waarde??""):h).trim()===huisnummer));
-    if(!match) throw new Error("Geen OAT-perceel met huisnummer "+huisnummer+" gevonden");
+    if(!match){ const hv=rows.slice(0,25).map(p=>({perceel:p.perceelnr||"",huisnrs:p.huisnrs||[],keys:Object.keys(p||{})})); throw new Error("Geen OAT-perceel met huisnummer "+huisnummer+" gevonden. Diagnose: "+JSON.stringify(hv)); }
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
     const owners=(article?.rechtsPersonen||[]).map(rp=>{
