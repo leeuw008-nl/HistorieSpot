@@ -1691,6 +1691,63 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
+async function hisgisOatProof(lat,lng,code){
+  const resultBox=document.getElementById("hisgisOatResult");
+  if(resultBox) resultBox.innerHTML="<small>HisGIS OAT-gegevens laden...</small>";
+  setStatus("HisGIS 1832: OAT-gegevens laden...");
+  try{
+    const b=box(lat,lng,40);
+    const bagUrl=\`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=\${b.minLo},\${b.minLa},\${b.maxLo},\${b.maxLa}&limit=100&f=json\`;
+    const bagRes=await fetch(bagUrl);
+    if(!bagRes.ok) throw new Error("BAG HTTP "+bagRes.status);
+    const bagData=await bagRes.json();
+    const candidates=(bagData.features||[]).map(f=>{const c=centerOf(f);return c?{f,c,d:dist(lat,lng,c.lat,c.lng)}:null;}).filter(Boolean).sort((a,b)=>a.d-b.d);
+    const addressFeature=candidates.find(x=>{
+      const p=x.f.properties||{};
+      return p.huisnummer!==undefined&&p.huisnummer!==null&&String(p.huisnummer).trim()!=="";
+    });
+    if(!addressFeature) throw new Error("Geen BAG-adres gevonden");
+    const bp=addressFeature.f.properties||{};
+    const huisnummer=String(bp.huisnummer).trim();
+    const straat=String(bp.openbare_ruimte_naam||"").trim();
+    const woonplaats=String(bp.woonplaats_naam||"").trim();
+    const oatCode="OAT04041B061";
+    const oatRes=await fetch("https://oat.hisgis.nl/oat-ws/rest/percelen/oat/"+oatCode);
+    if(!oatRes.ok) throw new Error("OAT HTTP "+oatRes.status);
+    const s=await oatRes.json();
+    const rows=Array.isArray(s.results)?s.results:[];
+    const articles=Array.isArray(s.artikelen)?s.artikelen:[];
+    const articleMap=new Map();
+    articles.forEach(a=>{let id=String(a.artikelnr||"");if(a.artikelnrtvg)id+=String(a.artikelnrtvg);articleMap.set(id,a);});
+    const match=rows.find(p=>(p.huisnrs||[]).some(h=>String(h.nr||"").trim()===huisnummer));
+    if(!match) throw new Error("Geen OAT-perceel met huisnummer "+huisnummer+" gevonden");
+    const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
+    const article=articleMap.get(aid);
+    const owners=(article?.rechtsPersonen||[]).map(rp=>{
+      const p=rp.persoon||rp.persoonsVerwijzing?.persoon||{};
+      if(rp.type==="PERSOON"||Object.keys(p).length){
+        return [p.titel,p.voornaam,p.voorvoegsel,p.achternaam].filter(Boolean).join(" ")+(p.beroep||p.woonplaats?" ("+[p.beroep,p.woonplaats].filter(Boolean).join(" te ")+")":"");
+      }
+      const i=rp.instantie||{};
+      return i.naam||"";
+    }).filter(Boolean);
+    const gebruik=match.grondGebruik||"";
+    const opp=match.oppervlak||0;
+    const oppervlakte=opp?String(Math.floor(opp/10000))+" bunder, "+String(Math.floor((opp%10000)/100))+" roede, "+String(opp%100)+" el":"";
+    const gemeente=s.gemeente?.naam||"Stad Ommen";
+    const sectie=oatCode.charAt(8);
+    const blad=parseInt(oatCode.substring(9),10);
+    if(resultBox){
+      resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'><b>HisGIS 1832 – gevonden OAT-perceel</b><br>Kadastrale gemeente: "+esc(gemeente)+"<br>Sectie: "+esc(sectie)+"<br>Blad: "+esc(blad)+"<br><b>Perceel: "+esc(match.perceelnr||"Onbekend")+(match.perceelnrtvg?"/"+esc(match.perceelnrtvg):"")+"</b><br>Adres 1832: "+esc(straat)+" "+esc(huisnummer)+(woonplaats?", "+esc(woonplaats):"")+"<br>Eigenaar: "+esc(owners.join("; ")||"Niet gevonden")+(gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+(oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+"</div>";
+    }
+    setStatus("HisGIS 1832: perceel "+(match.perceelnr||"?")+" gevonden via OAT blad "+blad);
+  }catch(err){
+    console.error("HisGIS OAT proef:",err);
+    if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS OAT-proef: "+esc(err.message||String(err))+"</small>";
+    setStatus("HisGIS OAT-proef: "+(err.message||"fout"));
+  }
+}
+
 let selectedMarker=null;
 map.on("click",async e=>{
   const lat=e.latlng.lat, lng=e.latlng.lng, r=Number(radiusSel.value);
@@ -1707,7 +1764,7 @@ map.on("click",async e=>{
         if(window.histLayer)map.removeLayer(window.histLayer);
         window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
         const p=data.features[0].properties;
-        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;text-decoration:none;border-radius:5px">HisGIS OAT-scan – blad 61 (proef)</a><br><br>' : ''}<small>Proef: de gevonden historische sectie wordt rechtstreeks gekoppeld aan de HisGIS-koppelsite. Voor Stad Ommen B03 is nu als eerste test de bekende OAT-scan OAT04041B061 gekoppeld; perceel en eigenaar worden nog niet automatisch bepaald.</small></div>`).openOn(map);
+        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<button type="button" onclick="hisgisOatProof('+lat+','+lng+',\''+code+'\')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS OAT-gegevens ophalen (proef)</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Proef: BAG-adres wordt gebruikt om in OAT04041B061 een historisch perceel te zoeken.</div>`).openOn(map);
       }
     }
   }catch(err){console.error(err);}
