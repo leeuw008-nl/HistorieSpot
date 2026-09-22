@@ -1720,7 +1720,7 @@ async function hisgisOatProof(lat,lng,code){
     const articleMap=new Map();
     articles.forEach(a=>{let id=String(a.artikelnr||"");if(a.artikelnrtvg)id+=String(a.artikelnrtvg);articleMap.set(id,a);});
     const match=rows.find(p=>(p.huisnrs||[]).some(h=>String(typeof h==="object"?(h.nr??h.huisnummer??h.waarde??""):h).trim()===huisnummer));
-    if(!match){ const hv=rows.slice(0,25).map(p=>({perceel:p.perceelnr||"",huisnrs:p.huisnrs||[],keys:Object.keys(p||{})})); throw new Error("Geen OAT-perceel met huisnummer "+huisnummer+" gevonden. Diagnose: "+JSON.stringify(hv)); }
+    if(!match){ if(resultBox){ const proef=rows.slice(0,20).map(p=>({perceel:p.perceelnr||"",huisnrs:p.huisnrs||[],artikel:p.artikelLink||null,gebruik:p.grondGebruik||"",oppervlak:p.oppervlak||""})); resultBox.innerHTML="<div style=\"margin-top:8px;padding-top:9px;border-top:1px solid #ddd\"><b>HisGIS OAT – blad 61 (gegevensproef)</b><br><small>"+esc(JSON.stringify(proef))+"</small></div>"; } setStatus("HisGIS 1832: OAT blad 61 opgehaald – "+rows.length+" records"); return; }
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
     const owners=(article?.rechtsPersonen||[]).map(rp=>{
