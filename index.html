@@ -10,6 +10,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <link rel="stylesheet" href="style.css">
+  <style>#status::after{content:" · TEST: HisGIS-proef 10c6468";font-size:11px;opacity:.8;}</style>
 </head>
 <body>
   <header class="app-header">
@@ -19,7 +20,7 @@
   </header>
   <div id="menuOverlay" class="overlay hidden"></div>
   <nav id="sideMenu" class="side-menu">
-    <div class="side-menu-header"><strong>Menu</strong><button id="closeMenuBtn" class="icon-btn small" aria-label="Sluiten"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 20l-8-8 8-8 1.41 1.41L7.83 13H20v-2z"/></svg></button></div>
+    <div class="side-menu-header"><strong>Menu</strong><button id="closeMenuBtn" class="icon-btn small" aria-label="Sluiten"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 20l8 8-8 8-1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
     <div class="side-menu-content">
       <div class="menu-section"><h3>Zoeken</h3><label for="radius">Zoekradius</label><select id="radius"><option value="25">25 meter</option><option value="50" selected>50 meter</option><option value="100">100 meter</option><option value="250">250 meter</option><option value="500">500 meter</option></select><p class="menu-hint">Gebouwen binnen deze radius tonen hun bouwjaar direct op de kaart.</p></div>
       <div style="margin-top:12px">
