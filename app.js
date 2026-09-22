@@ -1707,7 +1707,7 @@ map.on("click",async e=>{
         if(window.histLayer)map.removeLayer(window.histLayer);
         window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
         const p=data.features[0].properties;
-        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><small>Geklikte positie wordt nu gebruikt voor BAG</small></div>`).openOn(map);
+        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br><small>Proef: de gevonden historische sectie wordt rechtstreeks gekoppeld aan de HisGIS-koppelsite. Perceel en eigenaar worden in deze eerste proef nog niet automatisch bepaald.</small></div>`).openOn(map);
       }
     }
   }catch(err){console.error(err);}
