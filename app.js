@@ -1693,8 +1693,8 @@ async function loadHistForLocation(lat,lng){
 
 async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null){
   const resultBox=document.getElementById("hisgisOatResult");
-  if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel 867 laden...</small>";
-  setStatus("HisGIS 1832: perceel 867 ophalen...");
+  if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel laden...</small>";
+  setStatus("HisGIS 1832: gevonden perceel ophalen...");
   try{
     const oatCode="OAT04041B061";
     const oatRes=await fetch("https://oat.hisgis.nl/oat-ws/rest/percelen/oat/"+oatCode);
@@ -1710,7 +1710,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     });
 
     const match=rows.find(p=>requestedPerceel!==null && String(p.perceelnr||"").trim()===String(requestedPerceel).trim());
-    if(!match) throw new Error("Perceel 867 niet gevonden in OAT blad 61");
+    if(!match) throw new Error("Gevonden perceel niet gevonden in OAT blad 61");
 
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
@@ -1733,15 +1733,15 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "<b>HisGIS 1832 – gevonden OAT-perceel</b><br>"+
         "Kadastrale gemeente: "+esc(gemeente)+"<br>"+
         "Sectie: B<br>"+
-        "Blad: 61<br>"+
-        "<b>Perceel: 867</b><br>"+
+        "Blad: "+esc(requestedBlad||"61")+"<br>"+
+        "<b>Perceel: "+esc(requestedPerceel||"Onbekend")+"</b><br>"+
         "Eigenaar: "+esc(owners.join("; ")||"Niet gevonden")+
         (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
         (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
         "<br><small>Gekoppeld op perceelnummer uit de HistorieSpot-proef.</small>"+
         "</div>";
     }
-    setStatus("HisGIS 1832: perceel 867 gevonden");
+    setStatus("HisGIS 1832: perceel "+(requestedPerceel||"")+" gevonden");
   }catch(err){
     console.error("HisGIS OAT proef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS OAT-proef: "+esc(err.message||String(err))+"</small>";
