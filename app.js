@@ -1710,106 +1710,85 @@ async function loadHistForLocation(lat,lng){
 async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS OAT-gegevens zoeken...</small>";
-  setStatus("HisGIS 1832: OAT-gegevens zoeken...");
+  setStatus("HisGIS 1832: juiste OAT-scan zoeken...");
   try{
-    const gemeenteNaam=String(requestedGemeente||"").trim();
     const sectie=String(requestedSectie||"").trim().toUpperCase();
     const perceelZoek=String(requestedPerceel||"").trim();
-
-    if(!gemeenteNaam || !sectie || !perceelZoek)
+    if(!sectie||!perceelZoek)
       throw new Error("Onvoldoende kadastrale gegevens voor OAT-zoekactie");
 
     /*
-     * BELANGRIJK:
-     * kad:blad is het minuutplanblad en is NIET het nummer van een OAT-scan.
-     * De OAT-API biedt daarom de gemeentelijke dataset aan via /gemeente/{gemeente}.
-     * We zoeken daarin op sectie + perceelnummer.
+     * OAT-scanvolgorde is onafhankelijk van het minuutplanblad.
+     * We zoeken daarom binnen een ruime reeks scan-nummers en stoppen
+     * bij de eerste exacte perceelmatch.
+     *
+     * Voor Stad Ommen is de OAT-code opgebouwd als:
+     * OAT04041 + sectie + driecijferig scannummer.
+     *
+     * De API geeft bij een bestaande scan HTTP 200; een niet-bestaande
+     * scan geeft HTTP 404. 404 gebruiken we hier uitsluitend om naar de
+     * volgende scan te gaan.
      */
-    if(!window.hisgisOatGemeenteCache)
-      window.hisgisOatGemeenteCache=new Map();
+    if(!window.hisgisOatScanCache)
+      window.hisgisOatScanCache=new Map();
 
-    let data=window.hisgisOatGemeenteCache.get(gemeenteNaam);
+    const maxScan=200;
+    let found=null;
 
-    if(!data){
-      const gemeenteUrl=
-        "https://oat.hisgis.nl/oat-ws/rest/gemeente/"+
-        encodeURIComponent(gemeenteNaam);
+    for(let n=1;n<=maxScan;n++){
+      const scan=String(n).padStart(3,"0");
+      const oatCode="OAT04041"+sectie+scan;
+      let data=window.hisgisOatScanCache.get(oatCode);
 
-      const gemeenteRes=await fetch(gemeenteUrl);
-      if(!gemeenteRes.ok)
-        throw new Error("OAT gemeente HTTP "+gemeenteRes.status+" ("+gemeenteNaam+")");
-
-      data=await gemeenteRes.json();
-      window.hisgisOatGemeenteCache.set(gemeenteNaam,data);
-    }
-
-    /*
-     * De gemeentelijke API-respons kan per versie/gebied anders genest zijn.
-     * Verzamel daarom alle objecten met een perceelnr en zoek daarin exact
-     * op sectie + perceel. Artikelen worden eveneens uit de hele respons
-     * verzameld.
-     */
-    const parcelRows=[];
-    const articleRows=[];
-    const seenObjects=new Set();
-
-    function collectOatObjects(value){
-      if(!value || typeof value!=="object") return;
-      if(seenObjects.has(value)) return;
-      seenObjects.add(value);
-
-      if(Array.isArray(value)){
-        value.forEach(collectOatObjects);
-        return;
+      if(!data){
+        try{
+          const res=await fetch("https://oat.hisgis.nl/oat-ws/rest/percelen/oat/"+oatCode);
+          if(!res.ok){
+            if(res.status===404) continue;
+            throw new Error("OAT HTTP "+res.status+" ("+oatCode+")");
+          }
+          data=await res.json();
+          window.hisgisOatScanCache.set(oatCode,data);
+        }catch(e){
+          if(String(e.message||"").includes("OAT HTTP 404")) continue;
+          throw e;
+        }
       }
 
-      if(value.perceelnr!==undefined && value.perceelnr!==null)
-        parcelRows.push(value);
+      const rows=Array.isArray(data.results)?data.results:[];
+      const match=rows.find(p=>{
+        const pnr=String(p.perceelnr||"").trim()+String(p.perceelnrtvg||"");
+        return pnr===perceelZoek;
+      });
 
-      if(
-        value.artikelnr!==undefined ||
-        Array.isArray(value.rechtsPersonen) ||
-        value.artikel_id!==undefined
-      )
-        articleRows.push(value);
-
-      Object.values(value).forEach(collectOatObjects);
+      if(match){
+        found={data,oatCode,match};
+        break;
+      }
     }
 
-    collectOatObjects(data);
-
-    function norm(v){
-      return String(v??"").trim().toLowerCase();
-    }
-
-    const match=parcelRows.find(p=>{
-      const pnr=norm(String(p.perceelnr||"")+(p.perceelnrtvg||""));
-      const ps=norm(p.sectie||p.kadSectie||p.kadastraleSectie||"");
-      return pnr===norm(perceelZoek) && (!ps || ps===norm(sectie));
-    }) || parcelRows.find(p=>{
-      const pnr=norm(String(p.perceelnr||"")+(p.perceelnrtvg||""));
-      return pnr===norm(perceelZoek);
-    });
-
-    if(!match){
+    if(!found){
       throw new Error(
         "Perceel "+perceelZoek+
-        " niet gevonden in OAT-gemeentedataset "+gemeenteNaam+
-        " (sectie "+sectie+")"
+        " niet gevonden in de OAT-scans van sectie "+sectie+
+        " (1 t/m "+maxScan+" gecontroleerd)"
       );
     }
+
+    const data=found.data;
+    const match=found.match;
+    const articles=Array.isArray(data.artikelen)?data.artikelen:[];
+    const articleMap=new Map();
+    articles.forEach(a=>{
+      let id=String(a.artikelnr||"");
+      if(a.artikelnrtvg) id+=String(a.artikelnrtvg);
+      articleMap.set(id,a);
+    });
 
     const aid=
       String(match.artikelLink?.artikelnr||"")+
       String(match.artikelLink?.artikelnrtvg||"");
-
-    const article=
-      articleRows.find(a=>
-        aid &&
-        String(a.artikelnr||"")+
-        String(a.artikelnrtvg||"")===aid
-      ) ||
-      (match.artikelLink?.artikel||null);
+    const article=articleMap.get(aid);
 
     const ownerEntries=(article?.rechtsPersonen||[]).map(rp=>{
       const ref=rp.persoonsVerwijzing;
@@ -1832,10 +1811,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         String(opp%100)+" el"
       : "";
 
-    const gemeente=
-      data.gemeente?.naam ||
-      data.naam ||
-      gemeenteNaam;
+    const gemeente=String(requestedGemeente||"Stad Ommen");
 
     if(resultBox){
       resultBox.innerHTML=
@@ -1843,16 +1819,17 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "<b>HisGIS 1832 – gevonden OAT-perceel</b><br>"+
         "Kadastrale gemeente: "+esc(gemeente)+"<br>"+
         "Sectie: "+esc(sectie)+"<br>"+
-        "Blad: "+esc(requestedBlad||"Onbekend")+"<br>"+
+        "Minuutplanblad: "+esc(requestedBlad||"Onbekend")+"<br>"+
         "<b>Perceel: "+esc(perceelZoek)+"</b><br>"+
+        "OAT-scan: "+esc(found.oatCode)+"<br>"+
         "Eigenaren / rechthebbenden: "+esc(owners.join("; ")||"Niet gevonden")+
         (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
         (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
-        "<br><small>Bron: HisGIS OAT 1832, gezocht in de gemeentelijke OAT-dataset.</small>"+
+        "<br><small>Bron: HisGIS OAT 1832, juiste OAT-scan automatisch gezocht.</small>"+
         "</div>";
     }
 
-    setStatus("HisGIS 1832: perceel "+perceelZoek+" gevonden in OAT-gemeentedataset");
+    setStatus("HisGIS 1832: perceel "+perceelZoek+" gevonden in "+found.oatCode);
   }catch(err){
     console.error("HisGIS OAT proef:",err);
     if(resultBox)
