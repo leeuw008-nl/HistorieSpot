@@ -1707,7 +1707,7 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
-async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null,requestedGemeenteCode=null){
+async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null,requestedGemeenteCode=null,requestedOatScan=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS OAT-gegevens zoeken...</small>";
   setStatus("HisGIS 1832: juiste OAT-scan zoeken...");
@@ -1735,6 +1735,12 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     let found=null;
     let candidateCodes=[];
+
+    // HisGIS-perceelvlakken kunnen de exacte OAT-scan al als tag bevatten.
+    // Die informatie is betrouwbaarder dan zelf scan-nummers raden.
+    const directOatScan=String(requestedOatScan||"").trim().toUpperCase();
+    if(/^OAT\\d{5}[A-Z]\\d{3}$/.test(directOatScan))
+      candidateCodes.push(directOatScan);
 
     // Eerst de officiële gemeente-REST-service proberen. Deze geeft de
     // beschikbare OAT-informatie per gemeente; we halen daar alleen echte
@@ -1931,10 +1937,11 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
 
     const minuutplan=String(t["minuutplan"]||"");
+    const oatScan=String(t["oat:scan"]||"").trim();
     const gemeenteCode=(/^MIN(\d{5})[A-Z]/i.test(minuutplan))
       ? minuutplan.match(/^MIN(\d{5})[A-Z]/i)[1]
       : "";
-    await hisgisOatProof(lat,lng,minuutplan,fullPerceel,blad,resultId,sectie,gemeente,gemeenteCode);
+    await hisgisOatProof(lat,lng,minuutplan,fullPerceel,blad,resultId,sectie,gemeente,gemeenteCode,oatScan);
   }catch(err){
     console.error("HisGIS kaartproef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS-kaartproef: "+esc(err.message||String(err))+"</small>";
