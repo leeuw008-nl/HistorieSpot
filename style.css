@@ -261,6 +261,8 @@ body {
 }
 .history-tab-panel{
   animation:historyPanelIn .16s ease-out;
+  min-height:220px;
+  box-sizing:border-box;
 }
 @keyframes historyPanelIn{
   from{opacity:.55;transform:translateY(2px)}
