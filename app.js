@@ -1556,20 +1556,36 @@ async function loadBAG(lat,lng,radius){
           ? kadasterColor(y)
           : "#0b5cab";
 
+      const bagTabId="bagTab_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
+      const hisgisTabId="hisgisTab_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
+      const hisgisResultId="hisgisResult_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
+
       const popup=`
-        <div style="min-width:250px">
-          <b>BAG-pand</b><br>
-          Bouwjaar: <b>${esc(y)}</b><br>
-          Afstand: ${Math.round(o.d)} m
-          <hr style="margin:8px 0">
-          <small>
-            BAG-identificatie: ${esc(bagId)}<br>
-            Status: ${esc(status)}<br>
-            Gebruiksdoel: ${esc(gebruiksdoel)}<br>
-            Geconstateerd: ${esc(geconstateerd)}<br>
-            BAG-document: ${esc(documentnummer)}<br>
-            Documentdatum: ${esc(documentdatum)}
-          </small>
+        <div style="min-width:280px;max-width:380px;font-size:14px;line-height:1.45">
+          <div style="display:flex;border-bottom:1px solid #ccc;margin-bottom:9px">
+            <button type="button" onclick="document.getElementById('${bagTabId}').style.display='block';document.getElementById('${hisgisTabId}').style.display='none';this.parentNode.querySelectorAll('button').forEach(b=>b.style.fontWeight='400');this.style.fontWeight='700'" style="border:0;background:none;padding:7px 10px;cursor:pointer;font-weight:700">BAG</button>
+            <button type="button" onclick="document.getElementById('${bagTabId}').style.display='none';document.getElementById('${hisgisTabId}').style.display='block';this.parentNode.querySelectorAll('button').forEach(b=>b.style.fontWeight='400');this.style.fontWeight='700';hisgisParcelProbe(${o.c.lat},${o.c.lng},'${hisgisResultId}')" style="border:0;background:none;padding:7px 10px;cursor:pointer">HISGIS</button>
+          </div>
+          <div id="${bagTabId}">
+            <b>BAG-pand</b><br>
+            Bouwjaar: <b>${esc(y)}</b><br>
+            Afstand: ${Math.round(o.d)} m
+            <hr style="margin:8px 0">
+            <small>
+              BAG-identificatie: ${esc(bagId)}<br>
+              Status: ${esc(status)}<br>
+              Gebruiksdoel: ${esc(gebruiksdoel)}<br>
+              Geconstateerd: ${esc(geconstateerd)}<br>
+              BAG-document: ${esc(documentnummer)}<br>
+              Documentdatum: ${esc(documentdatum)}
+            </small>
+          </div>
+          <div id="${hisgisTabId}" style="display:none">
+            <b>HisGIS 1832</b>
+            <div id="${hisgisResultId}" style="margin-top:8px">
+              <small>Klik op HISGIS om het historische perceel en de OAT-gegevens te laden.</small>
+            </div>
+          </div>
         </div>
       `;
 
@@ -1763,8 +1779,8 @@ function hisgisOnlineLink(lat,lng){
     "&z=18&r=0&l=11111";
 }
 
-async function hisgisParcelProbe(lat,lng){
-  const resultBox=document.getElementById("hisgisOatResult");
+async function hisgisParcelProbe(lat,lng,resultId=null){
+  const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel op de kaart zoeken...</small>";
   setStatus("HisGIS 1832: perceel op de kaart zoeken...");
   try{
