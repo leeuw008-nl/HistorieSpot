@@ -1735,7 +1735,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "Sectie: B<br>"+
         "Blad: "+esc(requestedBlad||"61")+"<br>"+
         "<b>Perceel: "+esc(requestedPerceel||"Onbekend")+"</b><br>"+
-        "Eigenaar"+(owners.length>1?"en":"")+": "+esc(owners.join("; ")||"Niet gevonden")+
+        "Eigenaren: "+esc(owners.join("; ")||"Niet gevonden")+
         (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
         (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
         "<br><small>Bron: HisGIS OAT 1832, gekoppeld via het automatisch gevonden perceel.</small>"+
