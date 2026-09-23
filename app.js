@@ -1751,45 +1751,65 @@ async function hisgisOatProof(lat,lng,code){
 
 async function hisgisParcelProbe(lat,lng){
   const resultBox=document.getElementById("hisgisOatResult");
-  if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel zoeken op de geklikte locatie...</small>";
+  if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel op de kaart zoeken...</small>";
   setStatus("HisGIS 1832: perceel op kaart zoeken...");
   try{
-    const q='[out:json][timeout:20];way(around:80,'+lat+','+lng+')["kad:perceelnr"];out geom;';
-    const url="https://overpass-api.de/api/interpreter?data="+encodeURIComponent(q);
-    const res=await fetch(url);
-    if(!res.ok) throw new Error("HisGIS-kaart HTTP "+res.status);
-    const data=await res.json();
-    const ways=Array.isArray(data.elements)?data.elements:[];
-    const candidates=ways.filter(w=>w.geometry&&w.geometry.length>=3);
+    const dLat=0.0015,dLng=0.0025;
+    const bbox=(lng-dLng)+","+(lat-dLat)+","+(lng+dLng)+","+(lat+dLat);
+    const urls=[
+      "https://osm.hisgis.nl/api/0.6/map?bbox="+encodeURIComponent(bbox),
+      "https://web2.fa.knaw.nl/osmapi/0.6/map?bbox="+encodeURIComponent(bbox)
+    ];
+    let xmlText="";
+    let lastStatus="";
+    for(const url of urls){
+      try{
+        const res=await fetch(url);
+        lastStatus=String(res.status);
+        if(res.ok){xmlText=await res.text();break;}
+      }catch(e){}
+    }
+    if(!xmlText) throw new Error("HisGIS-OSM HTTP "+lastStatus);
+    const doc=new DOMParser().parseFromString(xmlText,"text/xml");
+    if(doc.querySelector("parsererror")) throw new Error("HisGIS-OSM XML kon niet worden gelezen");
+    const nodes=new Map();
+    doc.querySelectorAll("node").forEach(n=>{
+      nodes.set(n.getAttribute("id"),{
+        lat:Number(n.getAttribute("lat")),
+        lon:Number(n.getAttribute("lon"))
+      });
+    });
+    const ways=[];
+    doc.querySelectorAll("way").forEach(w=>{
+      const tags={};
+      w.querySelectorAll(":scope > tag").forEach(t=>tags[t.getAttribute("k")]=t.getAttribute("v"));
+      if(!tags["kad:perceelnr"]) return;
+      const pts=[];
+      w.querySelectorAll(":scope > nd").forEach(nd=>{
+        const p=nodes.get(nd.getAttribute("ref"));
+        if(p) pts.push(p);
+      });
+      if(pts.length>=3) ways.push({id:w.getAttribute("id"),tags,pts});
+    });
     function inside(x,y,pts){
       let hit=false;
       for(let i=0,j=pts.length-1;i<pts.length;j=i++){
-        const xi=pts[i].lat, yi=pts[i].lon, xj=pts[j].lat, yj=pts[j].lon;
-        const cross=((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi);
-        if(cross) hit=!hit;
+        const xi=pts[i].lat,yi=pts[i].lon,xj=pts[j].lat,yj=pts[j].lon;
+        if(((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) hit=!hit;
       }
       return hit;
     }
-    const hit=candidates.find(w=>inside(lat,lng,w.geometry));
-    if(!hit) throw new Error("Geen ingetekend HisGIS-perceel op deze locatie gevonden");
-    const t=hit.tags||{};
-    const gemeente=t["kad:gemeente"]||"";
-    const sectie=t["kad:sectie"]||"";
-    const blad=t["kad:blad"]||"";
-    const perceel=t["kad:perceelnr"]||"";
+    const hit=ways.find(w=>inside(lat,lng,w.pts));
+    if(!hit) throw new Error("Geen ingetekend HisGIS-perceel op deze locatie gevonden ("+ways.length+" percelen in uitsnede)");
+    const t=hit.tags;
+    const gemeente=t["kad:gemeente"]||"Onbekend";
+    const sectie=t["kad:sectie"]||"Onbekend";
+    const blad=t["kad:blad"]||"Onbekend";
+    const perceel=t["kad:perceelnr"]||"Onbekend";
     const toevoeging=t["kad:perceelnrtvg"]||"";
     const fullPerceel=String(perceel)+String(toevoeging);
-    if(resultBox){
-      resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'>"+
-        "<b>HisGIS 1832 – kaartproef</b><br>"+
-        "Kadastrale gemeente: "+esc(gemeente||"Onbekend")+"<br>"+
-        "Sectie: "+esc(sectie||"Onbekend")+"<br>"+
-        "Blad: "+esc(blad||"Onbekend")+"<br>"+
-        "<b>Perceel: "+esc(fullPerceel||"Onbekend")+"</b><br>"+
-        "<small>Way: "+esc(hit.id)+" · gevonden op de ingetekende HisGIS-perceelgrens.</small>"+
-        "</div>";
-    }
-    setStatus("HisGIS 1832: perceel "+(fullPerceel||"?")+" gevonden");
+    if(resultBox) resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'><b>HisGIS 1832 – kaartproef</b><br>Kadastrale gemeente: "+esc(gemeente)+"<br>Sectie: "+esc(sectie)+"<br>Blad: "+esc(blad)+"<br><b>Perceel: "+esc(fullPerceel)+"</b><br><small>HisGIS-OSM way "+esc(hit.id)+" · perceelgrens bevat de kliklocatie.</small></div>";
+    setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
   }catch(err){
     console.error("HisGIS kaartproef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS-kaartproef: "+esc(err.message||String(err))+"</small>";
