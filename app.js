@@ -1736,6 +1736,10 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     let found=null;
     let candidateCodes=[];
+    let koppelStatus="niet geprobeerd";
+    let koppelRowFound=false;
+    let koppelRowCodes=[];
+    let scansGetest=0;
 
     // HisGIS-perceelvlakken kunnen de exacte OAT-scan al als tag bevatten.
     // Die informatie is betrouwbaarder dan zelf scan-nummers raden.
@@ -1762,8 +1766,12 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
       try{
         const u="https://osm.hisgis.nl/koppel/"+encodeURIComponent(gm)+"/"+encodeURIComponent(sectie);
         const r=await fetch(u);
-        if(!r.ok) continue;
+        if(!r.ok){
+          koppelStatus="HTTP "+r.status;
+          continue;
+        }
         const html=await r.text();
+        koppelStatus="opgehaald";
 
         const scanCodes=[...html.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
           .map(m=>String(m[0]).toUpperCase());
@@ -1777,8 +1785,10 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
           const plain=row.replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/\s+/g," ");
           const parcelRe=new RegExp("(^|\\D)"+String(perceelZoek)+"($|\\D)");
           if(parcelRe.test(plain)){
+            koppelRowFound=true;
             const rowCodes=[...row.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
               .map(m=>String(m[0]).toUpperCase());
+            koppelRowCodes.push(...rowCodes);
             rowCodes.forEach(code=>{
               if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
                 candidateCodes.unshift(code);
@@ -1854,6 +1864,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         }
       }
 
+      scansGetest++;
       const rows=Array.isArray(data.results)?data.results:[];
       const match=rows.find(p=>{
         const pnr=String(p.perceelnr||"").trim()+String(p.perceelnrtvg||"");
@@ -1867,10 +1878,18 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     }
 
     if(!found){
+      const diag=[
+        "Koppelsite: "+koppelStatus,
+        "rij voor perceel: "+(koppelRowFound?"gevonden":"niet gevonden"),
+        "OAT-code in rij: "+([...new Set(koppelRowCodes)].join(", ")||"geen"),
+        "kandidaten: "+candidateCodes.length,
+        "scans getest: "+scansGetest
+      ].join(" · ");
       throw new Error(
         "Perceel "+perceelZoek+
         " niet gevonden in de beschikbare OAT-scans van sectie "+sectie+
-        " (gemeente "+gemeenteNaam+"; codes "+gemeenteCodes.join(", ")+")"
+        " (gemeente "+gemeenteNaam+"; codes "+gemeenteCodes.join(", ")+"). "+
+        diag
       );
     }
 
