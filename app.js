@@ -1734,10 +1734,17 @@ function mapViewRadiusMeters(){
   const sw=bounds.getSouthWest();
   const ne=bounds.getNorthEast();
 
-  return Math.max(
-    dist(center.lat,center.lng,sw.lat,sw.lng),
-    dist(center.lat,center.lng,ne.lat,ne.lng)
-  );
+  // Op een breed PC-scherm liggen de hoeken van het kaartbeeld veel
+  // verder weg dan de noord/zuid- of oost/westrand. De oude hoekmeting
+  // kwam daardoor zelfs bij sterk inzoomen vaak boven 250 meter uit.
+  // Gebruik daarom de dichtstbijzijnde kaartkadrand als praktische
+  // maat voor "binnen 250 meter ingezoomd".
+  const north=dist(center.lat,center.lng,ne.lat,center.lng);
+  const south=dist(center.lat,center.lng,sw.lat,center.lng);
+  const east=dist(center.lat,center.lng,center.lat,ne.lng);
+  const west=dist(center.lat,center.lng,center.lat,sw.lng);
+
+  return Math.min(north,south,east,west);
 }
 
 function autoActivateHistoricalView(){
