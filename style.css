@@ -214,8 +214,8 @@ body {
    Professioneel BAG / HisGIS popupvenster
    ========================================================= */
 .history-popup{
-  min-width:290px;
-  max-width:390px;
+  min-width:280px;
+  max-width:380px;
   color:#263746;
   font-size:13px;
   line-height:1.45;
@@ -344,6 +344,7 @@ body {
   .history-popup{
     min-width:260px;
     max-width:calc(100vw - 58px);
+    min-width:280px;
   }
   .history-detail-row{
     display:block;
