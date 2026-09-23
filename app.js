@@ -1802,7 +1802,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
             candidateCodes.push(code);
         });
       }catch(e){
-        // CORS/bad-gateway van de koppelsite mag de normale route niet blokkeren.
+        koppelStatus="fout: "+(e?.message||String(e));
       }
     }
 
