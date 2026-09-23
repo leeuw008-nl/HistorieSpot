@@ -1749,6 +1749,15 @@ async function hisgisOatProof(lat,lng,code){
   }
 }
 
+function hisgisOnlineLink(lat,lng){
+  const R=6378137;
+  const x=R*Number(lng)*Math.PI/180;
+  const y=R*Math.log(Math.tan(Math.PI/4+Number(lat)*Math.PI/360));
+  return "https://beta.hisgis.nl/?x="+encodeURIComponent(x.toFixed(3))+
+    "&y="+encodeURIComponent(y.toFixed(3))+
+    "&z=18&r=0&l=11111";
+}
+
 async function hisgisParcelProbe(lat,lng){
   const resultBox=document.getElementById("hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel op de kaart zoeken...</small>";
@@ -1833,7 +1842,7 @@ map.on("click",async e=>{
         if(window.histLayer)map.removeLayer(window.histLayer);
         window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
         const p=data.features[0].properties;
-        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<button type="button" onclick="hisgisParcelProbe('+lat+','+lng+')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS perceel op kaart zoeken (diagnose)</button><br><br><button type="button" onclick="hisgisOatProof('+lat+','+lng+',\''+code+'\')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS OAT-gegevens ophalen (proef)</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Diagnose: de kliklocatie wordt vergeleken met de ingetekende HisGIS-perceelvlakken.</div>`).openOn(map);
+        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<a href="${hisgisOnlineLink(lat,lng)}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;text-decoration:none;border-radius:5px">HisGIS online – deze locatie bekijken</a><br><br><button type="button" onclick="hisgisOatProof('+lat+','+lng+',\''+code+'\')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS OAT-gegevens ophalen (proef)</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Diagnose: de kliklocatie wordt vergeleken met de ingetekende HisGIS-perceelvlakken.</div>`).openOn(map);
       }
     }
   }catch(err){console.error(err);}
