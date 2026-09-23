@@ -1714,7 +1714,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
   try{
     const sectie=String(requestedSectie||"").trim().toUpperCase();
     const perceelZoek=String(requestedPerceel||"").trim();
-    const gemeenteCode="04041";
+    const gemeenteCode=String(requestedGemeenteCode||"04041").trim();
     if(!sectie||!perceelZoek)
       throw new Error("Onvoldoende kadastrale gegevens voor OAT-zoekactie");
 
