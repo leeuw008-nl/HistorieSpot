@@ -1560,7 +1560,7 @@ async function loadBAG(lat,lng,radius){
       const hisgisTabId="hisgisTab_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
       const hisgisResultId="hisgisResult_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
 
-      const popup=\`
+      const popup=`
         <div class="history-popup">
           <div class="history-popup-tabs" role="tablist" aria-label="Historische gegevens">
             <button type="button" class="history-tab active" role="tab" aria-selected="true"
@@ -1617,7 +1617,7 @@ async function loadBAG(lat,lng,radius){
             </div>
           </div>
         </div>
-      \`
+      `
       const poly=L.geoJSON(
         o.f,
         {
