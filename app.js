@@ -1733,12 +1733,47 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     if(!window.hisgisOatScanCache)
       window.hisgisOatScanCache=new Map();
 
-    const maxScan=200;
     let found=null;
+    let candidateCodes=[];
 
-    for(let n=1;n<=maxScan;n++){
-      const scan=String(n).padStart(3,"0");
-      const oatCode="OAT"+gemeenteCode+sectie+scan;
+    // Eerst de officiële gemeente-REST-service proberen. Deze geeft de
+    // beschikbare OAT-informatie per gemeente; we halen daar alleen echte
+    // OAT-scan-codes uit. Zo zijn we niet afhankelijk van een vaste reeks
+    // A001..D200, die per gemeente kan verschillen.
+    const gemeenteNaam=String(requestedGemeente||"").trim();
+    const gemeenteCandidates=[gemeenteNaam,gemeenteCode].filter(Boolean);
+    const scanCodeRe=/OAT\\d{5}[A-Z]\\d{3}/gi;
+
+    for(const gm of gemeenteCandidates){
+      try{
+        const u="https://oat.hisgis.nl/oat-ws/rest/gemeente/"+encodeURIComponent(gm);
+        const r=await fetch(u);
+        if(!r.ok) continue;
+        const d=await r.json();
+        const raw=JSON.stringify(d);
+        const codes=raw.match(scanCodeRe)||[];
+        codes.forEach(code=>{
+          const normalized=String(code).toUpperCase();
+          if(normalized.startsWith("OAT"+gemeenteCode+sectie))
+            candidateCodes.push(normalized);
+        });
+      }catch(e){
+        // De scan-API blijft de veilige fallback.
+      }
+    }
+
+    candidateCodes=[...new Set(candidateCodes)].sort();
+
+    // Fallback: probeer de bestaande scanreeks, maar nu ruimer.
+    // Dit verandert niets aan de bekende werkende route voor Ommen,
+    // terwijl gemeenten met meer scans alsnog gevonden kunnen worden.
+    if(!candidateCodes.length){
+      for(let n=1;n<=500;n++){
+        candidateCodes.push("OAT"+gemeenteCode+sectie+String(n).padStart(3,"0"));
+      }
+    }
+
+    for(const oatCode of candidateCodes){
       let data=window.hisgisOatScanCache.get(oatCode);
 
       if(!data){
@@ -1771,8 +1806,8 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     if(!found){
       throw new Error(
         "Perceel "+perceelZoek+
-        " niet gevonden in de OAT-scans van sectie "+sectie+
-        " (1 t/m "+maxScan+" gecontroleerd)"
+        " niet gevonden in de beschikbare OAT-scans van sectie "+sectie+
+        " (gemeente "+gemeenteNaam+")"
       );
     }
 
