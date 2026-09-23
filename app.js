@@ -1605,7 +1605,7 @@ async function loadBAG(lat,lng,radius){
             fillOpacity:0.15
           }
         }
-      ).bindPopup(popup);
+      ).bindPopup(popup,{closeOnClick:false,autoPan:false});
 
       bagLayer.addLayer(poly);
 
@@ -1716,6 +1716,10 @@ async function loadHistForLocation(lat,lng){
    is ingezoomd, worden BAG en de 1832-laag automatisch geladen.
    ========================================================= */
 let autoHistorieCenter=null;
+let historicalPopupOpen=false;
+
+map.on("popupopen",function(){ historicalPopupOpen=true; });
+map.on("popupclose",function(){ historicalPopupOpen=false; });
 
 function mapViewRadiusMeters(){
   const center=map.getCenter();
@@ -1731,6 +1735,11 @@ function mapViewRadiusMeters(){
 
 function autoActivateHistoricalView(){
   if(!map || !map.getCenter()) return;
+
+  // Zolang een BAG/HisGIS-venster open staat, mag verschuiven van de kaart
+  // niets automatisch opruimen of opnieuw laden. De gebruiker kan dan vrij
+  // rondschuiven terwijl het geopende venster behouden blijft.
+  if(historicalPopupOpen) return;
 
   const viewRadius=mapViewRadiusMeters();
 
