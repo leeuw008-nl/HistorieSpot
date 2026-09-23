@@ -1707,6 +1707,59 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
+/* =========================================================
+   AUTOMATISCHE ACTIVERING 1832 + BAG
+   Zodra de zichtbare kaart binnen 50 meter van het kaartcentrum
+   is ingezoomd, worden BAG en de 1832-laag automatisch geladen.
+   ========================================================= */
+let autoHistorieCenter=null;
+
+function mapViewRadiusMeters(){
+  const center=map.getCenter();
+  const bounds=map.getBounds();
+  const sw=bounds.getSouthWest();
+  const ne=bounds.getNorthEast();
+
+  return Math.max(
+    dist(center.lat,center.lng,sw.lat,sw.lng),
+    dist(center.lat,center.lng,ne.lat,ne.lng)
+  );
+}
+
+function autoActivateHistoricalView(){
+  if(!map || !map.getCenter()) return;
+
+  const viewRadius=mapViewRadiusMeters();
+
+  // Pas activeren wanneer de zichtbare kaart daadwerkelijk
+  // ongeveer 50 meter rond het kaartcentrum beslaat.
+  if(viewRadius>50) return;
+
+  const center=map.getCenter();
+
+  // Voorkom opnieuw laden bij iedere kleine kaartbeweging.
+  if(
+    autoHistorieCenter &&
+    dist(
+      center.lat,center.lng,
+      autoHistorieCenter.lat,autoHistorieCenter.lng
+    )<25
+  ) return;
+
+  autoHistorieCenter={
+    lat:center.lat,
+    lng:center.lng
+  };
+
+  const r=Number(radiusSel.value)||50;
+
+  setStatus("Binnen 50 m – BAG en 1832-kaart automatisch laden...");
+  loadBAG(center.lat,center.lng,r);
+  loadHistForLocation(center.lat,center.lng);
+}
+
+map.on("moveend",autoActivateHistoricalView);
+
 async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null,requestedGemeenteCode=null,requestedOatScan=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS OAT-gegevens zoeken...</small>";
@@ -2032,6 +2085,10 @@ map.on("click",async e=>{
   if(selectedMarker) map.removeLayer(selectedMarker);
   selectedMarker=L.marker([lat,lng],{icon:L.divIcon({className:"",html:'<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',iconSize:[14,14],iconAnchor:[7,7]})}).addTo(map);
   setStatus(`Geselecteerd: ${lat.toFixed(5)}, ${lng.toFixed(5)} – BAG laden...`);
+  autoHistorieCenter={
+    lat,
+    lng
+  };
   loadBAG(lat,lng,r);
   loadHistForLocation(lat,lng);
   try{
