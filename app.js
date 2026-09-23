@@ -1740,7 +1740,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // HisGIS-perceelvlakken kunnen de exacte OAT-scan al als tag bevatten.
     // Die informatie is betrouwbaarder dan zelf scan-nummers raden.
     const directOatScan=String(requestedOatScan||"").trim().toUpperCase();
-    if(/^OAT\\d{5}[A-Z]\\d{3}$/.test(directOatScan))
+    if(/^OAT\d{5}[A-Z]\d{3}$/.test(directOatScan))
       candidateCodes.push(directOatScan);
 
     // Naast de code uit het minuutplan nemen we voor Drentse gemeenten
@@ -1765,7 +1765,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         if(!r.ok) continue;
         const html=await r.text();
 
-        const scanCodes=[...html.matchAll(/OAT\\d{5}[A-Z]\\d{3}/gi)]
+        const scanCodes=[...html.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
           .map(m=>String(m[0]).toUpperCase());
 
         // Alleen scans van deze gemeente + sectie meenemen.
@@ -1783,7 +1783,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // OAT-scan-codes uit. Zo zijn we niet afhankelijk van een vaste reeks
     // A001..D200, die per gemeente kan verschillen.
     const gemeenteCandidates=[gemeenteNaam,...gemeenteCodes].filter(Boolean);
-    const scanCodeRe=/OAT\\d{5}[A-Z]\\d{3}/gi;
+    const scanCodeRe=/OAT\d{5}[A-Z]\d{3}/gi;
 
     for(const gm of gemeenteCandidates){
       try{
