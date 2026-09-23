@@ -1707,8 +1707,8 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
-async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null){
-  const resultBox=document.getElementById("hisgisOatResult");
+async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null){
+  const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel laden...</small>";
   setStatus("HisGIS 1832: gevonden perceel ophalen...");
   try{
@@ -1827,7 +1827,7 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
 
     const oatBlad=String(blad)!=="Onbekend" ? String(blad) : "61";
-    await hisgisOatProof(lat,lng,"MIN04041B03",fullPerceel,oatBlad);
+    await hisgisOatProof(lat,lng,"MIN04041B03",fullPerceel,oatBlad,resultId);
   }catch(err){
     console.error("HisGIS kaartproef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS-kaartproef: "+esc(err.message||String(err))+"</small>";
