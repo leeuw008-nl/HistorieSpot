@@ -1715,6 +1715,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     const sectie=String(requestedSectie||"").trim().toUpperCase();
     const perceelZoek=String(requestedPerceel||"").trim();
     const gemeenteCode=String(requestedGemeenteCode||"04041").trim();
+    const gemeenteNaam=String(requestedGemeente||"").trim();
     if(!sectie||!perceelZoek)
       throw new Error("Onvoldoende kadastrale gegevens voor OAT-zoekactie");
 
@@ -1781,7 +1782,6 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // beschikbare OAT-informatie per gemeente; we halen daar alleen echte
     // OAT-scan-codes uit. Zo zijn we niet afhankelijk van een vaste reeks
     // A001..D200, die per gemeente kan verschillen.
-    const gemeenteNaam=String(requestedGemeente||"").trim();
     const gemeenteCandidates=[gemeenteNaam,...gemeenteCodes].filter(Boolean);
     const scanCodeRe=/OAT\\d{5}[A-Z]\\d{3}/gi;
 
