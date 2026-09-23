@@ -1898,7 +1898,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "<b>HisGIS 1832 – gevonden OAT-perceel</b><br>"+
         "Kadastrale gemeente: "+esc(gemeente)+"<br>"+
         "Sectie: "+esc(sectie)+"<br>"+
-        "Minuutplanblad: "+esc(requestedBlad||"Onbekend")+"<br>"+
+        "Minuutplan: "+esc(requestedBlad||"Onbekend")+"<br>"+
         "<b>Perceel: "+esc(perceelZoek)+"</b><br>"+
         "OAT-scan: "+esc(found.oatCode)+"<br>"+
         "Eigenaren / rechthebbenden: "+esc(owners.join("; ")||"Niet gevonden")+
