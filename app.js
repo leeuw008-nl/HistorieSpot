@@ -1771,13 +1771,13 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         // Probeer eerst de exacte koppeling perceel -> OAT-scan uit de
         // koppelsite te halen. Dat is betrouwbaarder dan een scanreeks
         // raden: één OAT-scan bevat meerdere opeenvolgende percelen.
-        const rowRe=/<tr[^>]*>[\\s\\S]*?<\\/tr>/gi;
+        const rowRe=/<tr[^>]*>[\s\S]*?<\/tr>/gi;
         for(const rowMatch of html.matchAll(rowRe)){
           const row=rowMatch[0];
-          const plain=row.replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/\\s+/g," ");
-          const parcelRe=new RegExp("(^|\\\\D)"+String(perceelZoek)+"($|\\\\D)");
+          const plain=row.replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/\s+/g," ");
+          const parcelRe=new RegExp("(^|\\D)"+String(perceelZoek)+"($|\\D)");
           if(parcelRe.test(plain)){
-            const rowCodes=[...row.matchAll(/OAT\\d{5}[A-Z]\\d{3}/gi)]
+            const rowCodes=[...row.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
               .map(m=>String(m[0]).toUpperCase());
             rowCodes.forEach(code=>{
               if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
