@@ -1731,9 +1731,24 @@ function autoActivateHistoricalView(){
 
   const viewRadius=mapViewRadiusMeters();
 
-  // Pas activeren wanneer de zichtbare kaart daadwerkelijk
-  // ongeveer 50 meter rond het kaartcentrum beslaat.
-  if(viewRadius>50) return;
+  // Buiten het 50-meter kaartbeeld ruimen we de automatisch geladen
+  // BAG-, 1832-, gemeentelijke en rijksmonumentenweergave op.
+  if(viewRadius>50){
+    bagLayer.clearLayers();
+    bagLabel.clearLayers();
+    rceLayer.clearLayers();
+    monumentLayer.clearLayers();
+    rceSeen.clear();
+    monumentSeen.clear();
+
+    if(window.histLayer){
+      map.removeLayer(window.histLayer);
+      window.histLayer=null;
+    }
+
+    autoHistorieCenter=null;
+    return;
+  }
 
   const center=map.getCenter();
 
