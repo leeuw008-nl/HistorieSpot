@@ -1974,7 +1974,6 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
 
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
 
-    const minuutplan=String(t["minuutplan"]||"");
     const oatScan=String(t["oat:scan"]||"").trim();
     const gemeenteCode=(/^MIN(\d{5})[A-Z]/i.test(minuutplan))
       ? minuutplan.match(/^MIN(\d{5})[A-Z]/i)[1]
