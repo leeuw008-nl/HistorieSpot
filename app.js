@@ -1714,6 +1714,13 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
+    const oatRelatiesDiagnose=(article?.rechtsPersonen||[]).map((rp,i)=>({
+        index:i,
+        keys:Object.keys(rp||{}),
+        persoon:rp.persoon||null,
+        persoonsVerwijzing:rp.persoonsVerwijzing||null,
+        instantie:rp.instantie||null
+      }));
     const owners=[...new Set((article?.rechtsPersonen||[]).map(rp=>{
       const p=rp.persoon||rp.persoonsVerwijzing?.persoon||{};
       if(Object.keys(p).length){
@@ -1739,6 +1746,9 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
         (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
         "<br><small>Bron: HisGIS OAT 1832, gekoppeld via het automatisch gevonden perceel.</small>"+
+        "<details style='margin-top:8px'><summary>OAT-relaties (technische diagnose)</summary>"+
+        "<pre style='white-space:pre-wrap;font-size:11px;max-height:300px;overflow:auto'>"+esc(JSON.stringify(oatRelatiesDiagnose,null,2))+"</pre>"+
+        "</details>"+
         "</div>";
     }
     setStatus("HisGIS 1832: perceel "+(requestedPerceel||"")+" gevonden");
