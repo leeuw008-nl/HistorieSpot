@@ -1768,7 +1768,33 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         const scanCodes=[...html.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
           .map(m=>String(m[0]).toUpperCase());
 
+        // Probeer eerst de exacte koppeling perceel -> OAT-scan uit de
+        // koppelsite te halen. Dat is betrouwbaarder dan een scanreeks
+        // raden: één OAT-scan bevat meerdere opeenvolgende percelen.
+        const rowRe=/<tr[^>]*>[\\s\\S]*?<\\/tr>/gi;
+        for(const rowMatch of html.matchAll(rowRe)){
+          const row=rowMatch[0];
+          const plain=row.replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/\\s+/g," ");
+          const escapedParcel=String(perceelZoek).replace(/[.*+?^\${}()|[\\]\\\\]/g,"\\\\        const scanCodes=[...html.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
+          .map(m=>String(m[0]).toUpperCase());
+
         // Alleen scans van deze gemeente + sectie meenemen.
+        scanCodes.forEach(code=>{
+          if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
+            candidateCodes.push(code);
+        });");
+          const parcelRe=new RegExp("(^|\\\\D)"+escapedParcel+"($|\\\\D)");
+          if(parcelRe.test(plain)){
+            const rowCodes=[...row.matchAll(/OAT\\d{5}[A-Z]\\d{3}/gi)]
+              .map(m=>String(m[0]).toUpperCase());
+            rowCodes.forEach(code=>{
+              if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
+                candidateCodes.unshift(code);
+            });
+          }
+        }
+
+        // Voeg overige echte scanverwijzingen van de koppelsite toe.
         scanCodes.forEach(code=>{
           if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
             candidateCodes.push(code);
