@@ -1761,45 +1761,17 @@ function hisgisOnlineLink(lat,lng){
 async function hisgisParcelProbe(lat,lng){
   const resultBox=document.getElementById("hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel op de kaart zoeken...</small>";
-  setStatus("HisGIS 1832: perceel op kaart zoeken...");
+  setStatus("HisGIS 1832: perceel op de kaart zoeken...");
   try{
-    const dLat=0.0015,dLng=0.0025;
-    const bbox=(lng-dLng)+","+(lat-dLat)+","+(lng+dLng)+","+(lat+dLat);
-    const urls=[
-      "https://osm.hisgis.nl/api/0.6/map?bbox="+encodeURIComponent(bbox),
-      "https://web2.fa.knaw.nl/osmapi/0.6/map?bbox="+encodeURIComponent(bbox)
-    ];
-    let xmlText="";
-    let lastStatus="";
-    for(const url of urls){
-      try{
-        const res=await fetch(url);
-        lastStatus=String(res.status);
-        if(res.ok){xmlText=await res.text();break;}
-      }catch(e){}
-    }
-    if(!xmlText) throw new Error("HisGIS-OSM HTTP "+lastStatus);
-    const doc=new DOMParser().parseFromString(xmlText,"text/xml");
-    if(doc.querySelector("parsererror")) throw new Error("HisGIS-OSM XML kon niet worden gelezen");
-    const nodes=new Map();
-    doc.querySelectorAll("node").forEach(n=>{
-      nodes.set(n.getAttribute("id"),{
-        lat:Number(n.getAttribute("lat")),
-        lon:Number(n.getAttribute("lon"))
-      });
-    });
-    const ways=[];
-    doc.querySelectorAll("way").forEach(w=>{
-      const tags={};
-      w.querySelectorAll(":scope > tag").forEach(t=>tags[t.getAttribute("k")]=t.getAttribute("v"));
-      if(!tags["kad:perceelnr"]) return;
-      const pts=[];
-      w.querySelectorAll(":scope > nd").forEach(nd=>{
-        const p=nodes.get(nd.getAttribute("ref"));
-        if(p) pts.push(p);
-      });
-      if(pts.length>=3) ways.push({id:w.getAttribute("id"),tags,pts});
-    });
+    const query='[out:json][timeout:20];way(around:100,'+lat+','+lng+')[\"kad:perceelnr\"];out tags geom;';
+    const url="https://overpass.hisgis.nl/cache/api/interpreter?data="+encodeURIComponent(query);
+    const res=await fetch(url);
+    if(!res.ok) throw new Error("HisGIS-Overpass HTTP "+res.status);
+
+    const data=await res.json();
+    const ways=(Array.isArray(data.elements)?data.elements:[])
+      .filter(w=>w.type==="way"&&Array.isArray(w.geometry)&&w.geometry.length>=3&&w.tags?.["kad:perceelnr"]);
+
     function inside(x,y,pts){
       let hit=false;
       for(let i=0,j=pts.length-1;i<pts.length;j=i++){
@@ -1808,17 +1780,34 @@ async function hisgisParcelProbe(lat,lng){
       }
       return hit;
     }
-    const hit=ways.find(w=>inside(lat,lng,w.pts));
+
+    const hit=ways.find(w=>inside(lat,lng,w.geometry));
     if(!hit) throw new Error("Geen ingetekend HisGIS-perceel op deze locatie gevonden ("+ways.length+" percelen in uitsnede)");
-    const t=hit.tags;
+
+    const t=hit.tags||{};
     const gemeente=t["kad:gemeente"]||"Onbekend";
     const sectie=t["kad:sectie"]||"Onbekend";
     const blad=t["kad:blad"]||"Onbekend";
     const perceel=t["kad:perceelnr"]||"Onbekend";
     const toevoeging=t["kad:perceelnrtvg"]||"";
     const fullPerceel=String(perceel)+String(toevoeging);
-    if(resultBox) resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'><b>HisGIS 1832 – kaartproef</b><br>Kadastrale gemeente: "+esc(gemeente)+"<br>Sectie: "+esc(sectie)+"<br>Blad: "+esc(blad)+"<br><b>Perceel: "+esc(fullPerceel)+"</b><br><small>HisGIS-OSM way "+esc(hit.id)+" · perceelgrens bevat de kliklocatie.</small></div>";
+
+    if(resultBox){
+      resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'>"+
+        "<b>HisGIS 1832 – perceel gevonden</b><br>"+
+        "Kadastrale gemeente: "+esc(gemeente)+"<br>"+
+        "Sectie: "+esc(sectie)+"<br>"+
+        "Blad: "+esc(blad)+"<br>"+
+        "<b>Perceel: "+esc(fullPerceel)+"</b><br>"+
+        "<small>HisGIS-perceelgrens bevat de kliklocatie · way "+esc(hit.id)+"</small>"+
+        "</div>";
+    }
+
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
+
+    if(String(perceel)==="867"){
+      await hisgisOatProof(lat,lng,"MIN04041B03");
+    }
   }catch(err){
     console.error("HisGIS kaartproef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS-kaartproef: "+esc(err.message||String(err))+"</small>";
@@ -1842,7 +1831,7 @@ map.on("click",async e=>{
         if(window.histLayer)map.removeLayer(window.histLayer);
         window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
         const p=data.features[0].properties;
-        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<a href="${hisgisOnlineLink(lat,lng)}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;text-decoration:none;border-radius:5px">HisGIS online – deze locatie bekijken</a><br><br><button type="button" onclick="hisgisOatProof('+lat+','+lng+',\''+code+'\')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS OAT-gegevens ophalen (proef)</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Diagnose: de kliklocatie wordt vergeleken met de ingetekende HisGIS-perceelvlakken.</div>`).openOn(map);
+        L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<a href="${hisgisOnlineLink(lat,lng)}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;text-decoration:none;border-radius:5px">HisGIS online – deze locatie bekijken</a><br><br><button type="button" onclick="hisgisParcelProbe('+lat+','+lng+')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS perceel automatisch bepalen</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Diagnose: de kliklocatie wordt vergeleken met de ingetekende HisGIS-perceelvlakken.</div>`).openOn(map);
       }
     }
   }catch(err){console.error(err);}
