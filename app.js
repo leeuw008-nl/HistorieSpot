@@ -1728,46 +1728,16 @@ map.on("popupclose",function(){
   historicalPopupSource=null;
 });
 
-function mapViewRadiusMeters(){
-  const center=map.getCenter();
-  const bounds=map.getBounds();
-  const sw=bounds.getSouthWest();
-  const ne=bounds.getNorthEast();
-
-  // Op een breed PC-scherm liggen de hoeken van het kaartbeeld veel
-  // verder weg dan de noord/zuid- of oost/westrand. De oude hoekmeting
-  // kwam daardoor zelfs bij sterk inzoomen vaak boven 250 meter uit.
-  // Gebruik daarom de dichtstbijzijnde kaartkadrand als praktische
-  // maat voor "binnen 250 meter ingezoomd".
-  const north=dist(center.lat,center.lng,ne.lat,center.lng);
-  const south=dist(center.lat,center.lng,sw.lat,center.lng);
-  const east=dist(center.lat,center.lng,center.lat,ne.lng);
-  const west=dist(center.lat,center.lng,center.lat,sw.lng);
-
-  return Math.min(north,south,east,west);
-}
-
 function autoActivateHistoricalView(){
   if(!map || !map.getCenter()) return;
 
-  // Zolang de bron van het geopende BAG/HisGIS-venster nog in beeld is,
-  // mag verschuiven van de kaart niets automatisch opruimen of opnieuw laden.
-  // Pas wanneer het betreffende label uit beeld is, hervat de 250-meterlogica.
-  if(historicalPopupOpen && historicalPopupSource){
-    let sourceLatLng=null;
-    if(typeof historicalPopupSource.getLatLng==="function"){
-      sourceLatLng=historicalPopupSource.getLatLng();
-    }else if(typeof historicalPopupSource.getBounds==="function"){
-      sourceLatLng=historicalPopupSource.getBounds().getCenter();
-    }
-    if(sourceLatLng && map.getBounds().contains(sourceLatLng)) return;
-  }
+  // De automatische historische weergave wordt op de PC gekoppeld aan
+  // het daadwerkelijke zoomniveau. Zoom 18 is het eerste detailniveau
+  // waarbij een normaal desktopkaartbeeld ongeveer binnen 250 m valt.
+  // Zo zijn we niet afhankelijk van de fysieke schermbreedte.
+  const zoom=map.getZoom();
 
-  const viewRadius=mapViewRadiusMeters();
-
-  // Buiten het 250-meter kaartbeeld ruimen we de automatisch geladen
-  // BAG-, 1832-, gemeentelijke en rijksmonumentenweergave op.
-  if(viewRadius>250){
+  if(zoom<18){
     bagLayer.clearLayers();
     bagLabel.clearLayers();
     rceLayer.clearLayers();
@@ -1784,9 +1754,20 @@ function autoActivateHistoricalView(){
     return;
   }
 
+  // Zolang de bron van het geopende BAG/HisGIS-venster nog in beeld is,
+  // mag verschuiven van de kaart niets automatisch opruimen of opnieuw laden.
+  if(historicalPopupOpen && historicalPopupSource){
+    let sourceLatLng=null;
+    if(typeof historicalPopupSource.getLatLng==="function"){
+      sourceLatLng=historicalPopupSource.getLatLng();
+    }else if(typeof historicalPopupSource.getBounds==="function"){
+      sourceLatLng=historicalPopupSource.getBounds().getCenter();
+    }
+    if(sourceLatLng && map.getBounds().contains(sourceLatLng)) return;
+  }
+
   const center=map.getCenter();
 
-  // Voorkom opnieuw laden bij iedere kleine kaartbeweging.
   if(
     autoHistorieCenter &&
     dist(
@@ -1809,8 +1790,6 @@ function autoActivateHistoricalView(){
 
 map.on("moveend",autoActivateHistoricalView);
 map.on("zoomend",()=>{
-  // Een zoom verandert het zichtbare kaartbereik ook als het kaartcentrum
-  // exact gelijk blijft. Daarom mag de 25-meter blokkering hier niet gelden.
   if(!historicalPopupOpen) autoHistorieCenter=null;
   autoActivateHistoricalView();
 });
