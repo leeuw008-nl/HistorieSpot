@@ -1742,12 +1742,22 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     if(/^OAT\\d{5}[A-Z]\\d{3}$/.test(directOatScan))
       candidateCodes.push(directOatScan);
 
+    // Naast de code uit het minuutplan nemen we voor Drentse gemeenten
+    // ook de 2-cijferige provinciecode (03) + 3-cijferige kadastrale
+    // gemeentecode mee. De huidige gemeentecode is niet altijd dezelfde
+    // code die in de historische OAT-bestanden wordt gebruikt.
+    const gemeenteCodes=[gemeenteCode];
+    if(/^0109$/.test(gemeenteCode)||/^00109$/.test(gemeenteCode)||/^01090$/.test(gemeenteCode))
+      gemeenteCodes.push("03109");
+    if(/^03109$/.test(gemeenteCode))
+      gemeenteCodes.push("00109","01090");
+
     // Eerst de officiële gemeente-REST-service proberen. Deze geeft de
     // beschikbare OAT-informatie per gemeente; we halen daar alleen echte
     // OAT-scan-codes uit. Zo zijn we niet afhankelijk van een vaste reeks
     // A001..D200, die per gemeente kan verschillen.
     const gemeenteNaam=String(requestedGemeente||"").trim();
-    const gemeenteCandidates=[gemeenteNaam,gemeenteCode].filter(Boolean);
+    const gemeenteCandidates=[gemeenteNaam,...gemeenteCodes].filter(Boolean);
     const scanCodeRe=/OAT\\d{5}[A-Z]\\d{3}/gi;
 
     for(const gm of gemeenteCandidates){
@@ -1774,8 +1784,10 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // Dit verandert niets aan de bekende werkende route voor Ommen,
     // terwijl gemeenten met meer scans alsnog gevonden kunnen worden.
     if(!candidateCodes.length){
-      for(let n=1;n<=500;n++){
-        candidateCodes.push("OAT"+gemeenteCode+sectie+String(n).padStart(3,"0"));
+      for(const gc of gemeenteCodes){
+        for(let n=1;n<=500;n++){
+          candidateCodes.push("OAT"+gc+sectie+String(n).padStart(3,"0"));
+        }
       }
     }
 
@@ -1813,7 +1825,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
       throw new Error(
         "Perceel "+perceelZoek+
         " niet gevonden in de beschikbare OAT-scans van sectie "+sectie+
-        " (gemeente "+gemeenteNaam+")"
+        " (gemeente "+gemeenteNaam+"; codes "+gemeenteCodes.join(", ")+")"
       );
     }
 
