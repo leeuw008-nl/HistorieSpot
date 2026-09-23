@@ -2007,6 +2007,7 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
         "Sectie: "+esc(sectie)+"<br>"+
         "Blad: "+esc(blad)+"<br>"+
         "<b>Perceel: "+esc(fullPerceel)+"</b><br>"+
+        "OAT-tags: "+esc(Object.keys(t).filter(k=>/^oat:/i.test(k)).map(k=>k+"="+t[k]).join(" · ")||"geen")+"<br>"+
         "<small>HisGIS-perceelgrens bevat de kliklocatie · way "+esc(hit.id)+"</small>"+
         "</div>";
     }
