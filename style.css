@@ -208,3 +208,149 @@ body {
   .map-bottom-bar { max-width: calc(100% - 110px); min-width: 200px; }
   .map-bottom-bar input[type=range] { width:140px; }
 }
+
+
+/* =========================================================
+   Professioneel BAG / HisGIS popupvenster
+   ========================================================= */
+.history-popup{
+  min-width:290px;
+  max-width:390px;
+  color:#263746;
+  font-size:13px;
+  line-height:1.45;
+}
+.history-popup-tabs{
+  display:flex;
+  gap:4px;
+  margin:-4px -4px 12px;
+  padding:4px;
+  background:#f1f5f9;
+  border:1px solid #dce4ec;
+  border-radius:10px;
+}
+.history-tab{
+  flex:1;
+  min-height:38px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:#5b6b7b;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  transition:all .18s ease;
+}
+.history-tab:hover{
+  background:#e5edf5;
+  color:#244b70;
+}
+.history-tab.active{
+  background:#fff;
+  color:#0b5cab;
+  box-shadow:0 2px 7px rgba(26,55,80,.14);
+}
+.history-tab-icon{
+  display:inline-flex;
+  width:18px;
+  height:18px;
+  align-items:center;
+  justify-content:center;
+  margin-right:4px;
+  font-size:14px;
+}
+.history-tab-panel{
+  animation:historyPanelIn .16s ease-out;
+}
+@keyframes historyPanelIn{
+  from{opacity:.55;transform:translateY(2px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.history-panel-title{
+  font-size:16px;
+  font-weight:800;
+  color:#20384d;
+  margin-bottom:10px;
+}
+.history-year-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  background:#eef5fb;
+  border:1px solid #d8e6f2;
+  border-left:4px solid #0b5cab;
+  border-radius:8px;
+}
+.history-year-row span{
+  color:#53687a;
+  font-size:12px;
+  font-weight:600;
+}
+.history-year-row strong{
+  color:#0b5cab;
+  font-size:18px;
+}
+.history-distance{
+  margin:7px 2px 11px;
+  color:#6b7c8c;
+  font-size:11px;
+}
+.history-details{
+  border:1px solid #e1e7ed;
+  border-radius:8px;
+  overflow:hidden;
+  background:#fff;
+}
+.history-detail-row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:7px 9px;
+  border-bottom:1px solid #edf1f4;
+}
+.history-detail-row:last-child{
+  border-bottom:0;
+}
+.history-detail-row span{
+  color:#6a7886;
+  flex:0 0 43%;
+}
+.history-detail-row strong{
+  color:#263746;
+  font-weight:600;
+  text-align:right;
+  overflow-wrap:anywhere;
+}
+.history-hisgis-result{
+  margin-top:4px;
+}
+.history-loading-hint{
+  padding:11px 12px;
+  background:#f7f9fb;
+  border:1px dashed #cbd7e2;
+  border-radius:8px;
+  color:#687888;
+  font-size:12px;
+}
+.leaflet-popup-content-wrapper{
+  border-radius:12px;
+}
+.leaflet-popup-content{
+  margin:12px 14px;
+}
+@media (max-width:480px){
+  .history-popup{
+    min-width:260px;
+    max-width:calc(100vw - 58px);
+  }
+  .history-detail-row{
+    display:block;
+  }
+  .history-detail-row strong{
+    display:block;
+    text-align:left;
+    margin-top:2px;
+  }
+}
