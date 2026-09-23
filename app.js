@@ -1707,12 +1707,15 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
-async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null){
+async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel laden...</small>";
   setStatus("HisGIS 1832: gevonden perceel ophalen...");
   try{
-    const oatCode="OAT04041B061";
+    const sectie=String(requestedSectie||"B").trim().toUpperCase();
+    const bladNum=String(requestedBlad||"61").trim();
+    const bladCode=bladNum.padStart(3,"0");
+    const oatCode="OAT04041"+sectie+bladCode;
     const oatRes=await fetch("https://oat.hisgis.nl/oat-ws/rest/percelen/oat/"+oatCode);
     if(!oatRes.ok) throw new Error("OAT HTTP "+oatRes.status);
     const s=await oatRes.json();
@@ -1726,7 +1729,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     });
 
     const match=rows.find(p=>requestedPerceel!==null && String(p.perceelnr||"").trim()===String(requestedPerceel).trim());
-    if(!match) throw new Error("Gevonden perceel niet gevonden in OAT blad 61");
+    if(!match) throw new Error("Perceel "+String(requestedPerceel)+" niet gevonden in OAT "+oatCode);
 
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
@@ -1827,7 +1830,7 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
 
     const oatBlad=String(blad)!=="Onbekend" ? String(blad) : "61";
-    await hisgisOatProof(lat,lng,"MIN04041B03",fullPerceel,oatBlad,resultId);
+    await hisgisOatProof(lat,lng,"MIN04041B03",fullPerceel,oatBlad,resultId,sectie);
   }catch(err){
     console.error("HisGIS kaartproef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS-kaartproef: "+esc(err.message||String(err))+"</small>";
