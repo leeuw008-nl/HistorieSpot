@@ -1801,7 +1801,12 @@ function autoActivateHistoricalView(){
 }
 
 map.on("moveend",autoActivateHistoricalView);
-map.on("zoomend",autoActivateHistoricalView);
+map.on("zoomend",()=>{
+  // Een zoom verandert het zichtbare kaartbereik ook als het kaartcentrum
+  // exact gelijk blijft. Daarom mag de 25-meter blokkering hier niet gelden.
+  if(!historicalPopupOpen) autoHistorieCenter=null;
+  autoActivateHistoricalView();
+});
 
 async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null,requestedGemeenteCode=null,requestedOatScan=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
