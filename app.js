@@ -1801,6 +1801,7 @@ function autoActivateHistoricalView(){
 }
 
 map.on("moveend",autoActivateHistoricalView);
+map.on("zoomend",autoActivateHistoricalView);
 
 async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null,requestedGemeenteCode=null,requestedOatScan=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
