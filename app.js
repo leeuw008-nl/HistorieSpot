@@ -1707,13 +1707,16 @@ async function loadHistForLocation(lat,lng){
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
-async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null){
+async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=null,resultId=null,requestedSectie=null,requestedGemeente=null,requestedGemeenteCode=null){
   const resultBox=document.getElementById(resultId||"hisgisOatResult");
   if(resultBox) resultBox.innerHTML="<small>HisGIS OAT-gegevens zoeken...</small>";
   setStatus("HisGIS 1832: juiste OAT-scan zoeken...");
   try{
     const sectie=String(requestedSectie||"").trim().toUpperCase();
     const perceelZoek=String(requestedPerceel||"").trim();
+    const gemeenteCode=String(requestedGemeenteCode||"").trim();
+    if(!/^\\d{5}$/.test(gemeenteCode))
+      throw new Error("HisGIS gemeente-code niet gevonden uit minuutplan ("+String(code||"onbekend")+")");
     if(!sectie||!perceelZoek)
       throw new Error("Onvoldoende kadastrale gegevens voor OAT-zoekactie");
 
@@ -1722,8 +1725,8 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
      * We zoeken daarom binnen een ruime reeks scan-nummers en stoppen
      * bij de eerste exacte perceelmatch.
      *
-     * Voor Stad Ommen is de OAT-code opgebouwd als:
-     * OAT04041 + sectie + driecijferig scannummer.
+     * De OAT-code gebruikt de vijfcijferige kadastrale gemeente-code
+     * uit de minuutplan-code: OAT + gemeente-code + sectie + scan.
      *
      * De API geeft bij een bestaande scan HTTP 200; een niet-bestaande
      * scan geeft HTTP 404. 404 gebruiken we hier uitsluitend om naar de
@@ -1737,7 +1740,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     for(let n=1;n<=maxScan;n++){
       const scan=String(n).padStart(3,"0");
-      const oatCode="OAT04041"+sectie+scan;
+      const oatCode="OAT"+gemeenteCode+sectie+scan;
       let data=window.hisgisOatScanCache.get(oatCode);
 
       if(!data){
@@ -1894,8 +1897,11 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
 
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
 
-    const oatBlad=String(blad)!=="Onbekend" ? String(blad) : "61";
-    await hisgisOatProof(lat,lng,"MIN04041B03",fullPerceel,oatBlad,resultId,sectie,gemeente);
+    const minuutplan=String(t["minuutplan"]||"");
+    const gemeenteCode=(/^MIN(\\d{5})[A-Z]/i.test(minuutplan))
+      ? minuutplan.match(/^MIN(\\d{5})[A-Z]/i)[1]
+      : "";
+    await hisgisOatProof(lat,lng,minuutplan,fullPerceel,blad,resultId,sectie,gemeente,gemeenteCode);
   }catch(err){
     console.error("HisGIS kaartproef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS-kaartproef: "+esc(err.message||String(err))+"</small>";
