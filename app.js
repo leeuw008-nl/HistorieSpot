@@ -1752,6 +1752,31 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     if(/^03109$/.test(gemeenteCode))
       gemeenteCodes.push("00109","01090");
 
+    // Tweede route: de openbare HisGIS-koppelsite voor de sectie.
+    // Deze pagina kent de werkelijke OAT-scan per perceel en voorkomt dat
+    // we scan-nummers hoeven te raden. We halen alleen scan-codes uit de
+    // HTML; de OAT-API blijft daarna de bron voor de inhoud.
+    const koppelGemeentes=[gemeenteNaam].filter(Boolean);
+    for(const gm of koppelGemeentes){
+      try{
+        const u="https://osm.hisgis.nl/koppel/"+encodeURIComponent(gm)+"/"+encodeURIComponent(sectie);
+        const r=await fetch(u);
+        if(!r.ok) continue;
+        const html=await r.text();
+
+        const scanCodes=[...html.matchAll(/OAT\\d{5}[A-Z]\\d{3}/gi)]
+          .map(m=>String(m[0]).toUpperCase());
+
+        // Alleen scans van deze gemeente + sectie meenemen.
+        scanCodes.forEach(code=>{
+          if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
+            candidateCodes.push(code);
+        });
+      }catch(e){
+        // CORS/bad-gateway van de koppelsite mag de normale route niet blokkeren.
+      }
+    }
+
     // Eerst de officiële gemeente-REST-service proberen. Deze geeft de
     // beschikbare OAT-informatie per gemeente; we halen daar alleen echte
     // OAT-scan-codes uit. Zo zijn we niet afhankelijk van een vaste reeks
