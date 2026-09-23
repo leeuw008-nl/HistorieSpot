@@ -1805,16 +1805,18 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     candidateCodes=[...new Set(candidateCodes)].sort();
 
-    // Fallback: probeer de bestaande scanreeks, maar nu ruimer.
-    // Dit verandert niets aan de bekende werkende route voor Ommen,
-    // terwijl gemeenten met meer scans alsnog gevonden kunnen worden.
-    if(!candidateCodes.length){
-      for(const gc of gemeenteCodes){
-        for(let n=1;n<=500;n++){
-          candidateCodes.push("OAT"+gc+sectie+String(n).padStart(3,"0"));
-        }
+    // Vul de gevonden kandidaten altijd aan met de gewone scanreeks.
+    // De koppelsite/gemeente-REST kan namelijk wel kandidaten teruggeven
+    // zonder de scan te bevatten waarin het gevraagde perceel staat.
+    // Alleen als de kandidaatlijst leeg is zoeken we dus niet uitsluitend;
+    // de numerieke reeks blijft ook dan beschikbaar.
+    for(const gc of gemeenteCodes){
+      for(let n=1;n<=500;n++){
+        candidateCodes.push("OAT"+gc+sectie+String(n).padStart(3,"0"));
       }
     }
+
+    candidateCodes=[...new Set(candidateCodes)];
 
     for(const oatCode of candidateCodes){
       let data=window.hisgisOatScanCache.get(oatCode);
