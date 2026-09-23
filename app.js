@@ -1560,64 +1560,38 @@ async function loadBAG(lat,lng,radius){
       const hisgisTabId="hisgisTab_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
       const hisgisResultId="hisgisResult_"+String(bagId).replace(/[^a-zA-Z0-9]/g,"");
 
-      const popup=`
-        <div class="history-popup">
-          <div class="history-popup-tabs" role="tablist" aria-label="Historische gegevens">
-            <button type="button" class="history-tab active" role="tab" aria-selected="true"
-              onclick="
-                document.getElementById('${bagTabId}').style.display='block';
-                document.getElementById('${hisgisTabId}').style.display='none';
-                this.parentNode.querySelectorAll('.history-tab').forEach(b=>{
-                  b.classList.remove('active');
-                  b.setAttribute('aria-selected','false');
-                });
-                this.classList.add('active');
-                this.setAttribute('aria-selected','true');
-              ">
-              <span class="history-tab-icon">▦</span> BAG
-            </button>
-            <button type="button" class="history-tab" role="tab" aria-selected="false"
-              onclick="
-                document.getElementById('@@BAG@@').style.display='none';
-                document.getElementById('@@HIS@@').style.display='block';
-                this.parentNode.querySelectorAll('.history-tab').forEach(b=>{
-                  b.classList.remove('active');
-                  b.setAttribute('aria-selected','false');
-                });
-                this.classList.add('active');
-                this.setAttribute('aria-selected','true');
-                hisgisParcelProbe(${o.c.lat},${o.c.lng},'${hisgisResultId}');
-              ">
-              <span class="history-tab-icon">⌖</span> HisGIS
-            </button>
-          </div>
-
-          <div id="@@BAG@@" class="history-tab-panel">
-            <div class="history-panel-title">BAG-pand</div>
-            <div class="history-year-row">
-              <span>Bouwjaar</span>
-              <strong>${esc(y)}</strong>
-            </div>
-            <div class="history-distance">Afstand ${Math.round(o.d)} meter</div>
-
-            <div class="history-details">
-              <div class="history-detail-row"><span>BAG-identificatie</span><strong>${esc(bagId)}</strong></div>
-              <div class="history-detail-row"><span>Status</span><strong>${esc(status)}</strong></div>
-              <div class="history-detail-row"><span>Gebruiksdoel</span><strong>${esc(gebruiksdoel)}</strong></div>
-              <div class="history-detail-row"><span>Geconstateerd</span><strong>${esc(geconstateerd)}</strong></div>
-              <div class="history-detail-row"><span>BAG-document</span><strong>${esc(documentnummer)}</strong></div>
-              <div class="history-detail-row"><span>Documentdatum</span><strong>${esc(documentdatum)}</strong></div>
-            </div>
-          </div>
-
-          <div id="@@HIS@@" class="history-tab-panel" style="display:none">
-            <div class="history-panel-title">HisGIS 1832</div>
-            <div id="@@RES@@" class="history-hisgis-result">
-              <div class="history-loading-hint">Klik op HisGIS om het historische perceel en de OAT-gegevens te laden.</div>
-            </div>
-          </div>
-        </div>
-      `
+      const popup =
+        '<div class="history-popup">' +
+          '<div class="history-popup-tabs" role="tablist" aria-label="Historische gegevens">' +
+            '<button type="button" class="history-tab active" role="tab" aria-selected="true" ' +
+              'onclick="document.getElementById(\''+bagTabId+'\').style.display=\'block\';document.getElementById(\''+hisgisTabId+'\').style.display=\'none\';this.parentNode.querySelectorAll(\'.history-tab\').forEach(function(b){b.classList.remove(\'active\');b.setAttribute(\'aria-selected\',\'false\');});this.classList.add(\'active\');this.setAttribute(\'aria-selected\',\'true\');">' +
+              '<span class="history-tab-icon">▦</span> BAG' +
+            '</button>' +
+            '<button type="button" class="history-tab" role="tab" aria-selected="false" ' +
+              'onclick="document.getElementById(\''+bagTabId+'\').style.display=\'none\';document.getElementById(\''+hisgisTabId+'\').style.display=\'block\';this.parentNode.querySelectorAll(\'.history-tab\').forEach(function(b){b.classList.remove(\'active\');b.setAttribute(\'aria-selected\',\'false\');});this.classList.add(\'active\');this.setAttribute(\'aria-selected\',\'true\');hisgisParcelProbe('+o.c.lat+','+o.c.lng+',\''+hisgisResultId+'\');">' +
+              '<span class="history-tab-icon">⌖</span> HisGIS' +
+            '</button>' +
+          '</div>' +
+          '<div id="'+bagTabId+'" class="history-tab-panel">' +
+            '<div class="history-panel-title">BAG-pand</div>' +
+            '<div class="history-year-row"><span>Bouwjaar</span><strong>'+esc(y)+'</strong></div>' +
+            '<div class="history-distance">Afstand '+Math.round(o.d)+' meter</div>' +
+            '<div class="history-details">' +
+              '<div class="history-detail-row"><span>BAG-identificatie</span><strong>'+esc(bagId)+'</strong></div>' +
+              '<div class="history-detail-row"><span>Status</span><strong>'+esc(status)+'</strong></div>' +
+              '<div class="history-detail-row"><span>Gebruiksdoel</span><strong>'+esc(gebruiksdoel)+'</strong></div>' +
+              '<div class="history-detail-row"><span>Geconstateerd</span><strong>'+esc(geconstateerd)+'</strong></div>' +
+              '<div class="history-detail-row"><span>BAG-document</span><strong>'+esc(documentnummer)+'</strong></div>' +
+              '<div class="history-detail-row"><span>Documentdatum</span><strong>'+esc(documentdatum)+'</strong></div>' +
+            '</div>' +
+          '</div>' +
+          '<div id="'+hisgisTabId+'" class="history-tab-panel" style="display:none">' +
+            '<div class="history-panel-title">HisGIS 1832</div>' +
+            '<div id="'+hisgisResultId+'" class="history-hisgis-result">' +
+              '<div class="history-loading-hint">Klik op HisGIS om het historische perceel en de OAT-gegevens te laden.</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       const poly=L.geoJSON(
         o.f,
         {
