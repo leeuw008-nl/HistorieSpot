@@ -1714,14 +1714,14 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
-    const owners=(article?.rechtsPersonen||[]).map(rp=>{
+    const owners=[...new Set((article?.rechtsPersonen||[]).map(rp=>{
       const p=rp.persoon||rp.persoonsVerwijzing?.persoon||{};
       if(Object.keys(p).length){
         return [p.titel,p.voornaam,p.voorvoegsel,p.achternaam].filter(Boolean).join(" ")+
           (p.beroep||p.woonplaats?" ("+[p.beroep,p.woonplaats].filter(Boolean).join(" te ")+")":"");
       }
       return rp.instantie?.naam||"";
-    }).filter(Boolean);
+    }).filter(Boolean))];
 
     const gebruik=match.grondGebruik||"";
     const opp=Number(match.oppervlak||0);
@@ -1735,10 +1735,10 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "Sectie: B<br>"+
         "Blad: "+esc(requestedBlad||"61")+"<br>"+
         "<b>Perceel: "+esc(requestedPerceel||"Onbekend")+"</b><br>"+
-        "Eigenaar: "+esc(owners.join("; ")||"Niet gevonden")+
+        "Eigenaar"+(owners.length>1?"en":"")+": "+esc(owners.join("; ")||"Niet gevonden")+
         (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
         (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
-        "<br><small>Gekoppeld op perceelnummer uit de HistorieSpot-proef.</small>"+
+        "<br><small>Bron: HisGIS OAT 1832, gekoppeld via het automatisch gevonden perceel.</small>"+
         "</div>";
     }
     setStatus("HisGIS 1832: perceel "+(requestedPerceel||"")+" gevonden");
