@@ -1737,20 +1737,24 @@ function autoActivateHistoricalView(){
   // Zo zijn we niet afhankelijk van de fysieke schermbreedte.
   const zoom=map.getZoom();
 
+  // Alleen UITZOOMEN onder zoom 18 ruimt de historische lagen op.
+  // Bij inzoomen blijven BAG, 1832, GM en RM staan.
   if(zoom<18){
-    bagLayer.clearLayers();
-    bagLabel.clearLayers();
-    rceLayer.clearLayers();
-    monumentLayer.clearLayers();
-    rceSeen.clear();
-    monumentSeen.clear();
+    if(autoHistorieCenter){
+      bagLayer.clearLayers();
+      bagLabel.clearLayers();
+      rceLayer.clearLayers();
+      monumentLayer.clearLayers();
+      rceSeen.clear();
+      monumentSeen.clear();
 
-    if(window.histLayer){
-      map.removeLayer(window.histLayer);
-      window.histLayer=null;
+      if(window.histLayer){
+        map.removeLayer(window.histLayer);
+        window.histLayer=null;
+      }
+
+      autoHistorieCenter=null;
     }
-
-    autoHistorieCenter=null;
     return;
   }
 
