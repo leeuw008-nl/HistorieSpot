@@ -1709,7 +1709,7 @@ async function loadHistForLocation(lat,lng){
 
 /* =========================================================
    AUTOMATISCHE ACTIVERING 1832 + BAG
-   Zodra de zichtbare kaart binnen 50 meter van het kaartcentrum
+   Zodra de zichtbare kaart binnen 100 meter van het kaartcentrum
    is ingezoomd, worden BAG en de 1832-laag automatisch geladen.
    ========================================================= */
 let autoHistorieCenter=null;
@@ -1731,9 +1731,9 @@ function autoActivateHistoricalView(){
 
   const viewRadius=mapViewRadiusMeters();
 
-  // Buiten het 50-meter kaartbeeld ruimen we de automatisch geladen
+  // Buiten het 100-meter kaartbeeld ruimen we de automatisch geladen
   // BAG-, 1832-, gemeentelijke en rijksmonumentenweergave op.
-  if(viewRadius>50){
+  if(viewRadius>100){
     bagLayer.clearLayers();
     bagLabel.clearLayers();
     rceLayer.clearLayers();
@@ -1768,7 +1768,7 @@ function autoActivateHistoricalView(){
 
   const r=Number(radiusSel.value)||50;
 
-  setStatus("Binnen 50 m – BAG en 1832-kaart automatisch laden...");
+  setStatus("Binnen 100 m – BAG en 1832-kaart automatisch laden...");
   loadBAG(center.lat,center.lng,r);
   loadHistForLocation(center.lat,center.lng);
 }
