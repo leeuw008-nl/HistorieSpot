@@ -1621,7 +1621,7 @@ async function loadBAG(lat,lng,radius){
       const lab=L.marker(
         [o.c.lat,o.c.lng],
         {icon:ic}
-      ).bindPopup(popup);
+      ).bindPopup(popup,{closeOnClick:false,autoPan:false});
 
       bagLabel.addLayer(lab);
 
@@ -1717,9 +1717,16 @@ async function loadHistForLocation(lat,lng){
    ========================================================= */
 let autoHistorieCenter=null;
 let historicalPopupOpen=false;
+let historicalPopupSource=null;
 
-map.on("popupopen",function(){ historicalPopupOpen=true; });
-map.on("popupclose",function(){ historicalPopupOpen=false; });
+map.on("popupopen",function(e){
+  historicalPopupOpen=true;
+  historicalPopupSource=e.popup ? e.popup._source : null;
+});
+map.on("popupclose",function(){
+  historicalPopupOpen=false;
+  historicalPopupSource=null;
+});
 
 function mapViewRadiusMeters(){
   const center=map.getCenter();
@@ -1736,10 +1743,18 @@ function mapViewRadiusMeters(){
 function autoActivateHistoricalView(){
   if(!map || !map.getCenter()) return;
 
-  // Zolang een BAG/HisGIS-venster open staat, mag verschuiven van de kaart
-  // niets automatisch opruimen of opnieuw laden. De gebruiker kan dan vrij
-  // rondschuiven terwijl het geopende venster behouden blijft.
-  if(historicalPopupOpen) return;
+  // Zolang de bron van het geopende BAG/HisGIS-venster nog in beeld is,
+  // mag verschuiven van de kaart niets automatisch opruimen of opnieuw laden.
+  // Pas wanneer het betreffende label uit beeld is, hervat de 250-meterlogica.
+  if(historicalPopupOpen && historicalPopupSource){
+    let sourceLatLng=null;
+    if(typeof historicalPopupSource.getLatLng==="function"){
+      sourceLatLng=historicalPopupSource.getLatLng();
+    }else if(typeof historicalPopupSource.getBounds==="function"){
+      sourceLatLng=historicalPopupSource.getBounds().getCenter();
+    }
+    if(sourceLatLng && map.getBounds().contains(sourceLatLng)) return;
+  }
 
   const viewRadius=mapViewRadiusMeters();
 
