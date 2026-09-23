@@ -1714,21 +1714,18 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
-    const oatRelatiesDiagnose=(article?.rechtsPersonen||[]).map((rp,i)=>({
-        index:i,
-        keys:Object.keys(rp||{}),
-        persoon:rp.persoon||null,
-        persoonsVerwijzing:rp.persoonsVerwijzing||null,
-        instantie:rp.instantie||null
-      }));
-    const owners=[...new Set((article?.rechtsPersonen||[]).map(rp=>{
-      const p=rp.persoon||rp.persoonsVerwijzing?.persoon||{};
+    const ownerEntries=(article?.rechtsPersonen||[]).map(rp=>{
+      const ref=rp.persoonsVerwijzing;
+      const p=rp.persoon||ref?.persoon||{};
       if(Object.keys(p).length){
-        return [p.titel,p.voornaam,p.voorvoegsel,p.achternaam].filter(Boolean).join(" ")+
-          (p.beroep||p.woonplaats?" ("+[p.beroep,p.woonplaats].filter(Boolean).join(" te ")+")":"");
+        const base=[p.titel,p.voornaam,p.voorvoegsel,p.achternaam].filter(Boolean).join(" ");
+        const details=[p.beroep,p.woonplaats].filter(Boolean).join(" te ");
+        const text=base+(details?" ("+details+")":"");
+        return ref?.verwijzing==="ERVEN_VAN" ? "Erven van "+text : text;
       }
       return rp.instantie?.naam||"";
-    }).filter(Boolean))];
+    }).filter(Boolean);
+    const owners=[...new Set(ownerEntries)];
 
     const gebruik=match.grondGebruik||"";
     const opp=Number(match.oppervlak||0);
@@ -1742,13 +1739,11 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "Sectie: B<br>"+
         "Blad: "+esc(requestedBlad||"61")+"<br>"+
         "<b>Perceel: "+esc(requestedPerceel||"Onbekend")+"</b><br>"+
-        "Eigenaren: "+esc(owners.join("; ")||"Niet gevonden")+
+        "Eigenaren / rechthebbenden: "+esc(owners.join("; ")||"Niet gevonden")+
         (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
         (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
         "<br><small>Bron: HisGIS OAT 1832, gekoppeld via het automatisch gevonden perceel.</small>"+
-        "<details style='margin-top:8px'><summary>OAT-relaties (technische diagnose)</summary>"+
-        "<pre style='white-space:pre-wrap;font-size:11px;max-height:300px;overflow:auto'>"+esc(JSON.stringify(oatRelatiesDiagnose,null,2))+"</pre>"+
-        "</details>"+
+
         "</div>";
     }
     setStatus("HisGIS 1832: perceel "+(requestedPerceel||"")+" gevonden");
