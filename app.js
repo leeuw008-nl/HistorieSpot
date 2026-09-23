@@ -1731,9 +1731,9 @@ function autoActivateHistoricalView(){
 
   const viewRadius=mapViewRadiusMeters();
 
-  // Buiten het 100-meter kaartbeeld ruimen we de automatisch geladen
+  // Buiten het 250-meter kaartbeeld ruimen we de automatisch geladen
   // BAG-, 1832-, gemeentelijke en rijksmonumentenweergave op.
-  if(viewRadius>100){
+  if(viewRadius>250){
     bagLayer.clearLayers();
     bagLabel.clearLayers();
     rceLayer.clearLayers();
@@ -1768,7 +1768,7 @@ function autoActivateHistoricalView(){
 
   const r=Number(radiusSel.value)||50;
 
-  setStatus("Binnen 100 m – BAG en 1832-kaart automatisch laden...");
+  setStatus("Binnen 250 m – BAG en 1832-kaart automatisch laden...");
   loadBAG(center.lat,center.lng,r);
   loadHistForLocation(center.lat,center.lng);
 }
