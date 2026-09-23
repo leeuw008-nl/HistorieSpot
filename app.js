@@ -1,5 +1,5 @@
 // OUDE SITUATIE ZONDER MONUMENTEN - gefixed voor 4 punten
-const map=L.map("map",{zoomControl:false}).setView([52.516,6.42],15);
+const map=L.map("map",{zoomControl:false,maxZoom:20}).setView([52.516,6.42],15);
 window.map=map;
 L.control.zoom({position:'bottomleft'}).addTo(map);
 
@@ -19,7 +19,7 @@ function updateZoomInfo(){
 }
 map.on("zoomend",updateZoomInfo);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20}).addTo(map);
 
 let curMarker=null,accCircle=null;
 
