@@ -1693,24 +1693,9 @@ async function loadHistForLocation(lat,lng){
 
 async function hisgisOatProof(lat,lng,code){
   const resultBox=document.getElementById("hisgisOatResult");
-  if(resultBox) resultBox.innerHTML="<small>HisGIS OAT-gegevens laden...</small>";
-  setStatus("HisGIS 1832: OAT-gegevens laden...");
+  if(resultBox) resultBox.innerHTML="<small>HisGIS-perceel 867 laden...</small>";
+  setStatus("HisGIS 1832: perceel 867 ophalen...");
   try{
-    const b=box(lat,lng,40);
-    const bagUrl=`https://api.pdok.nl/kadaster/bag/ogc/v2/collections/verblijfsobject/items?bbox=${b.minLo},${b.minLa},${b.maxLo},${b.maxLa}&limit=100&f=json`;
-    const bagRes=await fetch(bagUrl);
-    if(!bagRes.ok) throw new Error("BAG HTTP "+bagRes.status);
-    const bagData=await bagRes.json();
-    const candidates=(bagData.features||[]).map(f=>{const c=centerOf(f);return c?{f,c,d:dist(lat,lng,c.lat,c.lng)}:null;}).filter(Boolean).sort((a,b)=>a.d-b.d);
-    const addressFeature=candidates.find(x=>{
-      const p=x.f.properties||{};
-      return p.huisnummer!==undefined&&p.huisnummer!==null&&String(p.huisnummer).trim()!=="";
-    });
-    if(!addressFeature) throw new Error("Geen BAG-adres gevonden");
-    const bp=addressFeature.f.properties||{};
-    const huisnummer=String(bp.huisnummer).trim();
-    const straat=String(bp.openbare_ruimte_naam||"").trim();
-    const woonplaats=String(bp.woonplaats_naam||"").trim();
     const oatCode="OAT04041B061";
     const oatRes=await fetch("https://oat.hisgis.nl/oat-ws/rest/percelen/oat/"+oatCode);
     if(!oatRes.ok) throw new Error("OAT HTTP "+oatRes.status);
@@ -1718,29 +1703,45 @@ async function hisgisOatProof(lat,lng,code){
     const rows=Array.isArray(s.results)?s.results:[];
     const articles=Array.isArray(s.artikelen)?s.artikelen:[];
     const articleMap=new Map();
-    articles.forEach(a=>{let id=String(a.artikelnr||"");if(a.artikelnrtvg)id+=String(a.artikelnrtvg);articleMap.set(id,a);});
-    const match=null; // Ruimtelijke perceelkoppeling volgt in een aparte proef; OAT-lijst blijft intact.
-    if(!match){ if(resultBox){ const proef=rows.slice(0,20).map(p=>{const aid=String(p.artikelLink?.artikelnr||"")+(p.artikelLink?.artikelnrtvg||"");const a=articleMap.get(aid);const owners=(a?.rechtsPersonen||[]).map(rp=>{const q=rp.persoon||rp.persoonsVerwijzing?.persoon||{};if(Object.keys(q).length)return [q.titel,q.voornaam,q.voorvoegsel,q.achternaam].filter(Boolean).join(" ")+(q.beroep||q.woonplaats?" ("+[q.beroep,q.woonplaats].filter(Boolean).join(" te ")+")":"");return rp.instantie?.naam||""}).filter(Boolean);return {perceel:p.perceelnr||"",artikel:p.artikelLink||null,eigenaar:owners.join("; "),gebruik:p.grondGebruik||"",oppervlak:p.oppervlak||""};}); resultBox.innerHTML="<div style=\"margin-top:8px;padding-top:9px;border-top:1px solid #ddd\"><b>HisGIS OAT – blad 61 (gegevensproef)</b><br><small>"+esc(JSON.stringify(proef))+"</small></div>"; } setStatus("HisGIS 1832: OAT blad 61 opgehaald – "+rows.length+" records"); return; }
+    articles.forEach(a=>{
+      let id=String(a.artikelnr||"");
+      if(a.artikelnrtvg)id+=String(a.artikelnrtvg);
+      articleMap.set(id,a);
+    });
+
+    const match=rows.find(p=>String(p.perceelnr||"").trim()==="867");
+    if(!match) throw new Error("Perceel 867 niet gevonden in OAT blad 61");
+
     const aid=String(match.artikelLink?.artikelnr||"")+(match.artikelLink?.artikelnrtvg||"");
     const article=articleMap.get(aid);
     const owners=(article?.rechtsPersonen||[]).map(rp=>{
       const p=rp.persoon||rp.persoonsVerwijzing?.persoon||{};
-      if(rp.type==="PERSOON"||Object.keys(p).length){
-        return [p.titel,p.voornaam,p.voorvoegsel,p.achternaam].filter(Boolean).join(" ")+(p.beroep||p.woonplaats?" ("+[p.beroep,p.woonplaats].filter(Boolean).join(" te ")+")":"");
+      if(Object.keys(p).length){
+        return [p.titel,p.voornaam,p.voorvoegsel,p.achternaam].filter(Boolean).join(" ")+
+          (p.beroep||p.woonplaats?" ("+[p.beroep,p.woonplaats].filter(Boolean).join(" te ")+")":"");
       }
-      const i=rp.instantie||{};
-      return i.naam||"";
+      return rp.instantie?.naam||"";
     }).filter(Boolean);
+
     const gebruik=match.grondGebruik||"";
-    const opp=match.oppervlak||0;
+    const opp=Number(match.oppervlak||0);
     const oppervlakte=opp?String(Math.floor(opp/10000))+" bunder, "+String(Math.floor((opp%10000)/100))+" roede, "+String(opp%100)+" el":"";
     const gemeente=s.gemeente?.naam||"Stad Ommen";
-    const sectie=oatCode.charAt(8);
-    const blad=parseInt(oatCode.substring(9),10);
+
     if(resultBox){
-      resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'><b>HisGIS 1832 – gevonden OAT-perceel</b><br>Kadastrale gemeente: "+esc(gemeente)+"<br>Sectie: "+esc(sectie)+"<br>Blad: "+esc(blad)+"<br><b>Perceel: "+esc(match.perceelnr||"Onbekend")+(match.perceelnrtvg?"/"+esc(match.perceelnrtvg):"")+"</b><br>Adres 1832: "+esc(straat)+" "+esc(huisnummer)+(woonplaats?", "+esc(woonplaats):"")+"<br>Eigenaar: "+esc(owners.join("; ")||"Niet gevonden")+(gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+(oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+"</div>";
+      resultBox.innerHTML="<div style='margin-top:8px;padding-top:9px;border-top:1px solid #ddd'>"+
+        "<b>HisGIS 1832 – gevonden OAT-perceel</b><br>"+
+        "Kadastrale gemeente: "+esc(gemeente)+"<br>"+
+        "Sectie: B<br>"+
+        "Blad: 61<br>"+
+        "<b>Perceel: 867</b><br>"+
+        "Eigenaar: "+esc(owners.join("; ")||"Niet gevonden")+
+        (gebruik?"<br>Grondgebruik: "+esc(gebruik):"")+
+        (oppervlakte?"<br>Oppervlakte: "+esc(oppervlakte):"")+
+        "<br><small>Gekoppeld op perceelnummer uit de HistorieSpot-proef.</small>"+
+        "</div>";
     }
-    setStatus("HisGIS 1832: perceel "+(match.perceelnr||"?")+" gevonden via OAT blad "+blad);
+    setStatus("HisGIS 1832: perceel 867 gevonden");
   }catch(err){
     console.error("HisGIS OAT proef:",err);
     if(resultBox) resultBox.innerHTML="<small style='color:#8b0000'>HisGIS OAT-proef: "+esc(err.message||String(err))+"</small>";
