@@ -46,7 +46,7 @@
       <input id="historischeOpacity" type="range" min="0" max="100" value="55">
       <span id="historischeOpacityValue" class="value">55%</span>
       <div class="bar-divider"></div>
-      <button id="toggleBAGBtn" class="bag-toggle-btn active" aria-label="BAG aan/uit" title="BAG gebouwen aan/uit"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2L2 7v3c0 5.25 3.84 10.14 10 11.42C18.16 20.14 22 15.25 22 10V7L12 2m0 2.18l6 2.7v2.49c0 4.12-2.88 8.33-6 9.72-3.12-1.39-6-5.6-6-9.72V6.88l6-2.7M9 10v2H7v-2h2m4 0v2h-2v-2h2m4 0v2h-2v-2h2M9 14v2H7v-2h2m4 0v2h-2v-2h2m4 0v2h-2v-2h2z"/></svg></button>
+      <button id="toggleMultiplyBtn" class="bag-toggle-btn active" aria-label="Multiply-weergave aan/uit" title="1832 multiply-weergave aan/uit"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 3h4v4H7V3m6 0h4v4h-4V3M7 9h4v4H7V9m6 0h4v4h-4V9M7 15h4v4H7v-4m6 0h4v4h-4v-4M3 5h2v14H3V5m16 0h2v14h-2V5z"/></svg></button>
     </div>
     <div id="status" class="status-toast">RM-test GM-velden fix – druk op het kompas-icoontje om je positie te bepalen.</div>
   </main>
@@ -66,6 +66,6 @@
   (function(){const t=setInterval(()=>{if(!window.map)return;clearInterval(t);const toggle=document.getElementById('toggleHisGIS');if(!toggle)return;const updateHisGISStatus=()=>{if(toggle.checked){const current=(document.getElementById('status')||{}).textContent||'';if(!current||current.startsWith('Klik op kaart met HisGIS'))return;}};toggle.addEventListener('change',updateHisGISStatus);},500);})();
   </script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=20260924-hisgis-proef-start-7"></script>
+  <script src="app.js?v=20260924-hisgis-proef-start-8"></script>
 </body>
 </html>
