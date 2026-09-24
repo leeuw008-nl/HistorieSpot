@@ -52,6 +52,7 @@ const locateBtn=document.getElementById("locateBtn"),
       toggleGM=document.getElementById("toggleGM"),
       toggleRM=document.getElementById("toggleRM"),
       toggleBAG=document.getElementById("toggleBAG"),
+      toggleHistOverlay=document.getElementById("toggleHistOverlay"),
       opSlider=document.getElementById("historischeOpacity"),
       opVal=document.getElementById("historischeOpacityValue"),
       toggleMultiplyBtn=document.getElementById("toggleMultiplyBtn"),
@@ -266,6 +267,15 @@ toggleBAG&&toggleBAG.addEventListener("change",e=>{
   }else{
     map.removeLayer(bagLayer);
     map.removeLayer(bagLabel);
+  }
+});
+
+toggleHistOverlay&&toggleHistOverlay.addEventListener("change",e=>{
+  if(!window.histLayer) return;
+  if(e.target.checked){
+    window.histLayer.addTo(map);
+  }else{
+    map.removeLayer(window.histLayer);
   }
 });
 
@@ -1754,8 +1764,9 @@ async function loadHistForLocation(lat,lng){
       map.removeLayer(window.histLayer);
       window.histLayer=null;
     }
-    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20,className:"histgis-overlay"}).addTo(map);
+    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20,className:"histgis-overlay"});
     window.histLayer._histCode=code;
+    if(toggleHistOverlay?.checked!==false) window.histLayer.addTo(map);
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
@@ -2185,7 +2196,9 @@ map.on("click",async e=>{
       const res=await fetch(url),data=await res.json();if(data.features&&data.features.length){
         let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
         if(window.histLayer)map.removeLayer(window.histLayer);
-        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20,className:"histgis-overlay"}).addTo(map);
+        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20,className:"histgis-overlay"});
+        window.histLayer._histCode=code;
+        if(toggleHistOverlay?.checked!==false) window.histLayer.addTo(map);
         const p=data.features[0].properties;
         L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<a href="${hisgisOnlineLink(lat,lng)}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;text-decoration:none;border-radius:5px">HisGIS online – deze locatie bekijken</a><br><br><button type="button" onclick="hisgisParcelProbe('+lat+','+lng+')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS perceel automatisch bepalen</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Diagnose: de kliklocatie wordt vergeleken met de ingetekende HisGIS-perceelvlakken.</div>`).openOn(map);
       }
@@ -2194,12 +2207,10 @@ map.on("click",async e=>{
 });
 
 yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
-toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 window.addEventListener("load",()=>{
   // Start altijd vanuit één vaste Ommen-positie. Zodra de gebruiker
   // toestemming geeft voor locatie, wordt deze direct vervangen door
   // de actuele positie. Bij weigering blijft het centrum van Ommen staan.
-  if(toggleKadasterColors)toggleKadasterColors.checked=true;
 
   const startOmmen=()=>{
     const lat=OMmen_CENTER[0],lng=OMmen_CENTER[1];
