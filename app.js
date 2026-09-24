@@ -219,7 +219,7 @@ function wgs84ToRD(lat,lon){
   return{x,y};
 }
 
-const minuutLayer=L.tileLayer.wms(
+const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:multiply}";document.head.appendChild(histgisStyle);\n\nconst minuutLayer=L.tileLayer.wms(
   "https://services.rce.geovoorziening.nl/misc/wms",
   {
     layers:"Minuutplanbegrenzingen",
@@ -1731,7 +1731,7 @@ async function loadHistForLocation(lat,lng){
       map.removeLayer(window.histLayer);
       window.histLayer=null;
     }
-    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
+    window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20,className:"histgis-overlay"}).addTo(map);
     window.histLayer._histCode=code;
   }catch(e){console.error("hist 1832 load fail",e);}
 }
@@ -2162,7 +2162,7 @@ map.on("click",async e=>{
       const res=await fetch(url),data=await res.json();if(data.features&&data.features.length){
         let code=data.features[0].properties.CODE;const orig=code;code=corr(code);
         if(window.histLayer)map.removeLayer(window.histLayer);
-        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
+        window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20,className:"histgis-overlay"}).addTo(map);
         const p=data.features[0].properties;
         L.popup().setLatLng(e.latlng).setContent(`<div style="min-width:240px"><strong>🕰 Minuutplan 1811-1832</strong><br>${esc(p.GEMEENTE)} ${esc(p.SECTIE)} ${esc(p.BLAD)}<br>RCE ${esc(orig)} → HisGIS ${esc(code)}<br><br><a href="${esc(p.URL)}" target="_blank" style="display:inline-block;padding:8px 12px;background:#1d5d8f;color:white;text-decoration:none;border-radius:5px">Origineel</a><br><br><a href="https://osm.hisgis.nl/koppel/Ommen/${encodeURIComponent(String(p.SECTIE||""))}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px">HisGIS 1832 – sectie ${esc(p.SECTIE||"")}</a><br><br>${code==="MIN04041B03" ? '<a href="${hisgisOnlineLink(lat,lng)}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;text-decoration:none;border-radius:5px">HisGIS online – deze locatie bekijken</a><br><br><button type="button" onclick="hisgisParcelProbe('+lat+','+lng+')" style="display:inline-block;padding:8px 12px;background:#7a5a2b;color:white;border:0;border-radius:5px;cursor:pointer">HisGIS perceel automatisch bepalen</button><br><br><div id="hisgisOatResult"></div><a href="https://tvermaut.github.io/hisgis-oat-scan-view/?OAT04041B061" target="_blank" rel="noopener" style="display:inline-block;padding:8px 12px;background:#6b4f2a;color:white;text-decoration:none;border-radius:5px;margin-top:8px">OAT-scan blad 61 bekijken</a><br><br>' : ''}<small>Diagnose: de kliklocatie wordt vergeleken met de ingetekende HisGIS-perceelvlakken.</div>`).openOn(map);
       }
