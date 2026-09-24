@@ -1721,8 +1721,17 @@ async function loadHistForLocation(lat,lng){
     const url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
     const res=await fetch(url); const data=await res.json(); if(!data.features||!data.features.length) return;
     let code=data.features[0].properties.CODE; const orig=code; code=corr(code);
-    if(window.histLayer) map.removeLayer(window.histLayer);
+    // Verwijder de bestaande 1832-kaart pas nadat een nieuwe kaartcode
+    // daadwerkelijk is gevonden. Zo kan een zoomactie de bestaande laag
+    // niet tijdelijk laten verdwijnen door een lege WFS-respons.
+    if(window.histLayer){
+      const huidigeCode=window.histLayer._histCode;
+      if(huidigeCode===code) return;
+      map.removeLayer(window.histLayer);
+      window.histLayer=null;
+    }
     window.histLayer=L.tileLayer(`https://geoservices.hisgis.nl/tiles/minuutplans/{z}/{x}/{y}.png?cut${code}*`,{opacity:Number(opSlider.value)/100||0.6,maxZoom:20}).addTo(map);
+    window.histLayer._histCode=code;
   }catch(e){console.error("hist 1832 load fail",e);}
 }
 
@@ -1761,11 +1770,8 @@ function autoActivateHistoricalView(){
     rceSeen.clear();
     monumentSeen.clear();
 
-    if(window.histLayer){
-      map.removeLayer(window.histLayer);
-      window.histLayer=null;
-    }
-
+    // De transparante 1832-kaart blijft ook bij uitzoomen zichtbaar.
+    // BAG/GM/RM worden hieronder wel op de bestaande manier opgeruimd.
     autoHistorieCenter=null;
     return;
   }
@@ -1806,7 +1812,8 @@ function autoActivateHistoricalView(){
 
 map.on("moveend",autoActivateHistoricalView);
 map.on("zoomend",()=>{
-  if(!historicalPopupOpen) autoHistorieCenter=null;
+  // Bij zoomen niet opnieuw de historische laag laden.
+  // Daardoor blijft de bestaande 55% 1832-kaart staan.
   autoActivateHistoricalView();
 });
 
