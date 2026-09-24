@@ -19,7 +19,7 @@ function updateZoomInfo(){
   if(el) el.innerHTML="Zoom: "+map.getZoom();
 }
 map.on("zoomend",updateZoomInfo);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxNativeZoom:19,maxZoom:20}).addTo(map);
 
 let curMarker=null,accCircle=null;
 
