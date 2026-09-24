@@ -51,7 +51,7 @@ const locateBtn=document.getElementById("locateBtn"),
       toggleMin=document.getElementById("toggleMinuutplan"),
       opSlider=document.getElementById("historischeOpacity"),
       opVal=document.getElementById("historischeOpacityValue"),
-      toggleBAGBtn=document.getElementById("toggleBAGBtn"),
+      toggleMultiplyBtn=document.getElementById("toggleMultiplyBtn"),
       yearFilterSel=document.getElementById("yearFilter"),
       toggleKadasterColors=document.getElementById("toggleKadasterColors");
 
@@ -219,7 +219,7 @@ function wgs84ToRD(lat,lon){
   return{x,y};
 }
 
-const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:multiply}";document.head.appendChild(histgisStyle);
+const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:multiply}.histgis-multiply .histgis-overlay{mix-blend-mode:multiply}.histgis-normal .histgis-overlay{mix-blend-mode:normal}";document.head.appendChild(histgisStyle);document.documentElement.classList.add("histgis-multiply");
 
 const minuutLayer=L.tileLayer.wms(
   "https://services.rce.geovoorziening.nl/misc/wms",
@@ -259,20 +259,12 @@ opSlider&&opSlider.addEventListener(
   }
 );
 
-toggleBAGBtn&&toggleBAGBtn.addEventListener(
+toggleMultiplyBtn&&toggleMultiplyBtn.addEventListener(
   "click",
   ()=>{
-    const h=map.hasLayer(bagLayer);
-
-    if(h){
-      map.removeLayer(bagLayer);
-      map.removeLayer(bagLabel);
-      toggleBAGBtn.classList.remove("active");
-    }else{
-      bagLayer.addTo(map);
-      bagLabel.addTo(map);
-      toggleBAGBtn.classList.add("active");
-    }
+    const enabled=toggleMultiplyBtn.classList.contains("active");
+    toggleMultiplyBtn.classList.toggle("active",!enabled);
+    document.documentElement.classList.toggle("histgis-multiply",!enabled);
   }
 );
 
