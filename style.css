@@ -215,7 +215,15 @@ body {
 .modal.hidden { display:none; }
 .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 16px 0 20px; }
 .modal-header h2 { margin:0; font-size:18px; }
-.modal-body { padding:16px 20px 20px; font-size:14.5px; line-height:1.5; color:#2f3d4a; }
+.modal-body {
+  padding:16px 20px 20px;
+  font-size:14.5px;
+  line-height:1.5;
+  color:#2f3d4a;
+  max-height:calc(100vh - 150px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
 .modal-body p { margin:0 0 10px; }
 .year-badge{
   background:#0b5cab;
