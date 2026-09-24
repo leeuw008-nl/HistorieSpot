@@ -597,11 +597,21 @@ async function loadOverijsselMonumentenVoorPand(o){
         count:"20"
       });
 
-      const res=await fetch(`${layer.wfs}?${params}`);
-      if(!res.ok)continue;
+      const requestUrl=layer.wfs+"?"+params;
+      const res=await fetch(requestUrl);
+      if(layer.name==="Rijksmonumenten"){
+        setStatus("RM-WFS HTTP "+res.status+" — antwoord ontvangen");
+      }
+      if(!res.ok){
+        if(layer.name==="Rijksmonumenten") setStatus("RM-WFS fout HTTP "+res.status);
+        continue;
+      }
 
       const data=await res.json();
       const features=Array.isArray(data.features)?data.features:[];
+      if(layer.name==="Rijksmonumenten"){
+        setStatus("RM-WFS OK — "+features.length+" feature(s) ontvangen");
+      }
 
       for(const f of features){
         const p=f.properties||{},g=f.geometry||{};
