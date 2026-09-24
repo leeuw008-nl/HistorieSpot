@@ -219,7 +219,7 @@ function wgs84ToRD(lat,lon){
   return{x,y};
 }
 
-const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:multiply}.histgis-multiply .histgis-overlay{mix-blend-mode:multiply}.histgis-normal .histgis-overlay{mix-blend-mode:normal}";document.head.appendChild(histgisStyle);document.documentElement.classList.add("histgis-multiply");
+const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:normal}.histgis-multiply .histgis-overlay{mix-blend-mode:multiply}";document.head.appendChild(histgisStyle);document.documentElement.classList.add("histgis-multiply");
 
 const minuutLayer=L.tileLayer.wms(
   "https://services.rce.geovoorziening.nl/misc/wms",
