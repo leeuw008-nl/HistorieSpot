@@ -247,10 +247,17 @@ toggleMin&&toggleMin.addEventListener(
 );
 
 toggleGM&&toggleGM.addEventListener("change",e=>{
-  e.target.checked ? monumentLayer.addTo(map) : map.removeLayer(monumentLayer);
+  const show=e.target.checked;
+  monumentLayer.eachLayer(m=>{
+    if(m._monumentType==="GM") m.setOpacity(show?1:0);
+  });
 });
 toggleRM&&toggleRM.addEventListener("change",e=>{
-  e.target.checked ? rceLayer.addTo(map) : map.removeLayer(rceLayer);
+  const show=e.target.checked;
+  monumentLayer.eachLayer(m=>{
+    if(m._monumentType==="RM") m.setOpacity(show?1:0);
+  });
+  rceLayer.eachLayer(m=>m.setOpacity(show?1:0));
 });
 toggleBAG&&toggleBAG.addEventListener("change",e=>{
   if(e.target.checked){
@@ -861,6 +868,8 @@ async function loadOverijsselMonumentenVoorPand(o){
         });
 
         const monumentMarker=L.marker([ll.lat,ll.lon],{icon}).bindPopup(popup);
+        monumentMarker._monumentType=isRM?"RM":"GM";
+        monumentMarker.setOpacity((isRM ? toggleRM : toggleGM)?.checked===false ? 0 : 1);
         monumentLayer.addLayer(monumentMarker);
 
         if(isRM && number){
@@ -1439,6 +1448,7 @@ function showRCE(rce,address,lat,lng){
     {icon:icon}
   ).bindPopup(popup);
 
+  marker.setOpacity(toggleRM?.checked===false ? 0 : 1);
   rceLayer.addLayer(marker);
 }
 
