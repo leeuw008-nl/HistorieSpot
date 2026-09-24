@@ -47,7 +47,7 @@
       <div class="bar-divider"></div>
       <button id="toggleMultiplyBtn" class="bag-toggle-btn active" aria-label="Multiply-weergave aan/uit" title="1832 multiply-weergave aan/uit"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 3h4v4H7V3m6 0h4v4h-4V3M7 9h4v4H7V9m6 0h4v4h-4V9M7 15h4v4H7v-4m6 0h4v4h-4v-4M3 5h2v14H3V5m16 0h2v14h-2V5z"/></svg></button>
     </div>
-    <div id="status" class="status-toast">RM-test GM-velden fix – druk op het kompas-icoontje om je positie te bepalen.</div>
+    <div id="status" class="status-toast">druk op het kompas-icoontje om je positie te bepalen.</div>
   </main>
 
   <script>
@@ -65,6 +65,6 @@
   (function(){const t=setInterval(()=>{if(!window.map)return;clearInterval(t);const toggle=document.getElementById('toggleHisGIS');if(!toggle)return;const updateHisGISStatus=()=>{if(toggle.checked){const current=(document.getElementById('status')||{}).textContent||'';if(!current||current.startsWith('Klik op kaart met HisGIS'))return;}};toggle.addEventListener('change',updateHisGISStatus);},500);})();
   </script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=20260924-hisgis-proef-start-10"></script>
+  <script src="app.js?v=20260924-hisgis-proef-start-11"></script>
 </body>
 </html>
