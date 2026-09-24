@@ -19,7 +19,7 @@ function updateZoomInfo(){
   if(el) el.innerHTML="Zoom: "+map.getZoom();
 }
 map.on("zoomend",updateZoomInfo);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20}).addTo(map);
 
 let curMarker=null,accCircle=null;
 
@@ -1804,6 +1804,13 @@ function autoActivateHistoricalView(){
     lng:center.lng
   };
 
+  // Na de Ommen-fallback zijn de objectlagen van de kaart verwijderd.
+  // Voeg ze hier bij het eerste detailniveau weer toe voordat BAG/GM/RM laden.
+  if(!map.hasLayer(bagLayer)) bagLayer.addTo(map);
+  if(!map.hasLayer(bagLabel)) bagLabel.addTo(map);
+  if(!map.hasLayer(monumentLayer)) monumentLayer.addTo(map);
+  if(!map.hasLayer(rceLayer)) rceLayer.addTo(map);
+
   const r=Number(radiusSel.value)||50;
 
   setStatus("Binnen 250 m – BAG en 1832-kaart automatisch laden...");
@@ -2189,7 +2196,6 @@ window.addEventListener("load",()=>{
     map.removeLayer(rceLayer);
 
     map.setView(OMmen_CENTER,15);
-    autoHistorieCenter={lat,lng};
 
     // Bij weigering van locatie starten we alleen met de 1832-kaart.
     // BAG, GM en RM worden pas vanaf zoom 18 door de bestaande logica
