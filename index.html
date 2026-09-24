@@ -35,7 +35,51 @@
   <div id="infoOverlay" class="overlay hidden"></div>
   <div id="infoModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-header"><h2>Over HistorieSpot</h2><button id="closeInfoBtn" class="icon-btn small">✕</button></div>
-    <div class="modal-body"><p><strong>HistorieSpot</strong> laat zien wat er nu en vroeger op een locatie te vinden was.</p><p>De app gebruikt je GPS-locatie en haalt BAG-gegevens op via PDOK/Kadaster. Het bouwjaar wordt standaard op de kaart getoond.</p><p>Tip: klik op de kaart om een kadastrale minuutplan (1811-1832) te bekijken. Transparantie regel je met de schuifregelaar onderin.</p><p>Nieuw: HisGIS 1832 percelen met eigenaar en grondgebruik uit de OAT.</p><p>Data: PDOK, Kadaster, Rijksdienst voor het Cultureel Erfgoed, HisGIS.</p></div>
+    <div class="modal-body">
+  <div class="info-intro">
+    <strong>HistorieSpot</strong>
+    <span>Ontdek wat er nu én vroeger op een locatie te vinden was.</span>
+  </div>
+
+  <section class="info-section">
+    <h3>📍 Een locatie onderzoeken</h3>
+    <p>Gebruik het <strong>kompas-icoon</strong> om je huidige positie te bepalen, of verplaats en zoom de kaart naar een interessante plek.</p>
+    <p>Bij voldoende inzoomen worden historische gegevens rond het kaartcentrum automatisch geladen.</p>
+  </section>
+
+  <section class="info-section">
+    <h3>🏠 Gebouwen en bouwjaren</h3>
+    <p>HistorieSpot gebruikt gegevens uit de <strong>BAG</strong> (Basisregistratie Adressen en Gebouwen). Het bouwjaar van gebouwen wordt als jaartal op de kaart weergegeven.</p>
+    <p>Via <strong>Zoekradius</strong> bepaal je hoeveel meter rond de gekozen locatie wordt onderzocht. Met <strong>Toon jaartallen</strong> kun je de gewenste bouwperiode filteren.</p>
+  </section>
+
+  <section class="info-section">
+    <h3>🏛️ Monumenten</h3>
+    <p>De kaart toont zowel <strong>gemeentelijke monumenten</strong> als <strong>rijksmonumenten</strong>. Bij beschikbare gegevens worden de kenmerken van het monument en, waar aanwezig, aanvullende afbeeldingen getoond.</p>
+  </section>
+
+  <section class="info-section">
+    <h3>🗺️ Kadastrale geschiedenis</h3>
+    <p>Met de <strong>kadastrale minuutplannen 1811–1832</strong> kun je historische perceelgrenzen bekijken. Er zijn twee kaartlagen beschikbaar: de sectiebegrenzingen en de historische kaart als transparante overlay.</p>
+    <p>De <strong>transparantie</strong> stel je in met de schuifregelaar onderaan de kaart. Met de knop ernaast schakel je de <strong>multiply-weergave</strong> in of uit, zodat de historische kaart beter over de huidige kaart heen zichtbaar is.</p>
+  </section>
+
+  <section class="info-section">
+    <h3>📜 HisGIS 1832</h3>
+    <p>De laag <strong>HisGIS percelen 1832</strong> koppelt historische percelen aan gegevens uit de Oorspronkelijk Aanwijzende Tafel (OAT), zoals <strong>eigenaar, beroep, grondgebruik en oppervlakte</strong>, wanneer deze beschikbaar zijn.</p>
+    <p>Klik op een historisch perceel om de bijbehorende informatie te bekijken.</p>
+  </section>
+
+  <section class="info-section">
+    <h3>☑️ Kaartlagen</h3>
+    <p>Via het menu kun je de verschillende kaartlagen afzonderlijk aan- en uitzetten: minuutplan-secties, HisGIS 1832, historische overlay, gemeentelijke monumenten, rijksmonumenten en BAG.</p>
+  </section>
+
+  <section class="info-section info-sources">
+    <h3>Bronnen</h3>
+    <p>HistorieSpot maakt gebruik van openbare gegevens van <strong>PDOK, Kadaster, Rijksdienst voor het Cultureel Erfgoed (RCE)</strong> en <strong>HisGIS</strong>.</p>
+  </section>
+</div>
   </div>
   <main class="main-fullscreen">
     <div id="map"></div>
