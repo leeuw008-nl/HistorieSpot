@@ -581,7 +581,7 @@ function buildRijksmonumentPopup(rce,number,fallbackAddress,wfs){
 }
 
 
-aasync function loadOverijsselMonumentenVoorPand(o){
+async function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
 
   let foundRijksmonument=false;
