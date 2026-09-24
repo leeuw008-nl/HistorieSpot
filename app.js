@@ -219,7 +219,9 @@ function wgs84ToRD(lat,lon){
   return{x,y};
 }
 
-const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:multiply}";document.head.appendChild(histgisStyle);\n\nconst minuutLayer=L.tileLayer.wms(
+const histgisStyle=document.createElement("style");histgisStyle.textContent=".histgis-overlay{mix-blend-mode:multiply}";document.head.appendChild(histgisStyle);
+
+const minuutLayer=L.tileLayer.wms(
   "https://services.rce.geovoorziening.nl/misc/wms",
   {
     layers:"Minuutplanbegrenzingen",
