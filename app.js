@@ -1,5 +1,6 @@
 // OUDE SITUATIE ZONDER MONUMENTEN - gefixed voor 4 punten
-const map=L.map("map",{zoomControl:false}).setView([52.516,6.42],15);
+const OMmen_CENTER=[52.519142,6.423672];
+const map=L.map("map",{zoomControl:false}).setView(OMmen_CENTER,15);
 window.map=map;
 L.control.zoom({position:'bottomleft'}).addTo(map);
 
@@ -2165,21 +2166,37 @@ map.on("click",async e=>{
 yearFilterSel&&yearFilterSel.addEventListener("change",e=>{activeYearFilter=e.target.value;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 toggleKadasterColors&&toggleKadasterColors.addEventListener("change",e=>{useKadaster=e.target.checked;const r=Number(radiusSel.value);if(curMarker){const ll=curMarker.getLatLng();loadBAG(ll.lat,ll.lng,r);}else loadBAG(52.516,6.42,r);});
 window.addEventListener("load",()=>{
-  // Monumenten worden ruimtelijk geladen per BAG-pand.
+  // Start altijd vanuit één vaste Ommen-positie. Zodra de gebruiker
+  // toestemming geeft voor locatie, wordt deze direct vervangen door
+  // de actuele positie. Bij weigering blijft het centrum van Ommen staan.
   if(toggleKadasterColors)toggleKadasterColors.checked=true;
-  setTimeout(()=>{
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(p=>{
-        const lat=p.coords.latitude,lng=p.coords.longitude,r=Number(radiusSel.value);
-        map.setView([lat,lng],18);
-        curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
-        accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
-        loadBAG(lat,lng,r);loadHistForLocation(lat,lng);
-      },()=>{
-        loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
-      },{enableHighAccuracy:true,timeout:8000});
-    }else{
-      loadBAG(52.516,6.42,Number(radiusSel.value));loadHistForLocation(52.516,6.42);
-    }
-  },600);
+
+  const startOmmen=()=>{
+    const lat=OMmen_CENTER[0],lng=OMmen_CENTER[1],r=Number(radiusSel.value);
+    map.setView(OMmen_CENTER,15);
+    loadBAG(lat,lng,r);
+    loadHistForLocation(lat,lng);
+  };
+
+  if(!navigator.geolocation){
+    startOmmen();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    p=>{
+      const lat=p.coords.latitude,lng=p.coords.longitude,r=Number(radiusSel.value);
+      map.setView([lat,lng],18);
+      if(curMarker)map.removeLayer(curMarker);
+      if(accCircle)map.removeLayer(accCircle);
+      curMarker=L.marker([lat,lng]).addTo(map).bindPopup("Huidige positie");
+      accCircle=L.circle([lat,lng],{radius:p.coords.accuracy,color:"#0b5cab",fillOpacity:0.08}).addTo(map);
+      loadBAG(lat,lng,r);
+      loadHistForLocation(lat,lng);
+    },
+    ()=>{
+      startOmmen();
+    },
+    {enableHighAccuracy:true,timeout:8000}
+  );
 });
