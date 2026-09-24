@@ -4,10 +4,10 @@ window.map=map;
 L.control.zoom({position:'bottomleft'}).addTo(map);
 
 // Tijdelijk zichtbaar diagnose-element: actueel Leaflet-zoomniveau op de kaart.
-const zoomInfo=L.control({position:"bottomright"});
+const zoomInfo=L.control({position:"bottomleft"});
 zoomInfo.onAdd=function(){
   const div=L.DomUtil.create("div","leaflet-control");
-  div.style.cssText="background:rgba(255,255,255,.94);padding:6px 10px;border:1px solid #cbd5df;border-radius:7px;box-shadow:0 1px 4px rgba(0,0,0,.18);font:600 12px/1.2 Arial,sans-serif;color:#263746;min-width:74px;text-align:center;margin-bottom:84px;";
+  div.style.cssText="background:rgba(255,255,255,.94);padding:6px 10px;border:1px solid #cbd5df;border-radius:7px;box-shadow:0 1px 4px rgba(0,0,0,.18);font:600 12px/1.2 Arial,sans-serif;color:#263746;min-width:74px;text-align:center;margin-bottom:76px;";
   div.innerHTML="Zoom: "+map.getZoom();
   L.DomEvent.disableClickPropagation(div);
   return div;
@@ -581,9 +581,10 @@ function buildRijksmonumentPopup(rce,number,fallbackAddress,wfs){
 }
 
 
-async function loadOverijsselMonumentenVoorPand(o){
+aasync function loadOverijsselMonumentenVoorPand(o){
   if(!o||!o.c||!o.f)return;
 
+  let foundRijksmonument=false;
   const rd=wgs84ToRD(o.c.lat,o.c.lng),r=50;
 
   const layers=[
@@ -660,6 +661,7 @@ async function loadOverijsselMonumentenVoorPand(o){
 
         const ll=rdToWgs84(mx,my);
         const isRM=layer.name==="Rijksmonumenten";
+        if(isRM) foundRijksmonument=true;
 
         const straat=String(getProp(
           "Straat","STRAATNAAM","straatnaam","straat",
@@ -1427,9 +1429,16 @@ function showRCE(rce,address,lat,lng){
   ).bindPopup(popup);
 
   rceLayer.addLayer(marker);
+
+  // Fallback: als de landelijke punten-WFS voor dit BAG-pand geen RM
+  // oplevert, probeer de bewezen RCE-adresquery alsnog.
+  if(!foundRijksmonument){
+    await loadRCEForPand(o);
+  }
+
 }
 
-/* =========================================================
+* =========================================================
    RCE FUNCTIE 4
    BAG-pand -> verblijfsobject -> adres -> RCE.
    ========================================================= */
