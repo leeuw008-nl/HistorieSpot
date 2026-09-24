@@ -393,3 +393,48 @@ body {
     margin-top:2px;
   }
 }
+
+/* =========================================================
+   Professionele info-pagina
+   ========================================================= */
+.info-intro{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  margin-bottom:18px;
+  padding:13px 14px;
+  background:#eef5fb;
+  border:1px solid #d8e6f2;
+  border-left:4px solid #0b5cab;
+  border-radius:10px;
+}
+.info-intro strong{
+  color:#20384d;
+  font-size:16px;
+}
+.info-intro span{
+  color:#5d7081;
+  font-size:12.5px;
+}
+.info-section{
+  margin:0 0 17px;
+}
+.info-section h3{
+  margin:0 0 6px;
+  color:#20384d;
+  font-size:13.5px;
+  font-weight:800;
+}
+.info-section p{
+  margin:0 0 7px;
+  color:#465867;
+  font-size:12.5px;
+  line-height:1.5;
+}
+.info-section p:last-child{
+  margin-bottom:0;
+}
+.info-sources{
+  padding-top:13px;
+  border-top:1px solid #e1e7ed;
+}
