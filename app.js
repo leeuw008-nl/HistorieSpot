@@ -1,6 +1,8 @@
 // OUDE SITUATIE ZONDER MONUMENTEN - gefixed voor 4 punten
 const map=L.map("map",{zoomControl:false}).setView([52.516,6.42],15);
 window.map=map;
+L.control.zoom({position:'bottomleft'}).addTo(map);
+
 // Tijdelijk zichtbaar diagnose-element: actueel Leaflet-zoomniveau op de kaart.
 const zoomInfo=L.control({position:"bottomleft"});
 zoomInfo.onAdd=function(){
@@ -11,7 +13,6 @@ zoomInfo.onAdd=function(){
   return div;
 };
 zoomInfo.addTo(map);
-L.control.zoom({position:'bottomleft'}).addTo(map);
 function updateZoomInfo(){
   const el=zoomInfo.getContainer();
   if(el) el.innerHTML="Zoom: "+map.getZoom();
