@@ -2173,9 +2173,27 @@ window.addEventListener("load",()=>{
 
   const startOmmen=()=>{
     const lat=OMmen_CENTER[0],lng=OMmen_CENTER[1];
+
+    // Fallback zonder locatie: eerst alle objectlagen daadwerkelijk
+    // verwijderen. Alleen clearLayers() is onvoldoende, omdat de
+    // LayerGroups zelf anders nog zichtbaar op de kaart staan.
+    bagLayer.clearLayers();
+    bagLabel.clearLayers();
+    monumentLayer.clearLayers();
+    rceLayer.clearLayers();
+    rceSeen.clear();
+    monumentSeen.clear();
+    map.removeLayer(bagLayer);
+    map.removeLayer(bagLabel);
+    map.removeLayer(monumentLayer);
+    map.removeLayer(rceLayer);
+
     map.setView(OMmen_CENTER,15);
+    autoHistorieCenter={lat,lng};
+
     // Bij weigering van locatie starten we alleen met de 1832-kaart.
-    // BAG, GM en RM mogen pas vanaf zoom 18 worden geladen.
+    // BAG, GM en RM worden pas vanaf zoom 18 door de bestaande logica
+    // opnieuw toegevoegd.
     loadHistForLocation(lat,lng);
   };
 
