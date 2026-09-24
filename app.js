@@ -49,6 +49,9 @@ const locateBtn=document.getElementById("locateBtn"),
       infoModal=document.getElementById("infoModal"),
       infoOverlay=document.getElementById("infoOverlay"),
       toggleMin=document.getElementById("toggleMinuutplan"),
+      toggleGM=document.getElementById("toggleGM"),
+      toggleRM=document.getElementById("toggleRM"),
+      toggleBAG=document.getElementById("toggleBAG"),
       opSlider=document.getElementById("historischeOpacity"),
       opVal=document.getElementById("historischeOpacityValue"),
       toggleMultiplyBtn=document.getElementById("toggleMultiplyBtn"),
@@ -242,6 +245,22 @@ toggleMin&&toggleMin.addEventListener(
       : map.removeLayer(minuutLayer);
   }
 );
+
+toggleGM&&toggleGM.addEventListener("change",e=>{
+  e.target.checked ? monumentLayer.addTo(map) : map.removeLayer(monumentLayer);
+});
+toggleRM&&toggleRM.addEventListener("change",e=>{
+  e.target.checked ? rceLayer.addTo(map) : map.removeLayer(rceLayer);
+});
+toggleBAG&&toggleBAG.addEventListener("change",e=>{
+  if(e.target.checked){
+    bagLayer.addTo(map);
+    bagLabel.addTo(map);
+  }else{
+    map.removeLayer(bagLayer);
+    map.removeLayer(bagLabel);
+  }
+});
 
 opSlider&&opSlider.addEventListener(
   "input",
