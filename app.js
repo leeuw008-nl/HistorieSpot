@@ -2172,9 +2172,10 @@ window.addEventListener("load",()=>{
   if(toggleKadasterColors)toggleKadasterColors.checked=true;
 
   const startOmmen=()=>{
-    const lat=OMmen_CENTER[0],lng=OMmen_CENTER[1],r=Number(radiusSel.value);
+    const lat=OMmen_CENTER[0],lng=OMmen_CENTER[1];
     map.setView(OMmen_CENTER,15);
-    loadBAG(lat,lng,r);
+    // Bij weigering van locatie starten we alleen met de 1832-kaart.
+    // BAG, GM en RM mogen pas vanaf zoom 18 worden geladen.
     loadHistForLocation(lat,lng);
   };
 
