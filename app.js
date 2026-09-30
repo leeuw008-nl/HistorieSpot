@@ -1749,7 +1749,11 @@ radiusSel&&radiusSel.addEventListener(
 
 async function loadHistForLocation(lat,lng){
   try{
-    if(!map.hasLayer(minuutLayer)) minuutLayer.addTo(map);
+    // De sectiebegrenzingen mogen door automatisch laden nooit
+    // terugkomen nadat de gebruiker ze in het menu heeft uitgezet.
+    if(toggleMin?.checked!==false && !map.hasLayer(minuutLayer)){
+      minuutLayer.addTo(map);
+    }
     const rd=wgs84ToRD(lat,lng);
     const b=[rd.x-50,rd.y-50,rd.x+50,rd.y+50].join(",");
     const url=`https://services.rce.geovoorziening.nl/misc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=misc:Minuutplanbegrenzingen&srsName=EPSG:28992&bbox=${encodeURIComponent(b)}&outputFormat=application/json&count=1`;
@@ -1839,11 +1843,19 @@ function autoActivateHistoricalView(){
   };
 
   // Na de Ommen-fallback zijn de objectlagen van de kaart verwijderd.
-  // Voeg ze hier bij het eerste detailniveau weer toe voordat BAG/GM/RM laden.
-  if(!map.hasLayer(bagLayer)) bagLayer.addTo(map);
-  if(!map.hasLayer(bagLabel)) bagLabel.addTo(map);
-  if(!map.hasLayer(monumentLayer)) monumentLayer.addTo(map);
-  if(!map.hasLayer(rceLayer)) rceLayer.addTo(map);
+  // Bij automatisch opnieuw laden respecteren we altijd de actuele
+  // keuzes in het menu. Een zoomactie mag een handmatig uitgezette
+  // kaartlaag dus nooit opnieuw zichtbaar maken.
+  if(toggleBAG?.checked!==false){
+    if(!map.hasLayer(bagLayer)) bagLayer.addTo(map);
+    if(!map.hasLayer(bagLabel)) bagLabel.addTo(map);
+  }
+  if(toggleGM?.checked!==false || toggleRM?.checked!==false){
+    if(!map.hasLayer(monumentLayer)) monumentLayer.addTo(map);
+  }
+  if(toggleRM?.checked!==false){
+    if(!map.hasLayer(rceLayer)) rceLayer.addTo(map);
+  }
 
   const r=Number(radiusSel.value)||50;
 
