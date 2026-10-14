@@ -1904,6 +1904,11 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     let found=null;
     let candidateCodes=[];
     let koppelStatus="niet geprobeerd";
+    let koppelHtmlLength=0;
+    let koppelScanCount=0;
+    let gemeenteApiStatus="niet geprobeerd";
+    let gemeenteApiScanCount=0;
+    let gemeenteApiError="";
     let koppelRowFound=false;
     let koppelRowCodes=[];
     let scansGetest=0;
@@ -1927,9 +1932,11 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         }
         const html=await r.text();
         koppelStatus="opgehaald";
+        koppelHtmlLength=html.length;
 
         const scanCodes=[...html.matchAll(/OAT\d{5}[A-Z]\d{3}/gi)]
           .map(m=>String(m[0]).toUpperCase());
+        koppelScanCount=scanCodes.length;
 
         // Probeer eerst de exacte koppeling perceel -> OAT-scan uit de
         // koppelsite te halen. Dat is betrouwbaarder dan een scanreeks
@@ -1972,16 +1979,20 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
       try{
         const u="https://oat.hisgis.nl/oat-ws/rest/gemeente/"+encodeURIComponent(gm);
         const r=await fetch(u);
-        if(!r.ok) continue;
+        if(!r.ok){ gemeenteApiStatus="HTTP "+r.status; continue; }
+        gemeenteApiStatus="opgehaald";
         const d=await r.json();
         const raw=JSON.stringify(d);
         const codes=raw.match(scanCodeRe)||[];
+        gemeenteApiScanCount=codes.length;
         codes.forEach(code=>{
           const normalized=String(code).toUpperCase();
           if(new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(normalized))
             candidateCodes.push(normalized);
         });
       }catch(e){
+        gemeenteApiStatus="fout";
+        gemeenteApiError=e?.message||String(e);
         // De scan-API blijft de veilige fallback.
       }
     }
@@ -1997,7 +2008,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // vóór de overige scans van dezelfde kadastrale gemeente.
     candidateCodes=[...new Set(candidateCodes)];
     if(!candidateCodes.length)
-      throw new Error("Geen OAT-scan-codes gevonden voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". Er is niet gezocht met een onbevestigde gemeentecode.");
+      throw new Error("Geen OAT-scan-codes gevonden voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". Koppelsite: "+koppelStatus+"; HTML-lengte: "+koppelHtmlLength+"; scancodes in HTML: "+koppelScanCount+"; REST-gemeente: "+gemeenteApiStatus+"; scancodes in REST: "+gemeenteApiScanCount+(gemeenteApiError?"; REST-fout: "+gemeenteApiError:"")+". Er is niet gezocht met een onbevestigde gemeentecode.");
 
     for(const oatCode of candidateCodes){
       let data=window.hisgisOatScanCache.get(oatCode);
