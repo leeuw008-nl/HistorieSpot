@@ -2031,14 +2031,28 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     }
 
     const officialCodeSet=new Set(officialScanCodes);
+    const sourceCandidateCodes=[...new Set(candidateCodes)];
+    const normalizedDirectOatScan=directOatScan.toUpperCase();
+    const directTagInOfficialList=!!normalizedDirectOatScan && officialCodeSet.has(normalizedDirectOatScan);
+    const directTagSectionMatches=!!normalizedDirectOatScan &&
+      new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(normalizedDirectOatScan);
+    const officialSectionCodes=officialScanCodes.filter(code=>
+      new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(code));
     candidateCodes=candidateCodes.filter(code=>officialCodeSet.has(code));
-    if(directOatScan && officialCodeSet.has(directOatScan.toUpperCase()) &&
-       new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(directOatScan.toUpperCase())){
-      candidateCodes.unshift(directOatScan.toUpperCase());
+    if(directOatScan && directTagInOfficialList && directTagSectionMatches){
+      candidateCodes.unshift(normalizedDirectOatScan);
       candidateCodes=[...new Set(candidateCodes)];
     }
+    const oatSourceDiagnostic=[
+      "kaarttag="+(normalizedDirectOatScan||"geen"),
+      "kaarttagInGemeenteScanlijst="+(directTagInOfficialList?"ja":"nee"),
+      "kaarttagSectieKlopt="+(directTagSectionMatches?"ja":"nee"),
+      "officieleScansVoorSectie="+(officialSectionCodes.join(", ")||"geen"),
+      "koppelsiteCodesBijPerceel="+([...new Set(koppelRowCodes)].join(", ")||"geen"),
+      "bronKandidaten="+(sourceCandidateCodes.join(", ")||"geen")
+    ].join(" · ");
     if(!candidateCodes.length)
-      throw new Error("Geen bevestigde OAT-scan-codes voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". De scanlijst van HisGIS is wel opgehaald ("+officialScanCodes.length+" scans), maar geen kandidaat uit de kaart/koppelsite komt daarin voor. Er worden geen eigenaren uit een andere gemeente gebruikt.");
+      throw new Error("Geen bevestigde OAT-scan-codes voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". De scanlijst is opgehaald ("+officialScanCodes.length+" scans), maar geen kandidaat is bevestigd. "+oatSourceDiagnostic+". Er worden geen eigenaren uit een andere gemeente gebruikt.");
 
     for(const oatCode of candidateCodes){
       let data=window.hisgisOatScanCache.get(oatCode);
@@ -2085,7 +2099,8 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         "rij voor perceel: "+(koppelRowFound?"gevonden":"niet gevonden"),
         "OAT-code in rij: "+([...new Set(koppelRowCodes)].join(", ")||"geen"),
         "kandidaten: "+candidateCodes.length,
-        "scans getest: "+scansGetest
+        "scans getest: "+scansGetest,
+        oatSourceDiagnostic
       ].join(" · ");
       throw new Error(
         "Perceel "+perceelZoek+
