@@ -1989,7 +1989,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // Als de OAT-tag op het kaartvlak overeenkomt met een gemeente-code
     // die ook door de gemeentegebonden bronnen is bevestigd, probeer die
     // exacte scan eerst. Een afwijkende tag wordt niet blind vertrouwd.
-    const directPrefix=/^OAT(\\d{5})[A-Z]\\d{3}$/.exec(directOatScan)?.[1]||"";
+    const directPrefix=/^OAT(\d{5})[A-Z]\d{3}$/.exec(directOatScan)?.[1]||"";
     if(directPrefix && candidateCodes.some(c=>c.startsWith("OAT"+directPrefix+sectie)))
       candidateCodes.unshift(directOatScan);
 
