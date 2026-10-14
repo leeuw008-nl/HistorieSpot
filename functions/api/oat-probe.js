@@ -34,11 +34,11 @@ export async function onRequest() {
         finalUrl: response.url,
         contentType: response.headers.get("content-type"),
         bodyLength: body.length,
-        snippet: body.slice(0, 320).replace(/\\s+/g, " ")
+        snippet: body.slice(0, 320).replace(/\s+/g, " ")
       };
       if (path === "/oat-ws/") {
         result.landingHtml = body.slice(0, 12000);
-        result.references = [...body.matchAll(/(?:href|src)\\s*=\\s*["']([^"']+)["']/gi)].map(m => m[1]).slice(0, 100);
+        result.references = [...body.matchAll(/(?:href|src)\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]).slice(0, 100);
       }
       if (/wadl|openapi|swagger|api-docs/.test(path) && response.ok) {
         result.document = body.slice(0, 12000);
