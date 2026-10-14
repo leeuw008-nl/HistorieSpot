@@ -2004,11 +2004,41 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     if(directPrefix && candidateCodes.some(c=>c.startsWith("OAT"+directPrefix+sectie)))
       candidateCodes.unshift(directOatScan);
 
-    // Behoud de bronvolgorde: een exacte koppeling voor het perceel komt
-    // vóór de overige scans van dezelfde kadastrale gemeente.
+    // Veiligheidscontrole: accepteer uitsluitend scan-codes die de officiële
+    // OAT-service zelf teruggeeft voor precies deze kadastrale gemeente.
+    // De koppelsite/kaarttag alleen is niet voldoende om een gemeente te bewijzen.
     candidateCodes=[...new Set(candidateCodes)];
+    let officialScanCodes=[];
+    try{
+      const scanUrl="https://oat.hisgis.nl/oat-ws/rest/scans/"+encodeURIComponent(gemeenteNaam);
+      const scanRes=await fetch(scanUrl,{headers:{Accept:"application/json"}});
+      if(!scanRes.ok)
+        throw new Error("HTTP "+scanRes.status);
+      const scanData=await scanRes.json();
+      if(!Array.isArray(scanData))
+        throw new Error("onverwacht antwoordformaat");
+      officialScanCodes=scanData
+        .map(scan=>String(scan?.code||"").trim().toUpperCase())
+        .filter(Boolean);
+      if(!officialScanCodes.length)
+        throw new Error("geen officiële scans voor deze gemeente");
+      gemeenteApiStatus="officiële scanlijst bevestigd";
+      gemeenteApiScanCount=officialScanCodes.length;
+    }catch(e){
+      gemeenteApiStatus="niet bevestigd";
+      gemeenteApiError=e?.message||String(e);
+      throw new Error("De officiële OAT-scanlijst voor kadastrale gemeente "+gemeenteNaam+" kon niet worden bevestigd ("+gemeenteApiError+"). Er worden daarom geen eigenaren getoond.");
+    }
+
+    const officialCodeSet=new Set(officialScanCodes);
+    candidateCodes=candidateCodes.filter(code=>officialCodeSet.has(code));
+    if(directOatScan && officialCodeSet.has(directOatScan.toUpperCase()) &&
+       new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(directOatScan.toUpperCase())){
+      candidateCodes.unshift(directOatScan.toUpperCase());
+      candidateCodes=[...new Set(candidateCodes)];
+    }
     if(!candidateCodes.length)
-      throw new Error("Geen OAT-scan-codes gevonden voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". Koppelsite: "+koppelStatus+"; HTML-lengte: "+koppelHtmlLength+"; scancodes in HTML: "+koppelScanCount+"; REST-gemeente: "+gemeenteApiStatus+"; scancodes in REST: "+gemeenteApiScanCount+(gemeenteApiError?"; REST-fout: "+gemeenteApiError:"")+". Er is niet gezocht met een onbevestigde gemeentecode.");
+      throw new Error("Geen bevestigde OAT-scan-codes voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". De scanlijst van HisGIS is wel opgehaald ("+officialScanCodes.length+" scans), maar geen kandidaat uit de kaart/koppelsite komt daarin voor. Er worden geen eigenaren uit een andere gemeente gebruikt.");
 
     for(const oatCode of candidateCodes){
       let data=window.hisgisOatScanCache.get(oatCode);
@@ -2029,10 +2059,18 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
       }
 
       scansGetest++;
+      // Controleer ook de gemeente in het antwoord van de scan zelf.
+      // Een perceelnummer is niet uniek over gemeenten heen.
+      const dataGemeente=String(data?.gemeente?.uniekeNaam||data?.gemeente?.naam||"").trim();
+      const normNaam=value=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+      if(!dataGemeente || normNaam(dataGemeente)!==normNaam(gemeenteNaam))
+        continue;
+
       const rows=Array.isArray(data.results)?data.results:[];
       const match=rows.find(p=>{
         const pnr=String(p.perceelnr||"").trim()+String(p.perceelnrtvg||"");
-        return pnr===perceelZoek;
+        const psectie=String(p.sectie?.letter||"").trim().toUpperCase();
+        return pnr===perceelZoek && psectie===sectie;
       });
 
       if(match){
