@@ -1,5 +1,5 @@
 // Temporary focused OAT diagnostic for the isolated HistorieSpot test branch.
-// Queries the documented scan endpoint and searches scan records for the two target parcel numbers.
+// Returns only exact target parcel records so the output stays readable.
 // Remove after diagnosis.
 async function getJson(base, path) {
   const response = await fetch(base + path, {
@@ -12,25 +12,36 @@ async function getJson(base, path) {
   return { status: response.status, contentType: response.headers.get("content-type"), body, data };
 }
 
-function targetRecords(value, target, path = "$", out = []) {
+function parcelMatches(value, target, path = "$", out = []) {
   if (!value || typeof value !== "object") return out;
   if (Array.isArray(value)) {
-    value.forEach((item, i) => targetRecords(item, target, path + "[" + i + "]", out));
+    value.forEach((item, i) => parcelMatches(item, target, path + "[" + i + "]", out));
     return out;
   }
-  const entries = Object.entries(value);
-  const relevant = entries.some(([key, val]) => {
-    const k = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return (k.includes("perceel") || k === "nr" || k.includes("nummer")) && String(val ?? "").trim() === String(target);
-  });
-  if (relevant) {
+  const section = value.sectie && typeof value.sectie === "object" ? value.sectie.letter : undefined;
+  const hasParcelNumber = value.perceelnr !== undefined || (value.nr !== undefined && value.oatScan);
+  const number = value.perceelnr !== undefined ? value.perceelnr : value.nr;
+  const sectionMatches = !target.section || String(section || "").toUpperCase() === target.section;
+  if (hasParcelNumber && String(number) === target.parcel && sectionMatches) {
     out.push({ path, record: value });
     return out;
   }
-  for (const [key, val] of entries) {
-    if (val && typeof val === "object") targetRecords(val, target, path + "." + key, out);
+  for (const [key, val] of Object.entries(value)) {
+    if (val && typeof val === "object") parcelMatches(val, target, path + "." + key, out);
   }
   return out;
+}
+
+function summarizeDirect(data, target) {
+  if (!data || typeof data !== "object") return { parsed: false };
+  const results = Array.isArray(data.results) ? data.results : [];
+  const matches = parcelMatches(results, target);
+  return {
+    gemeente: data.gemeente ? { naam: data.gemeente.naam, uniekeNaam: data.gemeente.uniekeNaam, status: data.gemeente.status, provincie: data.gemeente.provincie?.naam } : undefined,
+    resultCount: results.length,
+    articleCount: Array.isArray(data.artikelen) ? data.artikelen.length : undefined,
+    targetMatches: matches.slice(0, 10)
+  };
 }
 
 export async function onRequest() {
@@ -50,16 +61,15 @@ export async function onRequest() {
       if (!scan || !scan.code) return null;
       try {
         const result = await getJson(base, "/percelen/oat/" + encodeURIComponent(scan.code));
-        const matches = result.data === undefined ? [] : targetRecords(result.data, target.parcel);
-        const bodyHasParcel = new RegExp("(?<![0-9])" + target.parcel + "(?![0-9])").test(result.body);
+        const matches = result.data === undefined ? [] : parcelMatches(result.data, target);
         return {
           code: scan.code,
           listedRange: scan.percelen,
           status: result.status,
           bodyLength: result.body.length,
-          targetMatches: matches.slice(0, 8),
-          containsStandaloneParcelNumber: bodyHasParcel,
-          errorSnippet: result.data === undefined ? result.body.slice(0, 220).replace(/\\s+/g, " ") : undefined
+          resultCount: Array.isArray(result.data?.results) ? result.data.results.length : undefined,
+          targetMatches: matches.slice(0, 5),
+          errorSnippet: result.data === undefined ? result.body.slice(0, 180).replace(/\\s+/g, " ") : undefined
         };
       } catch (error) {
         return { code: scan.code, error: String(error?.message || error) };
@@ -72,8 +82,8 @@ export async function onRequest() {
         path: directPath,
         status: direct.status,
         bodyLength: direct.body.length,
-        data: direct.data === undefined ? undefined : direct.data,
-        snippet: direct.data === undefined ? direct.body.slice(0, 500).replace(/\\s+/g, " ") : undefined
+        summary: summarizeDirect(direct.data, target),
+        errorSnippet: direct.data === undefined ? direct.body.slice(0, 300).replace(/\\s+/g, " ") : undefined
       },
       scanListStatus: scansResult.status,
       scanCount: scans.length,
@@ -81,7 +91,7 @@ export async function onRequest() {
     };
   }));
   return new Response(JSON.stringify({
-    diagnostic: "OAT scan-by-scan search for Bredevoord B-67 and Dokkum 484",
+    diagnostic: "OAT exact-parcel scan search (compact output)",
     checkedAt: new Date().toISOString(),
     results
   }, null, 2), {
