@@ -56,6 +56,7 @@ export async function onRequest() {
       : "/percelen/" + target.municipality;
     const direct = await getJson(base, directPath);
     const scansResult = await getJson(base, "/scans/" + target.municipality);
+    const statusResult = await getJson(base, "/status/gemeentes/" + encodeURIComponent(target.municipality));
     const scans = Array.isArray(scansResult.data) ? scansResult.data : [];
     const scanChecks = await Promise.all(scans.map(async scan => {
       if (!scan || !scan.code) return null;
@@ -65,9 +66,12 @@ export async function onRequest() {
         return {
           code: scan.code,
           listedRange: scan.percelen,
+          scanMetadata: Object.fromEntries(Object.entries(scan).filter(([key]) => !["code", "percelen"].includes(key))),
           status: result.status,
           bodyLength: result.body.length,
           resultCount: Array.isArray(result.data?.results) ? result.data.results.length : undefined,
+          sampleParcelFields: Array.isArray(result.data?.results) && result.data.results[0] ? Object.keys(result.data.results[0]) : undefined,
+          sampleParcel: Array.isArray(result.data?.results) && result.data.results[0] ? result.data.results[0] : undefined,
           targetMatches: matches.slice(0, 5),
           errorSnippet: result.data === undefined ? result.body.slice(0, 180).replace(/\\s+/g, " ") : undefined
         };
@@ -87,6 +91,8 @@ export async function onRequest() {
       },
       scanListStatus: scansResult.status,
       scanCount: scans.length,
+      municipalityStatus: { status: statusResult.status, contentType: statusResult.contentType, bodyLength: statusResult.body.length, data: statusResult.data ?? statusResult.body.slice(0, 500) },
+      scanListSample: scans.slice(0, 3),
       scanChecks: scanChecks.filter(Boolean)
     };
   }));
