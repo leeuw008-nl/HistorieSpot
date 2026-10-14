@@ -1,55 +1,48 @@
 // Temporary diagnostic endpoint for the isolated HistorieSpot OAT test branch.
-// Inspect the reachable OAT application landing page and probe documented-looking routes.
-// Remove after the correct public route is identified.
+// Uses routes listed by the OAT service's own WADL and landing page.
+// Remove after the correct data path is confirmed.
 export async function onRequest() {
-  const base = "https://oat.hisgis.nl";
+  const base = "https://oat.hisgis.nl/oat-ws/rest";
   const paths = [
-    "/oat-ws/",
-    "/oat-ws/rest/",
-    "/oat-ws/rest/application.wadl",
-    "/oat-ws/rest/application.wadl?detail=true",
-    "/oat-ws/openapi.json",
-    "/oat-ws/openapi.yaml",
-    "/oat-ws/swagger.json",
-    "/oat-ws/swagger-ui/",
-    "/oat-ws/api-docs",
-    "/oat-ws/api-docs/",
-    "/oat-ws/rest/gemeente",
-    "/oat-ws/rest/gemeenten",
-    "/oat-ws/rest/gemeente/Bredevoort",
-    "/oat-ws/rest/gemeente/Dokkum",
-    "/oat-ws/rest/gemeente/Bredevoord",
-    "/oat-ws/rest/percelen"
+    "/scans/Bredevoort",
+    "/scans/Bredevoord",
+    "/scans/Dokkum",
+    "/percelen/Bredevoort",
+    "/percelen/Bredevoord",
+    "/percelen/Dokkum",
+    "/percelen/Bredevoort/B",
+    "/percelen/Bredevoord/B",
+    "/percelen/Dokkum/A",
+    "/status/gemeentes",
+    "/status/gemeentes/Bredevoort",
+    "/status/gemeentes/Bredevoord",
+    "/status/gemeentes/Dokkum",
+    "/tarieven?gemeente=Bredevoort",
+    "/tarieven?gemeente=Dokkum"
   ];
   const results = await Promise.all(paths.map(async path => {
     try {
       const response = await fetch(base + path, {
-        headers: { "Accept": "application/json, text/html, application/xml;q=0.9, */*;q=0.8" },
+        headers: { "Accept": "application/json, text/plain;q=0.9, */*;q=0.8" },
         redirect: "follow"
       });
       const body = await response.text();
-      const result = {
+      let parsed;
+      try { parsed = JSON.parse(body); } catch {}
+      return {
         path,
         status: response.status,
-        finalUrl: response.url,
         contentType: response.headers.get("content-type"),
         bodyLength: body.length,
-        snippet: body.slice(0, 320).replace(/\s+/g, " ")
+        data: parsed === undefined ? undefined : parsed,
+        snippet: parsed === undefined ? body.slice(0, 1200).replace(/\s+/g, " ") : undefined
       };
-      if (path === "/oat-ws/") {
-        result.landingHtml = body.slice(0, 12000);
-        result.references = [...body.matchAll(/(?:href|src)\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]).slice(0, 100);
-      }
-      if (/wadl|openapi|swagger|api-docs/.test(path) && response.ok) {
-        result.document = body.slice(0, 12000);
-      }
-      return result;
     } catch (error) {
       return { path, error: String(error?.message || error) };
     }
   }));
   return new Response(JSON.stringify({
-    diagnostic: "temporary OAT route discovery",
+    diagnostic: "OAT data route check for Bredevoort and Dokkum",
     checkedAt: new Date().toISOString(),
     results
   }, null, 2), {
