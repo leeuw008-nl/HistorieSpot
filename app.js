@@ -1878,8 +1878,13 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
   try{
     const sectie=String(requestedSectie||"").trim().toUpperCase();
     const perceelZoek=String(requestedPerceel||"").trim();
-    const gemeenteCode=String(requestedGemeenteCode||"04041").trim();
     const gemeenteNaam=String(requestedGemeente||"").trim();
+    const directOatScan=String(requestedOatScan||"").trim().toUpperCase();
+    // Geen standaardcode gebruiken: die kan een perceel aan een andere
+    // kadastrale gemeente koppelen. Alleen afleiden uit een expliciete
+    // minuutplancode of een OAT-scan-tag van hetzelfde kaartvlak.
+    const codeUitOatScan=/^OAT(\d{5})[A-Z]\d{3}$/.exec(directOatScan)?.[1]||"";
+    const gemeenteCode=String(requestedGemeenteCode||codeUitOatScan).trim();
     if(!sectie||!perceelZoek)
       throw new Error("Onvoldoende kadastrale gegevens voor OAT-zoekactie");
 
@@ -1907,8 +1912,10 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
     // HisGIS-perceelvlakken kunnen de exacte OAT-scan al als tag bevatten.
     // Die informatie is betrouwbaarder dan zelf scan-nummers raden.
-    const directOatScan=String(requestedOatScan||"").trim().toUpperCase();
-    if(/^OAT\d{5}[A-Z]\d{3}$/.test(directOatScan))
+    if(!gemeenteCode)
+      throw new Error("Geen betrouwbare kadastrale gemeentecode beschikbaar. Geen OAT-scan gezocht om gegevens van een andere gemeente te voorkomen.");
+    if(/^OAT\d{5}[A-Z]\d{3}$/.test(directOatScan) &&
+       directOatScan.startsWith("OAT"+gemeenteCode+sectie))
       candidateCodes.push(directOatScan);
 
     // Naast de code uit het minuutplan nemen we voor Drentse gemeenten
