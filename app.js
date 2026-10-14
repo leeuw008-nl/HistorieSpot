@@ -1880,11 +1880,9 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     const perceelZoek=String(requestedPerceel||"").trim();
     const gemeenteNaam=String(requestedGemeente||"").trim();
     const directOatScan=String(requestedOatScan||"").trim().toUpperCase();
-    // Geen standaardcode gebruiken: die kan een perceel aan een andere
-    // kadastrale gemeente koppelen. Alleen afleiden uit een expliciete
-    // minuutplancode of een OAT-scan-tag van hetzelfde kaartvlak.
-    const codeUitOatScan=/^OAT(\d{5})[A-Z]\d{3}$/.exec(directOatScan)?.[1]||"";
-    const gemeenteCode=String(requestedGemeenteCode||codeUitOatScan).trim();
+    // De gemeentenaam uit het gevonden HisGIS-perceel is de sleutel voor
+    // de gemeentegebonden koppelsite en REST-service. Een minuutplancode
+    // kan fout of verouderd zijn en mag die selectie niet overrulen.
     if(!sectie||!perceelZoek)
       throw new Error("Onvoldoende kadastrale gegevens voor OAT-zoekactie");
 
@@ -1910,23 +1908,9 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     let koppelRowCodes=[];
     let scansGetest=0;
 
-    // HisGIS-perceelvlakken kunnen de exacte OAT-scan al als tag bevatten.
-    // Die informatie is betrouwbaarder dan zelf scan-nummers raden.
-    if(!gemeenteCode)
-      throw new Error("Geen betrouwbare kadastrale gemeentecode beschikbaar. Geen OAT-scan gezocht om gegevens van een andere gemeente te voorkomen.");
-    if(/^OAT\d{5}[A-Z]\d{3}$/.test(directOatScan) &&
-       directOatScan.startsWith("OAT"+gemeenteCode+sectie))
-      candidateCodes.push(directOatScan);
-
-    // Naast de code uit het minuutplan nemen we voor Drentse gemeenten
-    // ook de 2-cijferige provinciecode (03) + 3-cijferige kadastrale
-    // gemeentecode mee. De huidige gemeentecode is niet altijd dezelfde
-    // code die in de historische OAT-bestanden wordt gebruikt.
-    const gemeenteCodes=[gemeenteCode];
-    if(/^0109$/.test(gemeenteCode)||/^00109$/.test(gemeenteCode)||/^01090$/.test(gemeenteCode))
-      gemeenteCodes.push("03109");
-    if(/^03109$/.test(gemeenteCode))
-      gemeenteCodes.push("00109","01090");
+    // Geen gemeentecode afleiden uit een mogelijk foutieve minuutplancode.
+    // De scan-codes moeten afkomstig zijn van de koppelsite of de REST-
+    // service die expliciet voor de gevonden kadastrale gemeente is bevraagd.
 
     // Tweede route: de openbare HisGIS-koppelsite voor de sectie.
     // Deze pagina kent de werkelijke OAT-scan per perceel en voorkomt dat
@@ -1961,7 +1945,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
               .map(m=>String(m[0]).toUpperCase());
             koppelRowCodes.push(...rowCodes);
             rowCodes.forEach(code=>{
-              if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
+              if(new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(code))
                 candidateCodes.unshift(code);
             });
           }
@@ -1969,7 +1953,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
 
         // Voeg overige echte scanverwijzingen van de koppelsite toe.
         scanCodes.forEach(code=>{
-          if(gemeenteCodes.some(gc=>code.startsWith("OAT"+gc+sectie)))
+          if(new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(code))
             candidateCodes.push(code);
         });
       }catch(e){
@@ -1981,7 +1965,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     // beschikbare OAT-informatie per gemeente; we halen daar alleen echte
     // OAT-scan-codes uit. Zo zijn we niet afhankelijk van een vaste reeks
     // A001..D200, die per gemeente kan verschillen.
-    const gemeenteCandidates=[gemeenteNaam,...gemeenteCodes].filter(Boolean);
+    const gemeenteCandidates=[gemeenteNaam].filter(Boolean);
     const scanCodeRe=/OAT\d{5}[A-Z]\d{3}/gi;
 
     for(const gm of gemeenteCandidates){
@@ -1994,7 +1978,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
         const codes=raw.match(scanCodeRe)||[];
         codes.forEach(code=>{
           const normalized=String(code).toUpperCase();
-          if(normalized.startsWith("OAT"+gemeenteCode+sectie))
+          if(new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(normalized))
             candidateCodes.push(normalized);
         });
       }catch(e){
@@ -2002,20 +1986,18 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
       }
     }
 
-    candidateCodes=[...new Set(candidateCodes)].sort();
+    // Als de OAT-tag op het kaartvlak overeenkomt met een gemeente-code
+    // die ook door de gemeentegebonden bronnen is bevestigd, probeer die
+    // exacte scan eerst. Een afwijkende tag wordt niet blind vertrouwd.
+    const directPrefix=/^OAT(\\d{5})[A-Z]\\d{3}$/.exec(directOatScan)?.[1]||"";
+    if(directPrefix && candidateCodes.some(c=>c.startsWith("OAT"+directPrefix+sectie)))
+      candidateCodes.unshift(directOatScan);
 
-    // Vul de gevonden kandidaten altijd aan met de gewone scanreeks.
-    // De koppelsite/gemeente-REST kan namelijk wel kandidaten teruggeven
-    // zonder de scan te bevatten waarin het gevraagde perceel staat.
-    // Alleen als de kandidaatlijst leeg is zoeken we dus niet uitsluitend;
-    // de numerieke reeks blijft ook dan beschikbaar.
-    for(const gc of gemeenteCodes){
-      for(let n=1;n<=500;n++){
-        candidateCodes.push("OAT"+gc+sectie+String(n).padStart(3,"0"));
-      }
-    }
-
+    // Behoud de bronvolgorde: een exacte koppeling voor het perceel komt
+    // vóór de overige scans van dezelfde kadastrale gemeente.
     candidateCodes=[...new Set(candidateCodes)];
+    if(!candidateCodes.length)
+      throw new Error("Geen OAT-scan-codes gevonden voor kadastrale gemeente "+gemeenteNaam+" en sectie "+sectie+". Er is niet gezocht met een onbevestigde gemeentecode.");
 
     for(const oatCode of candidateCodes){
       let data=window.hisgisOatScanCache.get(oatCode);
@@ -2059,7 +2041,7 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
       throw new Error(
         "Perceel "+perceelZoek+
         " niet gevonden in de beschikbare OAT-scans van sectie "+sectie+
-        " (gemeente "+gemeenteNaam+"; codes "+gemeenteCodes.join(", ")+"). "+
+        " (kadastrale gemeente "+gemeenteNaam+"). "+
         diag
       );
     }
@@ -2185,7 +2167,7 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
 
     setStatus("HisGIS 1832: perceel "+fullPerceel+" gevonden");
 
-    const oatScan=String(t["oat:scan"]||"").trim();
+    const oatScan=String(t["oat:code"]||t["oat:scan"]||"").trim();
     const gemeenteCode=(/^MIN(\d{5})[A-Z]/i.test(minuutplan))
       ? minuutplan.match(/^MIN(\d{5})[A-Z]/i)[1]
       : "";
