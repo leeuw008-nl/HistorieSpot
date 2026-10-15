@@ -47,6 +47,7 @@ function summarizeDirect(data, target) {
 export async function onRequest() {
   const base = "https://oat.hisgis.nl/oat-ws/rest";
   const targets = [
+    { municipality: "Bredevoord", parcel: "64", section: "B" },
     { municipality: "Bredevoord", parcel: "67", section: "B" },
     { municipality: "Dokkum", parcel: "484" }
   ];
@@ -57,12 +58,23 @@ export async function onRequest() {
     const direct = await getJson(base, directPath);
     const scansResult = await getJson(base, "/scans/" + target.municipality);
     const statusResult = await getJson(base, "/status/gemeentes/" + encodeURIComponent(target.municipality));
-    const scans = Array.isArray(scansResult.data) ? scansResult.data : [];
+    const allScans = Array.isArray(scansResult.data) ? scansResult.data : [];
+    // For a section-specific target, inspect only official scans for that section.
+    const scans = target.section
+      ? allScans.filter(scan => new RegExp("^OAT\\\\d{5}" + target.section + "\\\\d{3}$", "i").test(String(scan?.code || "")))
+      : allScans;
     const scanChecks = await Promise.all(scans.map(async scan => {
       if (!scan || !scan.code) return null;
       try {
         const result = await getJson(base, "/percelen/oat/" + encodeURIComponent(scan.code));
         const matches = result.data === undefined ? [] : parcelMatches(result.data, target);
+        const scanParcels = Array.isArray(result.data?.results) ? result.data.results.map(p => ({
+          nr: p.perceelnr ?? p.nr ?? null,
+          toevoeging: p.perceelnrtvg ?? null,
+          sectie: p.sectie?.letter ?? p.sectie ?? null,
+          artikel: p.artikelLink ? [p.artikelLink.artikelnr, p.artikelLink.artikelnrtvg, p.artikelLink.reeks].filter(v => v !== undefined && v !== null && v !== "").join("/") : null,
+          oatScan: p.oatScan ?? null
+        })) : [];
         return {
           code: scan.code,
           listedRange: scan.percelen,
@@ -72,6 +84,7 @@ export async function onRequest() {
           resultCount: Array.isArray(result.data?.results) ? result.data.results.length : undefined,
           sampleParcelFields: Array.isArray(result.data?.results) && result.data.results[0] ? Object.keys(result.data.results[0]) : undefined,
           sampleParcel: Array.isArray(result.data?.results) && result.data.results[0] ? result.data.results[0] : undefined,
+          scanParcels,
           targetMatches: matches.slice(0, 5),
           errorSnippet: result.data === undefined ? result.body.slice(0, 180).replace(/\\s+/g, " ") : undefined
         };
@@ -90,7 +103,10 @@ export async function onRequest() {
         errorSnippet: direct.data === undefined ? direct.body.slice(0, 300).replace(/\\s+/g, " ") : undefined
       },
       scanListStatus: scansResult.status,
-      scanCount: scans.length,
+      allOfficialScanCount: allScans.length,
+      allOfficialScanCodes: allScans.map(scan => scan.code).filter(Boolean),
+      relevantSectionScanCount: scans.length,
+      relevantSectionScanCodes: scans.map(scan => scan.code).filter(Boolean),
       municipalityStatus: { status: statusResult.status, contentType: statusResult.contentType, bodyLength: statusResult.body.length, data: statusResult.data ?? statusResult.body.slice(0, 500) },
       scanListSample: scans.slice(0, 3),
       scanChecks: scanChecks.filter(Boolean)
