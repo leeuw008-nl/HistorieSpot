@@ -2039,6 +2039,13 @@ async function hisgisOatProof(lat,lng,code,requestedPerceel=null,requestedBlad=n
     const officialSectionCodes=officialScanCodes.filter(code=>
       new RegExp("^OAT\\d{5}"+sectie+"\\d{3}$").test(code));
     candidateCodes=candidateCodes.filter(code=>officialCodeSet.has(code));
+    // Als de koppelsite geen perceel->scan-koppeling oplevert, gebruik dan
+    // de officiële scans van precies deze gemeente en sectie als veilige
+    // zoekkandidaten. Zo eindigt de diagnose niet voortijdig terwijl de
+    // gemeentelijke scanlijst zelf wel bevestigde codes bevat.
+    if(!candidateCodes.length && officialSectionCodes.length){
+      candidateCodes.push(...officialSectionCodes);
+    }
     if(directOatScan && directTagInOfficialList && directTagSectionMatches){
       candidateCodes.unshift(normalizedDirectOatScan);
       candidateCodes=[...new Set(candidateCodes)];
