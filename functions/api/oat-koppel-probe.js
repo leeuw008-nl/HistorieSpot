@@ -14,6 +14,14 @@ async function inspect(url) {
       const plain = html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim();
       return { plain: plain.slice(0, 500), codes: [...new Set((html.match(/OAT\d{5}[A-Z]\d{3}/gi) || []).map(x => x.toUpperCase()))] };
     });
+    const parcelRecords = Array.isArray(json?.results) ? json.results.map(p => ({
+      nr: p.perceelnr ?? p.nr ?? null,
+      toevoeging: p.perceelnrtvg ?? null,
+      sectie: p.sectie?.letter ?? p.sectie ?? null,
+      artikel: p.artikelLink ? [p.artikelLink.artikelnr, p.artikelLink.artikelnrtvg, p.artikelLink.reeks].filter(v => v !== undefined && v !== null && v !== "").join("/") : null,
+      oatScan: p.oatScan ?? null,
+      veldnamen: Object.keys(p)
+    })) : [];
     return {
       url, status: response.status, finalUrl: response.url,
       contentType: response.headers.get("content-type"),
@@ -24,6 +32,8 @@ async function inspect(url) {
         articleCount: Array.isArray(json.artikelen) ? json.artikelen.length : undefined,
         topLevelKeys: Object.keys(json)
       } : undefined,
+      sections: [...new Set(parcelRecords.map(p => String(p.sectie ?? "onbekend")))],
+      parcelRecords: parcelRecords.slice(0, 100),
       scanCodes: [...new Set((body.match(/OAT\d{5}[A-Z]\d{3}/gi) || []).map(x => x.toUpperCase()))].slice(0, 100),
       parcel67Rows: rows.filter(r => /(^|\D)67(\D|$)/.test(r.plain)).slice(0, 10),
       bodyStart: !json ? body.slice(0, 700).replace(/\s+/g, " ") : undefined
@@ -38,11 +48,13 @@ export async function onRequest() {
     "https://osm.hisgis.nl/koppel/Bredevoord/B",
     "https://oat.hisgis.nl/oat-ws/rest/percelen/Bredevoord/B",
     "https://oat.hisgis.nl/oat-ws/rest/percelen/Bredevoord",
-    "https://oat.hisgis.nl/oat-ws/rest/percelen/Bredevoord/B/67"
+    "https://oat.hisgis.nl/oat-ws/rest/percelen/Bredevoord/B/67",
+    "https://oat.hisgis.nl/oat-ws/rest/percelen/Dokkum",
+    "https://oat.hisgis.nl/oat-ws/rest/percelen/Dokkum/A/484"
   ];
   const results = await Promise.all(urls.map(inspect));
   return new Response(JSON.stringify({
-    diagnostic: "Server-side OAT/koppelsite probe",
+    diagnostic: "Server-side OAT/koppelsite probe including all municipal parcel records",
     checkedAt: new Date().toISOString(),
     results
   }, null, 2), {
