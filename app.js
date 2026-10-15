@@ -2242,6 +2242,27 @@ async function hisgisParcelProbe(lat,lng,resultId=null){
     const gemeenteCode=(/^MIN(\d{5})[A-Z]/i.test(minuutplan))
       ? minuutplan.match(/^MIN(\d{5})[A-Z]/i)[1]
       : "";
+
+    // Diagnose: bewaar de ruwe kaartgegevens apart van het OAT-resultaatpaneel,
+    // zodat de OAT-zoekfunctie deze brongegevens niet overschrijft.
+    if(resultBox){
+      const diagId=String(resultId||"hisgisOatResult")+"SourceDiag";
+      let diag=document.getElementById(diagId);
+      if(!diag){
+        diag=document.createElement("div");
+        diag.id=diagId;
+        diag.style.cssText="margin-top:8px;padding:9px;border:1px solid #b7c8d8;border-radius:6px;background:#f4f8fb;color:#172b3a;font-size:13px;overflow-wrap:anywhere";
+        resultBox.insertAdjacentElement("afterend",diag);
+      }
+      const oatTags=Object.keys(t).filter(k=>/^oat:/i.test(k)).map(k=>k+"="+t[k]).join(" · ")||"geen";
+      diag.innerHTML="<b>Diagnose brongegevens (alleen testomgeving)</b><br>"+
+        "HisGIS-gemeente: "+esc(gemeente)+"<br>"+
+        "Sectie / perceel: "+esc(sectie)+" / "+esc(fullPerceel)+"<br>"+
+        "Minuutplancode: "+esc(minuutplan||"geen")+"<br>"+
+        "Afgeleide gemeentecode: "+esc(gemeenteCode||"geen")+"<br>"+
+        "OAT-tags uit kaart: "+esc(oatTags)+"<br>"+
+        "Direct gebruikte kaarttag: "+esc(oatScan||"geen");
+    }
     await hisgisOatProof(lat,lng,minuutplan,fullPerceel,blad,resultId,sectie,gemeente,gemeenteCode,oatScan);
   }catch(err){
     console.error("HisGIS kaartproef:",err);
